@@ -1,70 +1,193 @@
+// components/PropertyCard.tsx
+
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bed, Bath, Heart, MapPin } from 'lucide-react-native';
+import { Bed, Bath, Heart, MapPin, ArrowLeft, ArrowRight } from 'lucide-react-native';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function PropertyCard({ property, saved = false }) {
   const router = useRouter();
   const [isFavorite, setIsFavorite] = useState(saved);
 
+  // Slideshow state
+  const images = Array.isArray(property.images) ? property.images : [];
+  const imgCount = images.length;
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Handlers
+  const goPrev = (e: any) => {
+    e.stopPropagation?.();
+    if (imgCount > 0) {
+      setCurrentIndex(i => (i - 1 + imgCount) % imgCount);
+    }
+  };
+  const goNext = (e: any) => {
+    e.stopPropagation?.();
+    if (imgCount > 0) {
+      setCurrentIndex(i => (i + 1) % imgCount);
+    }
+  };
+  const jumpTo = (idx: number) => {
+    setCurrentIndex(idx);
+  };
+
+  // Derive URI for current image
+  let imageUri = '';
+  if (imgCount > 0) {
+    const raw = images[currentIndex];
+    // If your images array stores URLs directly, use raw.
+    // If it stores objects with .image field, adjust: raw.image
+    // Here we assume property.images is array of strings (absolute URLs)
+    // If relative paths, prefix them: e.g. raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`
+    imageUri = raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`;
+  }
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.container}
       onPress={() => router.push(`/property/${property.id}`)}
+      activeOpacity={0.9}
     >
+      {/* Image slideshow section */}
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: property.images[0] }}
-          style={styles.image}
-          resizeMode="cover"
-        />
+        {imgCount > 0 ? (
+          <>
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.image}
+              resizeMode="cover"
+              onError={e => console.error('Image load failed:', imageUri, e.nativeEvent.error)}
+            />
+
+            {/* Left arrow */}
+            {imgCount > 1 && (
+              <TouchableOpacity style={styles.arrowLeft} onPress={goPrev} activeOpacity={0.7}>
+                <ArrowLeft size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {/* Right arrow */}
+            {imgCount > 1 && (
+              <TouchableOpacity style={styles.arrowRight} onPress={goNext} activeOpacity={0.7}>
+                <ArrowRight size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {/* Indicator “1/3” */}
+            {imgCount > 1 && (
+              <View style={styles.counter}>
+                <Text style={styles.counterText}>
+                  {currentIndex + 1}/{imgCount}
+                </Text>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={[styles.image, styles.noImagePlaceholder]}>
+            <Text style={styles.noImageText}>No Image</Text>
+          </View>
+        )}
+
+        {/* Type Tag */}
         <View style={styles.typeTag}>
-          <Text style={styles.typeText}>{property.forSale ? 'FOR SALE' : 'FOR RENT'}</Text>
+          <Text style={styles.typeText}>
+            {property.forSale ? 'FOR SALE' : 'FOR RENT'}
+          </Text>
         </View>
-        <TouchableOpacity 
+        {/* Favorite Button */}
+        <TouchableOpacity
           style={styles.favoriteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            setIsFavorite(!isFavorite);
+          onPress={e => {
+            e.stopPropagation?.();
+            setIsFavorite(prev => !prev);
           }}
+          activeOpacity={0.7}
         >
-          <Heart 
-            size={20} 
-            color={isFavorite ? "#FF6B6B" : "#fff"} 
-            fill={isFavorite ? "#FF6B6B" : "transparent"} 
+          <Heart
+            size={20}
+            color={isFavorite ? '#FF6B6B' : '#fff'}
+            fill={isFavorite ? '#FF6B6B' : 'transparent'}
           />
         </TouchableOpacity>
       </View>
-      
+
+      {/* Thumbnail strip */}
+      {imgCount > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.thumbnailScroll}
+          contentContainerStyle={styles.thumbnailContainer}
+        >
+          {images.map((imgUriRaw: string, idx: number) => {
+            const uri = imgUriRaw.startsWith('http')
+              ? imgUriRaw
+              : `https://api.propertpro.com${imgUriRaw}`;
+            const isActive = idx === currentIndex;
+            return (
+              <TouchableOpacity
+                key={idx}
+                onPress={() => jumpTo(idx)}
+                style={[
+                  styles.thumbnailWrapper,
+                  isActive && styles.thumbnailActiveWrapper,
+                ]}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={{ uri }}
+                  style={[styles.thumbnailImage, isActive && styles.thumbnailActiveImage]}
+                  resizeMode="cover"
+                  onError={e => console.error('Thumbnail load failed:', uri, e.nativeEvent.error)}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* Content below images */}
       <View style={styles.content}>
         <View style={styles.priceRow}>
           <Text style={styles.price}>
-            ${property.price.toLocaleString()}
+            ${Number(property.price).toLocaleString()}
             {!property.forSale && <Text style={styles.period}>/mo</Text>}
           </Text>
           <View style={styles.propertyType}>
             <Text style={styles.propertyTypeText}>{property.propertyType}</Text>
           </View>
         </View>
-        
-        <Text style={styles.title} numberOfLines={1}>{property.title}</Text>
-        
+
+        <Text style={styles.title} numberOfLines={1}>
+          {property.title}
+        </Text>
+
         <View style={styles.locationRow}>
           <MapPin size={14} color="#666" />
-          <Text style={styles.location} numberOfLines={1}>{property.location}</Text>
+          <Text style={styles.location} numberOfLines={1}>
+            {property.location}
+          </Text>
         </View>
-        
+
         <View style={styles.featuresRow}>
           <View style={styles.feature}>
             <Bed size={16} color="#0F3460" />
             <Text style={styles.featureText}>{property.bedrooms} beds</Text>
           </View>
-          
+
           <View style={styles.feature}>
             <Bath size={16} color="#0F3460" />
             <Text style={styles.featureText}>{property.bathrooms} baths</Text>
           </View>
-          
+
           <Text style={styles.size}>{property.size} sq ft</Text>
         </View>
       </View>
@@ -84,16 +207,58 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   imageContainer: {
-    height: 180,
+    height: 200,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     overflow: 'hidden',
     position: 'relative',
+    backgroundColor: '#EEE',
   },
   image: {
     width: '100%',
     height: '100%',
   },
+  noImagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noImageText: {
+    color: '#666',
+  },
+  // Arrows overlay
+  arrowLeft: {
+    position: 'absolute',
+    top: '45%',
+    left: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 20,
+    padding: 6,
+    zIndex: 10,
+  },
+  arrowRight: {
+    position: 'absolute',
+    top: '45%',
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 20,
+    padding: 6,
+    zIndex: 10,
+  },
+  // Counter “1/3”
+  counter: {
+    position: 'absolute',
+    bottom: 8,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  counterText: {
+    color: '#fff',
+    fontSize: 12,
+  },
+  // Type tag (For Sale / For Rent)
   typeTag: {
     position: 'absolute',
     top: 12,
@@ -108,6 +273,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#fff',
   },
+  // Favorite heart
   favoriteButton: {
     position: 'absolute',
     top: 10,
@@ -119,6 +285,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Thumbnail strip
+  thumbnailScroll: {
+    marginTop: 8,
+    maxHeight: 50,
+  },
+  thumbnailContainer: {
+    paddingHorizontal: 16,
+  },
+  thumbnailWrapper: {
+    marginRight: 8,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  thumbnailActiveWrapper: {
+    borderColor: '#0F3460',
+  },
+  thumbnailImage: {
+    width: 50,
+    height: 50,
+  },
+  thumbnailActiveImage: {
+    // you can add slight scale or overlay if desired
+  },
+
   content: {
     padding: 12,
   },

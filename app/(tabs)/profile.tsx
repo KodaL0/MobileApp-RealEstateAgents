@@ -1,4 +1,4 @@
-import React from 'react';
+
 import {
   View,
   Text,
@@ -105,7 +105,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>PropertyPro v1.0.0</Text>
+          <Text style={styles.footerText}>PropertPro v1.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
