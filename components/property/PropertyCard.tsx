@@ -9,13 +9,43 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bed, Bath, Heart, MapPin, ArrowLeft, ArrowRight } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-export default function PropertyCard({ property, saved = false }) {
+// Platform-specific shadow styles
+const getShadowStyle = () => {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    };
+  }
+  return {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  };
+};
+
+type Property = {
+  id: number;
+  images: string[];
+  forSale: boolean;
+  price: number;
+  title: string;
+  location: string;
+  bedrooms: number;
+  bathrooms: number;
+  size: number;
+  propertyType: string;
+};
+
+export default function PropertyCard({ property, saved = false }: { property: Property; saved?: boolean }) {
   const router = useRouter();
   const [isFavorite, setIsFavorite] = useState(saved);
 
@@ -81,7 +111,7 @@ export default function PropertyCard({ property, saved = false }) {
                 <ArrowRight size={24} color="#fff" />
               </TouchableOpacity>
             )}
-            {/* Indicator “1/3” */}
+            {/* Indicator "1/3" */}
             {imgCount > 1 && (
               <View style={styles.counter}>
                 <Text style={styles.counterText}>
@@ -199,11 +229,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...getShadowStyle(),
     marginBottom: 16,
   },
   imageContainer: {
@@ -244,7 +270,7 @@ const styles = StyleSheet.create({
     padding: 6,
     zIndex: 10,
   },
-  // Counter “1/3”
+  // Counter "1/3"
   counter: {
     position: 'absolute',
     bottom: 8,
