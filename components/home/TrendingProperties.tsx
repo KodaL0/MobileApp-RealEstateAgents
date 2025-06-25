@@ -1,8 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MapPin, Star } from 'lucide-react-native';
 import { PROPERTIES } from '@/data/properties';
+
+// Platform-specific shadow styles
+const getShadowStyle = () => {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    };
+  }
+  return {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  };
+};
 
 export default function TrendingProperties() {
   const router = useRouter();
@@ -62,11 +78,7 @@ const styles = StyleSheet.create({
     width: 250,
     backgroundColor: '#fff',
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...getShadowStyle(),
     marginLeft: 16,
     flexDirection: 'row',
     overflow: 'hidden',

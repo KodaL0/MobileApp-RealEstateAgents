@@ -1,6 +1,23 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import React from 'react';
+import { StyleSheet, Platform } from 'react-native';
 import { Home, Search, Heart, User, MapPin } from 'lucide-react-native';
+
+// Platform-specific shadow styles
+const getShadowStyle = () => {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: '0 -2px 3px rgba(0,0,0,0.1)',
+    };
+  }
+  return {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 8,
+  };
+};
 
 export default function TabLayout() {
   return (
@@ -57,11 +74,7 @@ const styles = StyleSheet.create({
     height: 60,
     paddingBottom: 8,
     paddingTop: 8,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    ...getShadowStyle(),
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },

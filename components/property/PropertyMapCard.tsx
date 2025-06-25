@@ -1,15 +1,58 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bed, Bath, MapPin } from 'lucide-react-native';
+import { Bed, Bath, MapPin, Square } from 'lucide-react-native';
 
-export default function PropertyMapCard({ property }) {
+// Platform-specific shadow styles
+const getShadowStyle = () => {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    };
+  }
+  return {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  };
+};
+
+type Property = {
+  id: number;
+  title: string;
+  price: number;
+  location: string;
+  bedrooms: number;
+  bathrooms: number;
+  size: number;
+  images: string[];
+  property_status?: string;
+  forSale?: boolean;
+};
+
+export default function PropertyMapCard({ 
+  property, 
+  onPress 
+}: { 
+  property: Property; 
+  onPress?: () => void;
+}) {
   const router = useRouter();
+
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      router.push(`/property/${property.id}`);
+    }
+  };
 
   return (
     <TouchableOpacity 
       style={styles.container}
-      onPress={() => router.push(`/property/${property.id}`)}
+      onPress={handlePress}
     >
       <Image 
         source={{ uri: property.images[0] }}
@@ -19,7 +62,7 @@ export default function PropertyMapCard({ property }) {
       
       <View style={styles.content}>
         <Text style={styles.price}>
-          ${property.price.toLocaleString()}
+          €{property.price.toLocaleString()}
           {!property.forSale && <Text style={styles.period}>/mo</Text>}
         </Text>
         
@@ -54,11 +97,7 @@ const styles = StyleSheet.create({
     height: 120,
     backgroundColor: '#fff',
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...getShadowStyle(),
     marginRight: 12,
     flexDirection: 'row',
     overflow: 'hidden',
