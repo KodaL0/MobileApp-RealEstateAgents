@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 
 const API_BASE_URL = 'https://api.propertpro.com/api'; 
+export const WS_BASE_URL = 'wss://api.propertpro.com'; 
 // Ensure this matches your backend production URL + '/api' prefix if used.
 // If your endpoints live directly under the host (without '/api'), adjust accordingly.
 

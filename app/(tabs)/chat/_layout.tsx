@@ -1,10 +1,11 @@
 // File: app/(tabs)/_layout.tsx
+
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { Home, Search, MapPin, MessageSquare, User } from 'lucide-react-native';
 
-const getShadow = () =>
+const getShadowStyle = () =>
   Platform.select({
     web: { boxShadow: '0 -2px 3px rgba(0,0,0,0.1)' },
     default: {
@@ -20,35 +21,52 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
         tabBarActiveTintColor: '#0F3460',
         tabBarInactiveTintColor: '#666',
-        tabBarStyle: [styles.tabBar, getShadow()],
-        tabBarLabelStyle: styles.label,
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarStyle: styles.tabBar,
+        headerShown: false,
       }}
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+        }}
       />
+
       <Tabs.Screen
         name="search"
-        options={{ title: 'Search', tabBarIcon: ({ color, size }) => <Search color={color} size={size} /> }}
+        options={{
+          title: 'Search',
+          tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
+        }}
       />
+
       <Tabs.Screen
         name="map"
-        options={{ title: 'Map', tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} /> }}
+        options={{
+          title: 'Map',
+          tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} />,
+        }}
       />
+
+      {/* point *directly* at the index screen inside your chat folder */}
       <Tabs.Screen
-        name="chat"
+        name="chat/index"
         options={{
           title: 'Chat',
           tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
         }}
       />
+
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <User color={color} size={size} /> }}
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+        }}
       />
     </Tabs>
   );
@@ -57,12 +75,13 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     height: 60,
-    paddingTop: 8,
     paddingBottom: 8,
+    paddingTop: 8,
+    ...getShadowStyle(),
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
-  label: {
+  tabBarLabel: {
     fontFamily: 'Poppins-Medium',
     fontSize: 12,
   },
