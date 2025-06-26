@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: 300,
+    height: width * 0.6,
     position: 'relative',
     backgroundColor: '#EEE',
   },
@@ -828,7 +828,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingVertical: 8,
+    padding: 12,
   },
   backButton: {
     width: 40,

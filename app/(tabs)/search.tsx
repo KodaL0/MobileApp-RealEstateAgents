@@ -215,132 +215,106 @@ export default function SearchScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <StatusBar style="dark" />
 
-      <ScrollView
+      <FlatList
+        data={showResults ? listings : []}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingBottom: insets.bottom + 10,
           paddingHorizontal: 16,
         }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Find Properties</Text>
-        </View>
 
-        {/* Search bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <SearchIcon size={20} color="#666" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Search by location, property name..."
-              style={styles.searchInput}
-              placeholderTextColor="#999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onFocus={() => setShowResults(false)}
-              onBlur={() => setShowResults(true)}
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={20} color="#666" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          <TouchableOpacity style={styles.filterButton}>
-            <FilterIcon size={22} color="#0F3460" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Filter pills */}
-        <View style={styles.filtersContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {filters.map((filter) => (
-              <TouchableOpacity
-                key={filter}
-                style={[
-                  styles.filterPill,
-                  selectedFilter === filter && styles.filterPillActive,
-                ]}
-                onPress={() => setSelectedFilter(filter)}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    selectedFilter === filter && styles.filterTextActive,
-                  ]}
-                >
-                  {filter}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Results or suggestions */}
-        {!showResults ? (
-          <View style={styles.suggestions}>
-            <Text style={styles.suggestionsTitle}>Popular Searches</Text>
-            {[
-              'New York Real Estate',
-              'Apartments in San Francisco',
-              'Houses for rent in Miami',
-              'Luxury condos in Los Angeles',
-            ].map((text, index) => (
-              <TouchableOpacity key={index} style={styles.suggestionItem}>
-                <SearchIcon size={16} color="#666" />
-                <Text style={styles.suggestionText}>{text}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
+        // 1. HEADER: title, search bar, filters
+        ListHeaderComponent={() => (
           <>
-            {/* Results header */}
-            <View style={styles.resultsHeader}>
-              {loading ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator size="small" color="#0F3460" />
-                  <Text style={styles.loadingText}>Loading...</Text>
-                </View>
-              ) : (
-                <Text style={styles.resultsCount}>
-                  {totalCount.toLocaleString()} Results
-                </Text>
-              )}
-              {/* (Optional) Sort dropdown if you want */}
-              {/*<TouchableOpacity style={styles.sortButton}> ... </TouchableOpacity>*/}
+            {/* Title */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Find Properties</Text>
             </View>
 
-            {error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity onPress={() => fetchListings()}>
-                  <Text style={styles.retryText}>Tap to retry</Text>
-                </TouchableOpacity>
+            {/* Search bar */}
+            <View style={styles.searchContainer}>
+              <View style={styles.searchBar}>
+                <SearchIcon size={20} color="#666" style={styles.searchIcon} />
+                <TextInput
+                  placeholder="Search by location, property name..."
+                  style={styles.searchInput}
+                  placeholderTextColor="#999"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onFocus={() => setShowResults(false)}
+                  onBlur={() => setShowResults(true)}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <X size={20} color="#666" />
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            ) : (
-              <FlatList
-                data={listings}
-                keyExtractor={(item) => String(item.id)}
-                renderItem={renderItem}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingBottom: insets.bottom + 10,
-                }}
-                ListEmptyComponent={
-                  !loading ? (
-                    <View style={styles.emptyContainer}>
-                      <Text style={styles.emptyText}>
-                        No properties found.
-                      </Text>
-                    </View>
-                  ) : null
-                }
-                ListFooterComponent={renderFooter}
-              />
-            )}
+              <TouchableOpacity style={styles.filterButton}>
+                <FilterIcon size={22} color="#0F3460" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Filter pills */}
+            <View style={styles.filtersContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {filters.map((filter) => (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[
+                      styles.filterPill,
+                      selectedFilter === filter && styles.filterPillActive,
+                    ]}
+                    onPress={() => setSelectedFilter(filter)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterText,
+                        selectedFilter === filter && styles.filterTextActive,
+                      ]}
+                    >
+                      {filter}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           </>
         )}
-      </ScrollView>
+
+        // 2. EMPTY: either popular suggestions or “no results”
+        ListEmptyComponent={() =>
+          !showResults ? (
+            <View style={styles.suggestions}>
+              <Text style={styles.suggestionsTitle}>Popular Searches</Text>
+              {[
+                'New York Real Estate',
+                'Apartments in San Francisco',
+                'Houses for rent in Miami',
+                'Luxury condos in Los Angeles',
+              ].map((text, i) => (
+                <TouchableOpacity key={i} style={styles.suggestionItem}>
+                  <SearchIcon size={16} color="#666" />
+                  <Text style={styles.suggestionText}>{text}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : !loading && listings.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No properties found.</Text>
+            </View>
+          ) : null
+        }
+
+        // 3. FOOTER: pagination controls
+        ListFooterComponent={renderFooter}
+
+        // 4. HEADER/FOOTER spacing
+        ListHeaderComponentStyle={{ marginBottom: 16 }}
+        ListFooterComponentStyle={{ marginTop: 16 }}
+      />
     </SafeAreaView>
   );
 }

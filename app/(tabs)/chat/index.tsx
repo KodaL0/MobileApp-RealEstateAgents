@@ -11,10 +11,10 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useChat } from '../features/chat/context/ChatContext';
-import { useUser } from '../features/chat/context/UserContext';
+import { useChat } from '../../features/chat/context/ChatContext';
+import { useUser } from '../../features/chat/context/UserContext';
 import { Home, Clock } from 'lucide-react-native';
-import type { Thread } from '../features/chat/types';
+import type { Thread } from '../../features/chat/types';
 
 export default function ThreadList() {
   const router = useRouter();
