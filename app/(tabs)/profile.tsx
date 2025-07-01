@@ -1,29 +1,19 @@
-
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  ScrollView,
+  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import {
-  Settings,
-  Heart,
-  Calculator,
-  Calendar,
-  HelpCircle,
-  LogOut,
-  ChevronRight,
-} from 'lucide-react-native';
+import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+import { useNavigation } from '@react-navigation/native';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const menuItems = [
     { icon: Heart, label: 'Saved Properties', count: 3 },
@@ -32,6 +22,62 @@ export default function ProfileScreen() {
     { icon: HelpCircle, label: 'Help Center' },
     { icon: Settings, label: 'Settings' },
   ];
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('access_token');
+        if (!token) throw new Error('No token found');
+
+        const response = await axios.get('https://api.propertpro.com/users/me/', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUser(response.data);
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('access_token');
+      await axios.post('https://api.propertpro.com/auth/logout/', {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await SecureStore.deleteItemAsync('access_token');
+      await SecureStore.deleteItemAsync('refresh_token');
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); // Adjust route name
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ActivityIndicator size="large" color="#0F3460" style={{ marginTop: 100 }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <Text style={{ textAlign: 'center', marginTop: 100, color: '#FF6B6B' }}>
+          Failed to load profile. Please log in again.
+        </Text>
+        <TouchableOpacity onPress={handleLogout} style={[styles.logoutButton, { marginTop: 20 }]}>
+          <LogOut size={20} color="#FF6B6B" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -51,31 +97,38 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.profileInfo}>
             <Image
-              source={{
-                uri: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-              }}
+              source={{ uri: user.profile_picture || 'https://via.placeholder.com/60' }}
               style={styles.profileImage}
             />
             <View>
-              <Text style={styles.profileName}>John Doe</Text>
-              <Text style={styles.profileEmail}>john.doe@example.com</Text>
+              <Text style={styles.profileName}>{user.name}</Text>
+              <Text style={styles.profileEmail}>{user.email}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.membershipCard}>
           <View>
-            <Text style={styles.memberType}>Free Member</Text>
-            <Text style={styles.membershipText}>
-              Upgrade to access premium features
+            <Text style={styles.memberType}>
+              {user.is_premium ? 'Premium Member' : 'Free Member'}
             </Text>
+            {!user.is_premium && (
+              <Text style={styles.membershipText}>
+                Upgrade to access premium features
+              </Text>
+            )}
           </View>
-          <TouchableOpacity style={styles.upgradeButton}>
-            <Text style={styles.upgradeButtonText}>Upgrade</Text>
-          </TouchableOpacity>
+          {!user.is_premium && (
+            <TouchableOpacity style={styles.upgradeButton}>
+              <Text style={styles.upgradeButtonText}>Upgrade</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.menuContainer}>
@@ -99,7 +152,7 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.logoutButton}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <LogOut size={20} color="#FF6B6B" />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
