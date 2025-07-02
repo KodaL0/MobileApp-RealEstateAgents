@@ -7,13 +7,36 @@ import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { useNavigation } from '@react-navigation/native';
+import * as AuthSession from 'expo-auth-session';
+
+type User = {
+  id: number;
+  name: string;
+  email: string;
+  profile_picture?: string;
+  is_premium?: boolean;
+};
+
+const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+const REDIRECT_URI = AuthSession.makeRedirectUri();
+const discovery = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: CLIENT_ID,
+      redirectUri: REDIRECT_URI,
+      responseType: AuthSession.ResponseType.IdToken,
+      scopes: ['openid', 'profile', 'email'],
+    },
+    discovery
+  );
 
   const menuItems = [
     { icon: Heart, label: 'Saved Properties', count: 3 },
@@ -27,9 +50,11 @@ export default function ProfileScreen() {
     const fetchUser = async () => {
       try {
         const token = await SecureStore.getItemAsync('access_token');
-        if (!token) throw new Error('No token found');
-
-        const response = await axios.get('https://api.propertpro.com/users/me/', {
+        if (!token) {
+          setLoading(false); // No token → show login
+          return;
+        }
+        const response = await axios.get<User>('https://api.propertpro.com/users/me/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUser(response.data);
@@ -39,9 +64,30 @@ export default function ProfileScreen() {
         setLoading(false);
       }
     };
-
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    const handleOAuthResponse = async () => {
+      if (response?.type === 'success') {
+        const { id_token } = response.params;
+        console.log('Google ID Token obtained:', id_token);
+        try {
+          const res = await axios.post('https://api.propertpro.com/accounts/google/login/mobile/', {
+            id_token,
+          });
+          const { access_token, refresh_token, user: userData } = res.data;
+          await SecureStore.setItemAsync('access_token', access_token);
+          await SecureStore.setItemAsync('refresh_token', refresh_token);
+          setUser(userData);
+          console.log('Login successful, user:', userData);
+        } catch (error) {
+          console.error('Backend login failed:', error);
+        }
+      }
+    };
+    handleOAuthResponse();
+  }, [response]);
 
   const handleLogout = async () => {
     try {
@@ -51,7 +97,7 @@ export default function ProfileScreen() {
       });
       await SecureStore.deleteItemAsync('access_token');
       await SecureStore.deleteItemAsync('refresh_token');
-      navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); // Adjust route name
+      setUser(null);
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -68,13 +114,18 @@ export default function ProfileScreen() {
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Text style={{ textAlign: 'center', marginTop: 100, color: '#FF6B6B' }}>
-          Failed to load profile. Please log in again.
-        </Text>
-        <TouchableOpacity onPress={handleLogout} style={[styles.logoutButton, { marginTop: 20 }]}>
-          <LogOut size={20} color="#FF6B6B" />
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
+        <StatusBar style="dark" />
+        <View style={styles.loginContainer}>
+          <Text style={styles.title}>Sign in to your account</Text>
+          <Text style={styles.subtitle}>Secure sign-in with your Google account</Text>
+          <TouchableOpacity
+            onPress={() => promptAsync()}
+            style={styles.googleButton}
+            disabled={!request}
+          >
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -107,7 +158,7 @@ export default function ProfileScreen() {
           </View>
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() => navigation.navigate('EditProfile')}
+            onPress={() => console.log('Edit profile pressed')}
           >
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
@@ -166,173 +217,37 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  container: {
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  title: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 24,
-    color: '#0F3460',
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F7FA',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileCard: {
-    backgroundColor: '#F5F7FA',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-  },
-  profileInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 16,
-  },
-  profileName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: '#0F3460',
-  },
-  profileEmail: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#666',
-  },
-  editButton: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  editButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#0F3460',
-  },
-  membershipCard: {
-    backgroundColor: '#0F3460',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  memberType: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 4,
-  },
-  membershipText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#ccc',
-  },
-  upgradeButton: {
-    backgroundColor: '#FF6B6B',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  upgradeButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#fff',
-  },
-  menuContainer: {
-    marginBottom: 24,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F7FA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  menuText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: '#333',
-  },
-  countBadge: {
-    backgroundColor: '#0F3460',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginRight: 8,
-  },
-  countText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
-    color: '#fff',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    backgroundColor: '#F5F7FA',
-    marginHorizontal: 16,
-    marginBottom: 24,
-  },
-  logoutText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: '#FF6B6B',
-    marginLeft: 8,
-  },
-  footer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  footerText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#999',
-  },
+  safeArea: { flex: 1, backgroundColor: '#fff' },
+  container: { backgroundColor: '#fff' },
+  loginContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  title: { fontFamily: 'Poppins-Bold', fontSize: 24, color: '#0F3460', marginBottom: 8 },
+  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666', marginBottom: 32, textAlign: 'center' },
+  googleButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, elevation: 2 },
+  googleButtonText: { fontSize: 16, color: '#333', fontWeight: '500' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 },
+  settingsButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },
+  profileCard: { backgroundColor: '#F5F7FA', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 16 },
+  profileInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  profileImage: { width: 60, height: 60, borderRadius: 30, marginRight: 16 },
+  profileName: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#0F3460' },
+  profileEmail: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666' },
+  editButton: { backgroundColor: '#fff', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  editButtonText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: '#0F3460' },
+  membershipCard: { backgroundColor: '#0F3460', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  memberType: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#fff', marginBottom: 4 },
+  membershipText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#ccc' },
+  upgradeButton: { backgroundColor: '#FF6B6B', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
+  upgradeButtonText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: '#fff' },
+  menuContainer: { marginBottom: 24 },
+  menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  menuItemLeft: { flexDirection: 'row', alignItems: 'center' },
+  menuItemRight: { flexDirection: 'row', alignItems: 'center' },
+  menuIconContainer: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  menuText: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#333' },
+  countBadge: { backgroundColor: '#0F3460', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 },
+  countText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#fff' },
+  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, backgroundColor: '#F5F7FA', marginHorizontal: 16, marginBottom: 24 },
+  logoutText: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#FF6B6B', marginLeft: 8 },
+  footer: { alignItems: 'center', marginBottom: 24 },
+  footerText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#999' },
 });
