@@ -4,8 +4,8 @@
     "slug": "propertpro-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/ChatGPT Image May 14, 2025, 08_05_02 PM.png",
-    "scheme": "myapp",
+    "icon": "./assets/images/icon.png",
+    "scheme": "propertpro-mobile",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
 
@@ -46,6 +46,10 @@
 
     "experiments": {
       "typedRoutes": true
+    },
+    
+    "linking": {
+      "prefixes": ["propertpro-mobile://", "https://auth.expo.io/@dalmiraskon/propertpro-mobile"]
     }
   }
 }

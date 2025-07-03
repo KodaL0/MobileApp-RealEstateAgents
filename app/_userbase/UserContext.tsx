@@ -99,27 +99,51 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   };
 
   const login = async (accessToken: string, refreshToken: string, userData: User) => {
+    console.log('=== USERCONTEXT LOGIN START ===');
+    console.log('UserContext.login: Starting login process');
+    console.log('UserContext.login: Access token length:', accessToken?.length);
+    console.log('UserContext.login: Refresh token length:', refreshToken?.length);
+    console.log('UserContext.login: User data:', userData);
+    
     try {
-      console.log('login: storing tokens and user data');
-      console.log('login: accessToken length:', accessToken?.length);
-      console.log('login: refreshToken length:', refreshToken?.length);
-      console.log('login: userData:', userData);
+      console.log('UserContext.login: Storing tokens and user data');
+      console.log('UserContext.login: accessToken length:', accessToken?.length);
+      console.log('UserContext.login: refreshToken length:', refreshToken?.length);
+      console.log('UserContext.login: userData:', userData);
       
       // Store tokens first
+      console.log('UserContext.login: Storing access token in AsyncStorage');
       await AsyncStorage.setItem('access_token', accessToken);
+      console.log('UserContext.login: Access token stored successfully');
+      
+      console.log('UserContext.login: Storing refresh token');
       await setRefreshToken(refreshToken);
+      console.log('UserContext.login: Refresh token stored successfully');
       
       // Verify token was stored
+      console.log('UserContext.login: Verifying token storage');
       const storedToken = await AsyncStorage.getItem('access_token');
-      console.log('login: token verification - stored?', !!storedToken, storedToken ? storedToken.substring(0, 20) + '...' : 'none');
+      console.log('UserContext.login: token verification - stored?', !!storedToken, storedToken ? storedToken.substring(0, 20) + '...' : 'none');
       
       // Set user state immediately from the data we already have
+      console.log('UserContext.login: Updating user state');
       setUser(userData);
-      setIsAuthenticated(true);
+      console.log('UserContext.login: User state updated');
       
-      console.log('login: tokens stored successfully, user state updated');
-    } catch (error) {
-      console.error('Error storing tokens:', error);
+      console.log('UserContext.login: Setting authentication state');
+      setIsAuthenticated(true);
+      console.log('UserContext.login: Authentication state updated');
+      
+      console.log('UserContext.login: tokens stored successfully, user state updated');
+      console.log('=== USERCONTEXT LOGIN COMPLETE ===');
+    } catch (error: any) {
+      console.error('=== USERCONTEXT LOGIN ERROR ===');
+      console.error('UserContext.login: Error storing tokens:', error);
+      console.error('UserContext.login: Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      });
       throw error;
     }
   };

@@ -1,21 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform,
+  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
-import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 
 import { api } from '@/config/api'; // mobile API client
 import { useUser, User } from '@/app/_userbase/UserContext';
+import { OAUTH_CONFIG, generateOAuthUrl, logOAuthConfig } from '@/config/oauth';
 
-console.log('Expo Redirect URI:', AuthSession.makeRedirectUri());
-
-const CLIENT_ID = '447376864792-hle5fodoponi9c8do50ppn639f6fhbso.apps.googleusercontent.com';
-const REDIRECT_URI = AuthSession.makeRedirectUri();
+// OAuth configuration is handled in config/oauth.ts
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -61,59 +60,189 @@ export default function ProfileScreen() {
     }
   }, [login, hasProcessedOAuth, router]);
 
-  const handleGoogleLogin = async () => {
-    try {
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        `client_id=${CLIENT_ID}&` +
-        `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
-        `response_type=id_token&` +
-        `scope=${encodeURIComponent('openid profile email')}&` +
-        `response_mode=fragment&` +
-        `prompt=select_account&` +
-        `nonce=${Math.random().toString(36).substring(2, 15)}`;
-
-      console.log('Opening Google OAuth URL:', authUrl);
+  // Handle deep links from OAuth redirect
+  useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      console.log('=== DEEP LINK HANDLER ===');
+      console.log('Deep link received:', url);
       
-      if (Platform.OS === 'web') {
-        // Reset the flag to allow processing the new OAuth flow
-        setHasProcessedOAuth(false);
-        // On web, redirect to the auth URL
-        window.location.href = authUrl;
-      } else {
-        // On native, use WebBrowser
-        const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+      // Check if this is an OAuth redirect (support multiple formats)
+      const isOAuthRedirect = url.includes('auth.expo.io') || 
+                            url.includes('#id_token=') || 
+                            url.includes('&id_token=') ||
+                            url.includes('?id_token=');
+      
+      if (isOAuthRedirect) {
+        console.log('OAuth redirect detected, processing...');
+        console.log('Full URL:', url);
         
-        if (result.type === 'success') {
-          const url = result.url;
-          const fragmentStart = url.indexOf('#');
+        // Extract id_token from the URL (check both fragment and query)
+        let idToken = null;
+        
+        // Try fragment first (#)
+        const fragmentStart = url.indexOf('#');
+        if (fragmentStart !== -1) {
+          const fragment = url.substring(fragmentStart + 1);
+          console.log('URL fragment:', fragment);
+          const params = new URLSearchParams(fragment);
+          idToken = params.get('id_token');
+          console.log('ID token from fragment:', idToken ? idToken.substring(0, 20) + '...' : 'not found');
+        }
+        
+        // Try query parameters if fragment didn't work
+        if (!idToken) {
+          const queryStart = url.indexOf('?');
+          if (queryStart !== -1) {
+            const query = url.substring(queryStart + 1);
+            console.log('URL query:', query);
+            const params = new URLSearchParams(query);
+            idToken = params.get('id_token');
+            console.log('ID token from query:', idToken ? idToken.substring(0, 20) + '...' : 'not found');
+          }
+        }
+        
+        if (idToken) {
+          console.log('ID token found in deep link, exchanging with backend');
+          handleTokenExchange(idToken);
+        } else {
+          console.error('No id_token found in deep link. URL parts:');
+          console.error('- Fragment:', url.indexOf('#') !== -1 ? url.substring(url.indexOf('#') + 1) : 'none');
+          console.error('- Query:', url.indexOf('?') !== -1 ? url.substring(url.indexOf('?') + 1) : 'none');
+        }
+      } else {
+        console.log('Not an OAuth redirect, ignoring');
+      }
+      console.log('=== DEEP LINK HANDLER END ===');
+    };
+
+    // Set up deep link listener
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    // Check if app was opened with a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('App opened with initial URL:', url);
+        handleDeepLink(url);
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
+  // Manual test function for OAuth token
+  const testManualToken = () => {
+    const testUrl = 'https://auth.expo.io/@dalmiraskon/propertpro-mobile#state=s9jammvzk5n&id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ijg4MjUwM2E1ZmQ1NmU5ZjczNGRmYmE1YzUwZDdiZjQ4ZGIyODRhZTkiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0NDczNzY4NjQ3OTItaGxlNWZvZG9wb25pOWM4ZG81MHBwbjYzOWY2Zmhic28uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0NDczNzY4NjQ3OTItaGxlNWZvZG9wb25pOWM4ZG81MHBwbjYzOWY2Zmhic28uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTU3MzUyNTQ5NTkxNDc4MTE5OTMiLCJlbWFpbCI6ImtvbnN0YW50aW5vc2V2YW5nQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJub25jZSI6InM5amFtbXZ6azVuIiwibmJmIjoxNzUxNTc0NjE0LCJuYW1lIjoiS29uc3RhbnRpbm9zIEV2YW5nZWxpZGVzIiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0lWZmpwVHNyMmE1R1dJSDVqTVQ3aFlHSTc5UXRRYksxdFBGNzdzUWdhMUluQXFJd3c9czk2LWMiLCJnaXZlbl9uYW1lIjoiS29uc3RhbnRpbm9zIiwiZmFtaWx5X25hbWUiOiJFdmFuZ2VsaWRlcyIsImlhdCI6MTc1MTU3NDkxNCwiZXhwIjoxNzUxNTc4NTE0LCJqdGkiOiI5OWMzNjRlNjcyNTgyZWMzOGQ0MDM5ZTg1Yjg5NDIzM2EyM2I2OWM3In0.ViV6agth9abMw4EDWd_Dv_wGIGRxfapBJXqjXv4gJ63r434bc0SqT6TD18jnbaANOTniAD_BDMBWzaP0lQtf1MNc6ciMzQxMYHjivzRHoYygoUbh9JOhvbSJKJ0bdciBopP7OQPVcHkmwE8sxZySB63R_W48qS94UA6cd9lIMhY1mFurzekrtMMfBGY0oAPCqiLUMyF8Dejn_tKbraoWqgeRxvUpIaMkBmoF7aVJL2SYWjDNH0wvduli2cJVMoV5UYIDqXgOVOHYMpUJj-ma5Hb3UcYfNhm_XpTHPw0hB2Pco0dsozlvI6kxz-L9J6tGWk7tXoPPOV7GWgoNibxx9g&authuser=0&prompt=none';
+    
+    Alert.alert(
+      'Test OAuth Token',
+      'This will test the OAuth token from your successful login',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Test', onPress: () => {
+          console.log('=== MANUAL TOKEN TEST ===');
+          console.log('Testing with URL:', testUrl);
+          
+          const fragmentStart = testUrl.indexOf('#');
           if (fragmentStart !== -1) {
-            const fragment = url.substring(fragmentStart + 1);
+            const fragment = testUrl.substring(fragmentStart + 1);
             const params = new URLSearchParams(fragment);
             const idToken = params.get('id_token');
             
             if (idToken) {
-              console.log('Google ID Token obtained:', idToken);
-              await handleTokenExchange(idToken);
+              console.log('Extracted token:', idToken.substring(0, 30) + '...');
+              handleTokenExchange(idToken);
+            } else {
+              console.error('Failed to extract token');
             }
           }
-        }
+        }}
+      ]
+    );
+  };
+
+  const handleGoogleLogin = async () => {
+    console.log('=== ACCOUNT SELECTION FLOW START ===');
+    console.log('handleGoogleLogin: Starting Google OAuth flow');
+    console.log('Platform:', Platform.OS);
+    console.log('Client ID:', OAUTH_CONFIG.CLIENT_ID);
+    console.log('Redirect URI:', OAUTH_CONFIG.REDIRECT_URI);
+    
+    try {
+      if (Platform.OS === 'web') {
+        console.log('handleGoogleLogin: Web platform detected');
+        console.log('handleGoogleLogin: Resetting hasProcessedOAuth flag');
+        setHasProcessedOAuth(false);
+        
+        // For web, use manual URL generation (keep existing working flow)
+        const nonce = Math.random().toString(36).substring(2, 15);
+        const state = nonce;
+        const authUrl = generateOAuthUrl(nonce, state);
+        console.log('handleGoogleLogin: Redirecting to Google OAuth URL');
+        window.location.href = authUrl;
+      } else {
+        console.log('handleGoogleLogin: Native platform detected');
+        console.log('handleGoogleLogin: Using WebBrowser.openBrowserAsync');
+        
+        // For native, use WebBrowser.openBrowserAsync with Expo proxy
+        const nonce = Math.random().toString(36).substring(2, 15);
+        const state = nonce;
+        const authUrl = generateOAuthUrl(nonce, state);
+        
+        console.log('handleGoogleLogin: Opening OAuth URL with WebBrowser.openBrowserAsync');
+        console.log('handleGoogleLogin: Auth URL:', authUrl);
+        
+        // Open browser and let user complete OAuth flow
+        // The Expo proxy will handle redirecting back to the app
+        await WebBrowser.openBrowserAsync(authUrl);
+        
+        console.log('handleGoogleLogin: Browser opened. User should complete OAuth and app will handle the redirect.');
+        console.log('handleGoogleLogin: If you complete OAuth in browser, the redirect will be handled by the Expo proxy.');
+        
+        // Note: In a production app, you'd set up deep linking to handle the redirect
+        // For development with Expo Go, the user may need to manually return to the app
+        // The OAuth result will be handled by any registered URL handlers or the Expo proxy
       }
-    } catch (error) {
-      console.error('Google OAuth error:', error);
+    } catch (error: any) {
+      console.error('=== ACCOUNT SELECTION FLOW ERROR ===');
+      console.error('handleGoogleLogin: Google OAuth error:', error);
+      console.error('handleGoogleLogin: Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      });
     }
   };
 
   const handleTokenExchange = async (idToken: string) => {
     try {
+      console.log('=== TOKEN EXCHANGE START ===');
+      console.log('Exchanging token with backend...');
+      console.log('Token preview:', idToken.substring(0, 30) + '...');
+      
       const res = await api.post('users/accounts/google/login/mobile/', { id_token: idToken });
       const { access_token, refresh_token, user: userData } = res.data;
       console.log('Backend response:', { access_token: access_token?.substring(0, 20) + '...', user: userData });
+      
       await login(access_token, refresh_token, userData);
       console.log('Login successful, user:', userData);
+      
       // Navigate to Home tab after login
       router.replace('/');
+      console.log('=== TOKEN EXCHANGE SUCCESS ===');
     } catch (error) {
+      console.error('=== TOKEN EXCHANGE FAILED ===');
       console.error('Backend login failed:', error);
+      
+      // Show user-friendly error
+      Alert.alert(
+        'Login Failed',
+        'There was an error logging you in. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -152,6 +281,18 @@ export default function ProfileScreen() {
           <View style={styles.loginCard}>
             <Text style={styles.title}>Sign in to your account</Text>
             <Text style={styles.subtitle}>Secure sign-in with your Google account</Text>
+            
+            {Platform.OS !== 'web' && (
+              <View style={styles.instructionContainer}>
+                <Text style={styles.instructionTitle}>Mobile OAuth Instructions:</Text>
+                <Text style={styles.instructionText}>
+                  1. Tap "Continue with Google" below{'\n'}
+                  2. Complete sign-in in the opened browser{'\n'}
+                  3. The browser will redirect back to this app{'\n'}
+                  4. You'll be automatically logged in
+                </Text>
+              </View>
+            )}
 
             <TouchableOpacity
               onPress={handleGoogleLogin}
@@ -165,25 +306,15 @@ export default function ProfileScreen() {
               <Text style={styles.googleButtonText}>Continue with Google</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity
-              onPress={() => {
-                const testUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-                  `client_id=${CLIENT_ID}&` +
-                  `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
-                  `response_type=id_token&` +
-                  `scope=${encodeURIComponent('openid profile email')}&` +
-                  `response_mode=fragment&` +
-                  `prompt=select_account&` +
-                  `nonce=${Math.random().toString(36).substring(2, 15)}`;
-                console.log('Test OAuth URL:', testUrl);
-                if (Platform.OS === 'web') {
-                  window.open(testUrl, '_blank');
-                }
-              }}
-              style={[styles.googleButton, { backgroundColor: '#f0f0f0', marginTop: 10 }]}
-            >
-              <Text style={[styles.googleButtonText, { color: '#333' }]}>Test OAuth (Get Fresh Token)</Text>
-            </TouchableOpacity>
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity
+                onPress={testManualToken}
+                style={[styles.googleButton, { backgroundColor: '#f8f9fa', marginTop: 10 }]}
+              >
+                <Text style={[styles.googleButtonText, { color: '#666' }]}>Test OAuth Token</Text>
+              </TouchableOpacity>
+            )}
+
           </View>
         </View>
       </SafeAreaView>
@@ -312,4 +443,7 @@ const styles = StyleSheet.create({
   logoutText: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#FF6B6B', marginLeft: 8 },
   footer: { alignItems: 'center', marginBottom: 24 },
   footerText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#999' },
+  instructionContainer: { marginBottom: 20, padding: 16, backgroundColor: '#f8f9fa', borderRadius: 8, borderWidth: 1, borderColor: '#e9ecef' },
+  instructionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#0F3460', marginBottom: 8 },
+  instructionText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666', lineHeight: 20 },
 });

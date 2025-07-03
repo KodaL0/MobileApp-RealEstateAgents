@@ -28,36 +28,74 @@ export const apiClient = axios.create({
 // Request interceptor: attach Bearer token from AsyncStorage if present.
 apiClient.interceptors.request.use(
   async config => {
+    console.log('=== API REQUEST INTERCEPTOR START ===');
+    console.log('API Request Interceptor - Method:', config.method?.toUpperCase());
+    console.log('API Request Interceptor - URL:', config.url);
+    console.log('API Request Interceptor - Base URL:', config.baseURL);
+    console.log('API Request Interceptor - Full URL:', (config.baseURL || '') + (config.url || ''));
+    
     try {
       const token = await AsyncStorage.getItem('access_token');
       console.log('API Request Interceptor - Token found:', !!token, token ? token.substring(0, 20) + '...' : 'none');
       console.log('API Request Interceptor - URL:', config.url);
       
       if (token) {
+        console.log('API Request Interceptor - Token available, setting Authorization header');
         if (config.headers) {
           // Mutate existing headers object
           (config.headers as any).Authorization = `Bearer ${token}`;
+          console.log('API Request Interceptor - Authorization header added to existing headers');
         } else {
           // Initialize headers if missing
           config.headers = { Authorization: `Bearer ${token}` } as any;
+          console.log('API Request Interceptor - Authorization header set in new headers object');
         }
         console.log('API Request Interceptor - Authorization header set');
+        console.log('API Request Interceptor - Headers:', config.headers);
       } else {
         console.log('API Request Interceptor - No token found, request will be unauthenticated');
+        console.log('API Request Interceptor - Headers:', config.headers);
       }
-    } catch (e) {
-      console.warn('Error reading token from storage', e);
+    } catch (e: any) {
+      console.error('=== API REQUEST INTERCEPTOR ERROR ===');
+      console.error('API Request Interceptor - Error reading token from storage:', e);
+      console.error('API Request Interceptor - Error details:', {
+        message: e?.message,
+        stack: e?.stack,
+        name: e?.name
+      });
     }
+    
+    console.log('=== API REQUEST INTERCEPTOR COMPLETE ===');
     return config;
   },
-  error => Promise.reject(error)
+  error => {
+    console.error('=== API REQUEST INTERCEPTOR REJECTION ===');
+    console.error('API Request Interceptor - Request rejected:', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor: log errors
 apiClient.interceptors.response.use(
-  response => response,
+  response => {
+    console.log('=== API RESPONSE INTERCEPTOR SUCCESS ===');
+    console.log('API Response Interceptor - Status:', response.status);
+    console.log('API Response Interceptor - URL:', response.config.url);
+    console.log('API Response Interceptor - Method:', response.config.method?.toUpperCase());
+    console.log('API Response Interceptor - Data keys:', Object.keys(response.data || {}));
+    console.log('API Response Interceptor - Response size:', JSON.stringify(response.data).length, 'characters');
+    return response;
+  },
   error => {
-    console.error('API Error', error.response?.status, error.response?.data);
+    console.error('=== API RESPONSE INTERCEPTOR ERROR ===');
+    console.error('API Response Interceptor - Error status:', error.response?.status);
+    console.error('API Response Interceptor - Error status text:', error.response?.statusText);
+    console.error('API Response Interceptor - Error URL:', error.config?.url);
+    console.error('API Response Interceptor - Error method:', error.config?.method?.toUpperCase());
+    console.error('API Response Interceptor - Error data:', error.response?.data);
+    console.error('API Response Interceptor - Error message:', error.message);
+    console.error('API Response Interceptor - Full error:', error);
     return Promise.reject(error);
   }
 );
