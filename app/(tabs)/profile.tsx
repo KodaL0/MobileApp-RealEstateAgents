@@ -7,9 +7,10 @@ import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import { useRouter } from 'expo-router';
 
 import { api } from '@/config/api'; // mobile API client
-import { useUser, User } from '@/app/userbase/UserContext';
+import { useUser, User } from '@/app/_userbase/UserContext';
 
 console.log('Expo Redirect URI:', AuthSession.makeRedirectUri());
 
@@ -18,6 +19,7 @@ const REDIRECT_URI = AuthSession.makeRedirectUri();
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user, isLoading, isAuthenticated, login, logout, refreshUser } = useUser();
   const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
 
@@ -45,6 +47,8 @@ export default function ProfileScreen() {
               
               // Clean up the URL fragment
               window.history.replaceState({}, document.title, window.location.pathname);
+              // Navigate to Home tab after login
+              router.replace('/');
             } catch (error) {
               console.error('Backend login failed:', error);
               setHasProcessedOAuth(false); // Reset flag on error
@@ -55,7 +59,7 @@ export default function ProfileScreen() {
       
       handleWebOAuthRedirect();
     }
-  }, [login, hasProcessedOAuth]);
+  }, [login, hasProcessedOAuth, router]);
 
   const handleGoogleLogin = async () => {
     try {
@@ -65,6 +69,7 @@ export default function ProfileScreen() {
         `response_type=id_token&` +
         `scope=${encodeURIComponent('openid profile email')}&` +
         `response_mode=fragment&` +
+        `prompt=select_account&` +
         `nonce=${Math.random().toString(36).substring(2, 15)}`;
 
       console.log('Opening Google OAuth URL:', authUrl);
@@ -105,7 +110,8 @@ export default function ProfileScreen() {
       console.log('Backend response:', { access_token: access_token?.substring(0, 20) + '...', user: userData });
       await login(access_token, refresh_token, userData);
       console.log('Login successful, user:', userData);
-      // No need to call refreshUser since we already have the user data
+      // Navigate to Home tab after login
+      router.replace('/');
     } catch (error) {
       console.error('Backend login failed:', error);
     }
@@ -167,6 +173,7 @@ export default function ProfileScreen() {
                   `response_type=id_token&` +
                   `scope=${encodeURIComponent('openid profile email')}&` +
                   `response_mode=fragment&` +
+                  `prompt=select_account&` +
                   `nonce=${Math.random().toString(36).substring(2, 15)}`;
                 console.log('Test OAuth URL:', testUrl);
                 if (Platform.OS === 'web') {
@@ -201,7 +208,7 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.profileInfo}>
             <Image
-              source={{ uri: user.profile_picture || 'https://via.placeholder.com/60' }}
+              source={{ uri: user.profile_picture || 'https://placehold.co/60x60?text=PP' }}
               style={styles.profileImage}
             />
             <View>

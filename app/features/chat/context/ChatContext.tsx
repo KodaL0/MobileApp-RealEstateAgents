@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, WS_BASE_URL } from '@/config/api';
-import { useUser } from '../../../userbase/UserContext';
+import { useUser } from '../../../_userbase/UserContext';
 import { Thread, Message } from '../types';
 
 interface ChatContextValue {

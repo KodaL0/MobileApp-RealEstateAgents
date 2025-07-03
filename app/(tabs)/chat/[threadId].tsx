@@ -13,23 +13,33 @@ import {
   Platform,
   SafeAreaView
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Message } from '../../features/chat/types';
 import { useChat } from '../../features/chat/context/ChatContext';
-import { useUser } from '../../userbase/UserContext';
+import { useUser } from '../../_userbase/UserContext';
 import { Send } from 'lucide-react-native';
+import { apiClient } from '../../../config/api';
 
 export default function ChatThreadPage() {
   // Grab the threadId from the URL
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
 
   // Hooks from your context providers
-  const { messages, sendMessage } = useChat();
+  const { threads, messages, sendMessage, setMessages } = useChat();
   const { user } = useUser();
+  const router = useRouter();
 
   // Local state & refs
   const [input, setInput] = useState('');
   const flatListRef = useRef<FlatList<Message>>(null);
+
+  // Find the thread object
+  const thread = threads.find(t => t.id === threadId);
+  const isPropertyThread = thread?.property !== null;
+  const headerTitle = isPropertyThread 
+    ? (thread?.property_title || `Property #${thread?.property}`)
+    : (thread?.other_username || 'Chat');
+  const propertyId = thread?.property;
 
   // Pull the array of messages for this thread (or empty)
   const threadMessages = messages[threadId] ?? [];
@@ -38,6 +48,27 @@ export default function ChatThreadPage() {
   useEffect(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
   }, [threadMessages.length]);
+
+  // Fetch initial messages if not present
+  useEffect(() => {
+    let isMounted = true;
+    const loadInitial = async () => {
+      if (!threadId) return;
+      if (messages[threadId]?.length) return; // already have
+      try {
+        const res = await apiClient.get<{ results: Message[] }>(`chat/${threadId}/messages/?limit=30`);
+        if (!isMounted) return;
+        const fetched = res.data.results.reverse();
+        setMessages(prev => ({ ...prev, [threadId]: fetched }));
+      } catch (e) {
+        console.warn('Failed to load messages', e);
+      }
+    };
+    loadInitial();
+    return () => {
+      isMounted = false;
+    };
+  }, [threadId, messages, setMessages]);
 
   // Figure out who we're sending *to* -- if last message was from me, flip
   const getRecipientId = (): number => {
@@ -73,6 +104,25 @@ export default function ChatThreadPage() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backText}>{'‹'}</Text>
+        </TouchableOpacity>
+        {isPropertyThread && propertyId ? (
+          <TouchableOpacity 
+            onPress={() => router.push(`/property/${propertyId}`)}
+            style={styles.headerTitleContainer}
+          >
+            <Text style={[styles.headerTitle, styles.clickableTitle]} numberOfLines={1}>
+              {headerTitle}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+        )}
+        <View style={{ width: 32 }} />
+      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -105,6 +155,36 @@ export default function ChatThreadPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: '#f0f0f0',
+    backgroundColor: '#fff',
+    minHeight: 48,
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  backText: {
+    fontSize: 28,
+    color: '#0F3460',
+    fontWeight: 'bold',
+    marginTop: -2,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0F3460',
+    textAlign: 'center',
+  },
   bubble: { marginBottom: 12, padding: 10, borderRadius: 20, maxWidth: '80%' },
   bubbleOwn: {
     backgroundColor: '#0F3460',
@@ -136,5 +216,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
     maxHeight: 100
   },
-  sendButton: { padding: 8 }
+  sendButton: { padding: 8 },
+  headerTitleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  clickableTitle: {
+    color: '#007bff',
+    textDecorationLine: 'underline',
+  },
 });

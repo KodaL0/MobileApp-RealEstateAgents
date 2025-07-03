@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useChat } from '../../features/chat/context/ChatContext';
-import { useUser } from '../../userbase/UserContext';
-import { Home, Clock } from 'lucide-react-native';
+import { useUser } from '../../_userbase/UserContext';
+import { Home, Clock, User } from 'lucide-react-native';
 import type { Thread } from '../../features/chat/types';
 
 export default function ThreadList() {
@@ -21,15 +21,23 @@ export default function ThreadList() {
   const { threads, messages } = useChat();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'property' | 'dm'>('dm');
   const [filtered, setFiltered] = useState<Thread[]>(threads);
 
   useEffect(() => {
-    const list = threads.filter(thread => {
-      const title = thread.property_title || thread.other_username || '';
-      return title.toLowerCase().includes(searchTerm.toLowerCase());
-    });
+    // 1. Filter by tab (DM or property) **first** to avoid extra work
+    const base = threads.filter(t => (activeTab === 'property' ? t.property !== null : t.property === null));
+
+    // 2. Apply search within that subset
+    const list = base
+      .filter(t => {
+        const title = t.property_title || t.other_username || '';
+        return title.toLowerCase().includes(searchTerm.toLowerCase());
+      })
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
     setFiltered(list);
-  }, [threads, searchTerm]);
+  }, [threads, searchTerm, activeTab]);
 
   const getLastMessage = (threadId: string) => {
     const msgs = messages[threadId] || [];
@@ -57,6 +65,24 @@ export default function ThreadList() {
         />
       </View>
 
+      {/* Tab selector */}
+      <View style={styles.tabRow}>
+        {/* DM tab on the left */}
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'dm' && styles.tabActive]}
+          onPress={() => setActiveTab('dm')}
+        >
+          <User size={18} color={activeTab === 'dm' ? '#0F3460' : '#666'} />
+        </TouchableOpacity>
+        {/* Property tab on the right */}
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'property' && styles.tabActive]}
+          onPress={() => setActiveTab('property')}
+        >
+          <Home size={18} color={activeTab === 'property' ? '#0F3460' : '#666'} />
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
@@ -72,14 +98,20 @@ export default function ThreadList() {
               onPress={() => router.push(`/chat/${thread.id}`)}
             >
               <View style={styles.avatar}>
-                {thread.property_image ? (
-                  <Image
-                    source={{ uri: thread.property_image }}
-                    style={styles.image}
-                  />
+                {thread.property ? (
+                  thread.property_image ? (
+                    <Image
+                      source={{ uri: thread.property_image }}
+                      style={styles.image}
+                    />
+                  ) : (
+                    <View style={styles.iconBg}>
+                      <Home size={20} color="#FFF" />
+                    </View>
+                  )
                 ) : (
                   <View style={styles.iconBg}>
-                    <Home size={20} color="#FFF" />
+                    <User size={20} color="#FFF" />
                   </View>
                 )}
                 {unread > 0 && (
@@ -164,4 +196,22 @@ const styles = StyleSheet.create({
   itemSubtitle: { marginTop: 4, fontSize: 14, color: '#666' },
   meta: { alignItems: 'flex-end' },
   time: { fontSize: 12, color: '#666' },
+  /* Tabs */
+  tabRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  tabBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
+    backgroundColor: '#F0F2F5',
+  },
+  tabActive: {
+    backgroundColor: '#DCE4FF',
+  },
 });

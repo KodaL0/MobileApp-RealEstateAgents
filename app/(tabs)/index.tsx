@@ -16,7 +16,7 @@ import FeaturedListings from '@/components/home/FeaturedListings';
 import PropertyTypeFilters from '@/components/home/PropertyTypeFilters';
 import TrendingProperties from '@/components/home/TrendingProperties';
 import Promotions from '@/components/home/Promotions';
-import { useUser } from '../userbase/UserContext';
+import { useUser } from '../_userbase/UserContext';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -27,16 +27,6 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text>Loading...</Text>
-      </SafeAreaView>
-    );
-  }
-
-  // Show login prompt
-  if (!user) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Text style={{ fontSize: 18, textAlign: 'center', marginBottom: 10 }}>Welcome to PropertyPro</Text>
-        <Text style={{ textAlign: 'center', color: '#666' }}>Please go to Profile tab to sign in</Text>
       </SafeAreaView>
     );
   }
@@ -54,12 +44,16 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.welcomeText}>Hello, {user.username}</Text>
+            <Text style={styles.welcomeText}>
+              Hello{user ? `, ${user.username}` : ''}
+            </Text>
             <Text style={styles.subtitle}>Find your perfect property</Text>
           </View>
-          <TouchableOpacity style={styles.notificationBtn}>
-            <Bell size={24} color="#0F3460" />
-          </TouchableOpacity>
+          {user && (
+            <TouchableOpacity style={styles.notificationBtn}>
+              <Bell size={24} color="#0F3460" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.searchContainer}>

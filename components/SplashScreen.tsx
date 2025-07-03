@@ -1,16 +1,33 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Image, StyleSheet, Animated } from 'react-native';
 
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
-  const fadeAnim = new Animated.Value(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const finished = useRef(false);
 
   useEffect(() => {
+    let afterFinishTimeout: number | null = null;
     Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.delay(1200),
-      Animated.timing(fadeAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
-    ]).start(onFinish);
-  }, []);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 16, useNativeDriver: true }), // 1 frame
+      Animated.delay(84), // 5 frames (total ~100ms)
+      Animated.timing(fadeAnim, { toValue: 0, duration: 16, useNativeDriver: true }), // 1 frame
+    ]).start(() => {
+      if (!finished.current) {
+        finished.current = true;
+        // Wait 2 frames (~33ms) after animation before calling onFinish
+        afterFinishTimeout = setTimeout(onFinish, 33);
+      }
+    });
+    // In case parent calls onFinish early (e.g., fonts loaded), exit immediately
+    return () => {
+      if (!finished.current) {
+        finished.current = true;
+        if (afterFinishTimeout) clearTimeout(afterFinishTimeout);
+        // Wait 2 frames after onFinish
+        setTimeout(onFinish, 33);
+      }
+    };
+  }, [fadeAnim, onFinish]);
 
   return (
     <View style={styles.container}>
