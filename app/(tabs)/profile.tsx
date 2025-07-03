@@ -5,9 +5,10 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
-import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import * as AuthSession from 'expo-auth-session';
+
+import { api } from '@/config/api'; // mobile API client
 
 type User = {
   id: number;
@@ -17,7 +18,7 @@ type User = {
   is_premium?: boolean;
 };
 
-const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+const CLIENT_ID = '447376864792-evogs0jbp18dbuake12po6oh8dlictbo.apps.googleusercontent.com';
 const REDIRECT_URI = AuthSession.makeRedirectUri();
 const discovery = {
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: CLIENT_ID,
@@ -49,15 +51,8 @@ export default function ProfileScreen() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const token = await SecureStore.getItemAsync('access_token');
-        if (!token) {
-          setLoading(false); // No token → show login
-          return;
-        }
-        const response = await axios.get<User>('https://api.propertpro.com/users/me/', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(response.data);
+        const currentUser = await api.auth.getUser();
+        setUser(currentUser);
       } catch (error) {
         console.error('Failed to fetch user:', error);
       } finally {
@@ -73,10 +68,8 @@ export default function ProfileScreen() {
         const { id_token } = response.params;
         console.log('Google ID Token obtained:', id_token);
         try {
-          const res = await axios.post('https://api.propertpro.com/accounts/google/login/mobile/', {
-            id_token,
-          });
-          const { access_token, refresh_token, user: userData } = res.data;
+          const res = await api.post('accounts/google/login/mobile/', { id_token });
+          const { access_token, refresh_token, user: userData } = res;
           await SecureStore.setItemAsync('access_token', access_token);
           await SecureStore.setItemAsync('refresh_token', refresh_token);
           setUser(userData);
@@ -91,10 +84,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
-      const token = await SecureStore.getItemAsync('access_token');
-      await axios.post('https://api.propertpro.com/auth/logout/', {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.auth.logout();
       await SecureStore.deleteItemAsync('access_token');
       await SecureStore.deleteItemAsync('refresh_token');
       setUser(null);
@@ -116,15 +106,23 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="dark" />
         <View style={styles.loginContainer}>
-          <Text style={styles.title}>Sign in to your account</Text>
-          <Text style={styles.subtitle}>Secure sign-in with your Google account</Text>
-          <TouchableOpacity
-            onPress={() => promptAsync()}
-            style={styles.googleButton}
-            disabled={!request}
-          >
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
+          <View style={styles.loginCard}>
+            <Text style={styles.title}>Sign in to your account</Text>
+            <Text style={styles.subtitle}>Secure sign-in with your Google account</Text>
+
+            <TouchableOpacity
+              onPress={() => promptAsync()}
+              style={styles.googleButton}
+              disabled={!request}
+            >
+              <Image
+                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/1200px-Google_%22G%22_Logo.png' }}
+                style={styles.googleLogo}
+              />
+
+              <Text style={styles.googleButtonText}>Continue with Google</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -219,10 +217,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fff' },
   container: { backgroundColor: '#fff' },
-  loginContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  title: { fontFamily: 'Poppins-Bold', fontSize: 24, color: '#0F3460', marginBottom: 8 },
+  loginContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#f4f6fa' },
+  loginCard: { width: '100%', maxWidth: 360, backgroundColor: '#fff', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, alignItems: 'center' },
+  title: { fontFamily: 'Poppins-Bold', fontSize: 24, color: '#0F3460', marginBottom: 8, textAlign: 'center' },
   subtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666', marginBottom: 32, textAlign: 'center' },
-  googleButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, elevation: 2 },
+  googleButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, marginTop: 20, borderWidth: 1, borderColor: '#ccc' },
+  googleLogo: { width: 20, height: 20, marginRight: 12 },
   googleButtonText: { fontSize: 16, color: '#333', fontWeight: '500' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 },
   settingsButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },

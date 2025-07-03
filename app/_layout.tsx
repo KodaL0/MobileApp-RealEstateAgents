@@ -1,6 +1,5 @@
-// File: app/_layout.tsx
-import React, { useEffect } from 'react';
-import { Stack, SplashScreen } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Stack, SplashScreen as ExpoSplash } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { View, StyleSheet } from 'react-native';
@@ -14,8 +13,9 @@ import { useFonts,
 
 import { UserProvider } from './features/chat/context/UserContext';
 import { ChatProvider } from './features/chat/context/ChatContext';
+import SplashScreen from '../components/SplashScreen';
 
-SplashScreen.preventAutoHideAsync();
+ExpoSplash.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -25,14 +25,20 @@ export default function RootLayout() {
     'Poppins-Bold':    Poppins_700Bold,
   });
 
+  const [showCustomSplash, setShowCustomSplash] = useState(true);
+
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      ExpoSplash.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) {
-    return null;
+    return null; // wait until fonts load
+  }
+
+  if (showCustomSplash) {
+    return <SplashScreen onFinish={() => setShowCustomSplash(false)} />;
   }
 
   return (
