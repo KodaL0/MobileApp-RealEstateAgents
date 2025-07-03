@@ -28,7 +28,7 @@ interface ChatContextValue {
     recipientId: number,
     content: string,
     propertyId?: number
-  ) => void;
+  ) => Promise<void>;
   markThreadRead: (threadId: string) => void;
   sendTypingStart: (threadId: string, recipientId: number) => void;
   sendTypingStop: (threadId: string, recipientId: number) => void;
@@ -234,26 +234,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const sendMessage = useCallback(
-    (
+    async (
       threadId: string,
       recipientId: number,
       content: string,
       propertyId?: number
-    ) => {
+    ): Promise<void> => {
       // Validation
       if (!threadId) {
         console.error('sendMessage: threadId is required');
-        return;
+        throw new Error('threadId is required');
       }
       
       if (!recipientId) {
         console.error('sendMessage: recipientId is required');
-        return;
+        throw new Error('recipientId is required');
       }
       
       if (!content || typeof content !== 'string') {
         console.error('sendMessage: content must be a non-empty string');
-        return;
+        throw new Error('content must be a non-empty string');
       }
       
       openSocket();
@@ -265,14 +265,18 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       if (propertyId) payload.property_id = propertyId;
 
       if (ws.current?.readyState === WebSocket.OPEN) {
+        // For WebSocket, we send and assume success (real-time)
         ws.current.send(JSON.stringify(payload));
+        return Promise.resolve();
       } else {
-        apiClient.post(`chat/${threadId}/messages/`, {
+        // For REST API, we wait for the response
+        return apiClient.post(`chat/${threadId}/messages/`, {
           content,
           property_id: propertyId,
           recipient_id: recipientId,
-        }).catch((error) => {
-          console.error('REST API error:', error);
+        }).then(() => {
+          // Success - message sent via REST API
+          return;
         });
       }
     },

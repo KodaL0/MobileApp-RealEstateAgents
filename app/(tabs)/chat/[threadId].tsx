@@ -31,6 +31,7 @@ export default function ChatThreadPage() {
 
   // Local state & refs
   const [input, setInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   // Find the thread object
@@ -99,20 +100,24 @@ export default function ChatThreadPage() {
     if (!text) return;
     if (!threadId) return;
     if (!user) return;
+    if (isSending) return; // Prevent double sends
     
     const recipientId = getRecipientId();
     if (!recipientId) return;
     
+    setIsSending(true);
+    
     try {
-      // Clear input immediately for better UX
-      setInput('');
+      // Send the message first, THEN clear input on success
+      await sendMessage(threadId, recipientId, text, propertyId || undefined);
       
-      // Send the message with proper parameter order
-      sendMessage(threadId, recipientId, text, propertyId || undefined);
+      // Only clear input if message was sent successfully
+      setInput('');
     } catch (error) {
       console.error('Error sending message:', error);
-      // Restore input if sending failed
-      setInput(text);
+      // Don't clear input if sending failed - keep the message for user to retry
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -174,8 +179,18 @@ export default function ChatThreadPage() {
             onChangeText={setInput}
             multiline
           />
-          <TouchableOpacity onPress={onSend} style={styles.sendButton}>
-            <Send size={20} />
+          <TouchableOpacity 
+            onPress={onSend} 
+            style={[
+              styles.sendButton, 
+              { 
+                opacity: (!input.trim() || isSending) ? 0.5 : 1,
+                backgroundColor: isSending ? '#ccc' : 'transparent'
+              }
+            ]}
+            disabled={!input.trim() || isSending}
+          >
+            <Send size={20} color={(!input.trim() || isSending) ? '#999' : '#000'} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
