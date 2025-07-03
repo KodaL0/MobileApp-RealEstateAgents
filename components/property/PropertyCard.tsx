@@ -1,6 +1,6 @@
 // components/PropertyCard.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,12 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bed, Bath, Heart, MapPin, ArrowLeft, ArrowRight } from 'lucide-react-native';
+import { api } from '../../config/api';
+import { useUser } from '../../app/_userbase/UserContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -34,7 +37,7 @@ const getShadowStyle = () => {
 
 type Property = {
   id: number;
-  images: string[];
+  images: (string | { image: string })[];
   forSale: boolean;
   price: number;
   title: string;
@@ -47,12 +50,39 @@ type Property = {
 
 export default function PropertyCard({ property, saved = false }: { property: Property; saved?: boolean }) {
   const router = useRouter();
+  const { user } = useUser();
   const [isFavorite, setIsFavorite] = useState(saved);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Slideshow state
-  const images = Array.isArray(property.images) ? property.images : [];
+  // Slideshow state - handle both string arrays and image objects
+  const images = Array.isArray(property.images) 
+    ? property.images
+        .map(img => {
+          // Handle both string URLs and image objects
+          if (typeof img === 'string') return img;
+          if (img && typeof img === 'object' && img.image) return img.image;
+          return null;
+        })
+        .filter(img => img && typeof img === 'string' && img.trim() !== '')
+    : [];
   const imgCount = images.length;
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Debug logging for images
+  console.log('PropertyCard Debug:', {
+    propertyId: property.id,
+    originalImages: property.images,
+    filteredImages: images,
+    imgCount: imgCount,
+    currentIndex: currentIndex
+  });
+
+  // Ensure currentIndex is within bounds
+  useEffect(() => {
+    if (currentIndex >= imgCount && imgCount > 0) {
+      setCurrentIndex(0);
+    }
+  }, [imgCount, currentIndex]);
 
   // Handlers
   const goPrev = (e: any) => {
@@ -71,15 +101,53 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
     setCurrentIndex(idx);
   };
 
+  // Handle favorite button press
+  const handleFavoritePress = useCallback(async (e: any) => {
+    e.stopPropagation?.();
+    
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to save properties to your favorites.');
+      return;
+    }
+
+    if (isLoading) return;
+
+    const previousState = isFavorite;
+    const newState = !previousState;
+
+    // Optimistic update
+    setIsFavorite(newState);
+    setIsLoading(true);
+
+    try {
+      await api.properties.toggleFavorite(property.id);
+      console.log(`Property ${property.id} favorite status toggled to: ${newState}`);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      // Revert optimistic update on error
+      setIsFavorite(previousState);
+      Alert.alert('Error', 'Failed to update favorite status. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, isFavorite, isLoading, property.id]);
+
   // Derive URI for current image
   let imageUri = '';
   if (imgCount > 0) {
     const raw = images[currentIndex];
-    // If your images array stores URLs directly, use raw.
-    // If it stores objects with .image field, adjust: raw.image
-    // Here we assume property.images is array of strings (absolute URLs)
-    // If relative paths, prefix them: e.g. raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`
-    imageUri = raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`;
+    console.log('Processing image:', { raw, currentIndex, imgCount });
+    
+    // Check if raw exists and is a string before calling startsWith
+    if (raw && typeof raw === 'string') {
+      imageUri = raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`;
+      console.log('Constructed imageUri:', imageUri);
+    } else {
+      console.warn('Invalid image data at index', currentIndex, ':', raw);
+      imageUri = ''; // Fallback to empty string
+    }
+  } else {
+    console.log('No images available for property', property.id);
   }
 
   return (
@@ -135,11 +203,9 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
         {/* Favorite Button */}
         <TouchableOpacity
           style={styles.favoriteButton}
-          onPress={e => {
-            e.stopPropagation?.();
-            setIsFavorite(prev => !prev);
-          }}
+          onPress={handleFavoritePress}
           activeOpacity={0.7}
+          disabled={isLoading}
         >
           <Heart
             size={20}
@@ -158,9 +224,10 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
           contentContainerStyle={styles.thumbnailContainer}
         >
           {images.map((imgUriRaw: string, idx: number) => {
-            const uri = imgUriRaw.startsWith('http')
-              ? imgUriRaw
-              : `https://api.propertpro.com${imgUriRaw}`;
+            // Check if imgUriRaw exists and is a string before calling startsWith
+            const uri = (imgUriRaw && typeof imgUriRaw === 'string') 
+              ? (imgUriRaw.startsWith('http') ? imgUriRaw : `https://api.propertpro.com${imgUriRaw}`)
+              : '';
             const isActive = idx === currentIndex;
             return (
               <TouchableOpacity

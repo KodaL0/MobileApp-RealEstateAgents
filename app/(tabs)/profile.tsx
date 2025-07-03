@@ -246,12 +246,32 @@ export default function ProfileScreen() {
     }
   };
 
+  const [savedPropertiesCount, setSavedPropertiesCount] = useState<number>(0);
+
+  // Fetch saved properties count
+  useEffect(() => {
+    const fetchSavedCount = async () => {
+      if (user) {
+        try {
+          const data = await api.properties.myFavorites();
+          setSavedPropertiesCount(data?.length || 0);
+        } catch (error) {
+          console.error('Failed to fetch saved properties count:', error);
+        }
+      } else {
+        setSavedPropertiesCount(0);
+      }
+    };
+
+    fetchSavedCount();
+  }, [user]);
+
   const menuItems = [
-    { icon: Heart, label: 'Saved Properties', count: 3 },
+    { icon: Heart, label: 'Saved Properties', count: savedPropertiesCount || 0 },
     { icon: Calendar, label: 'Property Tours', count: 1 },
-    { icon: Calculator, label: 'Mortgage Calculator' },
-    { icon: HelpCircle, label: 'Help Center' },
-    { icon: Settings, label: 'Settings' },
+    { icon: Calculator, label: 'Mortgage Calculator', count: undefined },
+    { icon: HelpCircle, label: 'Help Center', count: undefined },
+    { icon: Settings, label: 'Settings', count: undefined },
   ];
 
   const handleLogout = async () => {
@@ -262,6 +282,32 @@ export default function ProfileScreen() {
       console.error('Logout failed:', error);
       // Still logout locally even if backend call fails
       await logout();
+    }
+  };
+
+  const handleMenuItemPress = (label: string) => {
+    switch (label) {
+      case 'Saved Properties':
+        router.push('/saved-properties');
+        break;
+      case 'Property Tours':
+        // TODO: Implement property tours
+        console.log('Property Tours pressed');
+        break;
+      case 'Mortgage Calculator':
+        // TODO: Implement mortgage calculator
+        console.log('Mortgage Calculator pressed');
+        break;
+      case 'Help Center':
+        // TODO: Implement help center
+        console.log('Help Center pressed');
+        break;
+      case 'Settings':
+        // TODO: Implement settings
+        console.log('Settings pressed');
+        break;
+      default:
+        console.log(`${label} pressed`);
     }
   };
 
@@ -307,12 +353,12 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             
             {Platform.OS !== 'web' && (
-              <TouchableOpacity
+            <TouchableOpacity
                 onPress={testManualToken}
                 style={[styles.googleButton, { backgroundColor: '#f8f9fa', marginTop: 10 }]}
-              >
+            >
                 <Text style={[styles.googleButtonText, { color: '#666' }]}>Test OAuth Token</Text>
-              </TouchableOpacity>
+            </TouchableOpacity>
             )}
 
           </View>
@@ -375,7 +421,11 @@ export default function ProfileScreen() {
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
-            <TouchableOpacity key={index} style={styles.menuItem}>
+            <TouchableOpacity 
+              key={index} 
+              style={styles.menuItem}
+              onPress={() => handleMenuItemPress(item.label)}
+            >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
                   <item.icon size={20} color="#0F3460" />
@@ -383,7 +433,7 @@ export default function ProfileScreen() {
                 <Text style={styles.menuText}>{item.label}</Text>
               </View>
               <View style={styles.menuItemRight}>
-                {item.count && (
+                {typeof item.count === 'number' && item.count > 0 && (
                   <View style={styles.countBadge}>
                     <Text style={styles.countText}>{item.count}</Text>
                   </View>
