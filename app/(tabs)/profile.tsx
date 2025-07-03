@@ -69,7 +69,7 @@ export default function ProfileScreen() {
         console.log('Google ID Token obtained:', id_token);
         try {
           const res = await api.post('accounts/google/login/mobile/', { id_token });
-          const { access_token, refresh_token, user: userData } = res;
+          const { access_token, refresh_token, user: userData } = res.data;
           await SecureStore.setItemAsync('access_token', access_token);
           await SecureStore.setItemAsync('refresh_token', refresh_token);
           setUser(userData);

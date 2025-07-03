@@ -9,9 +9,9 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiClient } from '@/config/api';
-import type { Thread, Message } from '../types';
+import { apiClient, WS_BASE_URL } from '@/config/api';
 import { useUser } from './UserContext';
+import { Thread, Message } from '../types';
 
 interface ChatContextValue {
   threads: Thread[];
@@ -45,12 +45,9 @@ const getToken = async (): Promise<string | null> =>
   (await AsyncStorage.getItem('mobile_access_token')) ??
   null;
 
-/** Derive WS URL from REST base (e.g. https://api… → wss://api…) */
+/** Get the WebSocket base URL */
 function makeWsUrl(): string {
-  const rest = apiClient.defaults.baseURL ?? '';
-  if (rest.startsWith('https')) return rest.replace(/^https/, 'wss');
-  if (rest.startsWith('http')) return rest.replace(/^http/, 'ws');
-  return rest;
+  return WS_BASE_URL;
 }
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
