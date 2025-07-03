@@ -1,88 +1,27 @@
-// File: app/(tabs)/_layout.tsx
+// File: app/(tabs)/chat/_layout.tsx
 
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Platform } from 'react-native';
-import { Home, Search, MapPin, MessageSquare, User } from 'lucide-react-native';
 
-const getShadowStyle = () =>
-  Platform.select({
-    web: { boxShadow: '0 -2px 3px rgba(0,0,0,0.1)' },
-    default: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 3,
-      elevation: 8,
-    },
-  });
-
-export default function TabLayout() {
+export default function ChatLayout() {
   return (
-    <Tabs
+    <Stack
       screenOptions={{
-        tabBarActiveTintColor: '#0F3460',
-        tabBarInactiveTintColor: '#666',
-        tabBarLabelStyle: styles.tabBarLabel,
-        tabBarStyle: styles.tabBar,
         headerShown: false,
       }}
     >
-      <Tabs.Screen
+      <Stack.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-        }}
-      />
-
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Search',
-          tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
-        }}
-      />
-
-      <Tabs.Screen
-        name="map"
-        options={{
-          title: 'Map',
-          tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} />,
-        }}
-      />
-
-      {/* point *directly* at the index screen inside your chat folder */}
-      <Tabs.Screen
-        name="chat/index"
-        options={{
           title: 'Chat',
-          tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
         }}
       />
-
-      <Tabs.Screen
-        name="profile"
+      <Stack.Screen
+        name="[threadId]"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+          title: 'Chat Thread',
         }}
       />
-    </Tabs>
+    </Stack>
   );
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    height: 60,
-    paddingBottom: 8,
-    paddingTop: 8,
-    ...getShadowStyle(),
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  tabBarLabel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
-  },
-});

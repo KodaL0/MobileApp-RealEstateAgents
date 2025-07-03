@@ -30,6 +30,9 @@ apiClient.interceptors.request.use(
   async config => {
     try {
       const token = await AsyncStorage.getItem('access_token');
+      console.log('API Request Interceptor - Token found:', !!token, token ? token.substring(0, 20) + '...' : 'none');
+      console.log('API Request Interceptor - URL:', config.url);
+      
       if (token) {
         if (config.headers) {
           // Mutate existing headers object
@@ -38,6 +41,9 @@ apiClient.interceptors.request.use(
           // Initialize headers if missing
           config.headers = { Authorization: `Bearer ${token}` } as any;
         }
+        console.log('API Request Interceptor - Authorization header set');
+      } else {
+        console.log('API Request Interceptor - No token found, request will be unauthenticated');
       }
     } catch (e) {
       console.warn('Error reading token from storage', e);

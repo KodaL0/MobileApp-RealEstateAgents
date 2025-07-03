@@ -1,37 +1,115 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator,
+  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
 import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 
 import { api } from '@/config/api'; // mobile API client
 import { useUser, User } from '@/app/userbase/UserContext';
 
 console.log('Expo Redirect URI:', AuthSession.makeRedirectUri());
 
-const CLIENT_ID = '447376864792-evogs0jbp18dbuake12po6oh8dlictbo.apps.googleusercontent.com';
+const CLIENT_ID = '447376864792-hle5fodoponi9c8do50ppn639f6fhbso.apps.googleusercontent.com';
 const REDIRECT_URI = AuthSession.makeRedirectUri();
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, isLoading, isAuthenticated, login, logout } = useUser();
+  const { user, isLoading, isAuthenticated, login, logout, refreshUser } = useUser();
+  const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
 
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: CLIENT_ID,
-      redirectUri: REDIRECT_URI,
-      responseType: AuthSession.ResponseType.IdToken,
-      scopes: ['openid', 'profile', 'email'],
-    },
-    discovery
-  );
+  // Handle OAuth redirect on web
+  useEffect(() => {
+    if (Platform.OS === 'web' && !hasProcessedOAuth) {
+      const handleWebOAuthRedirect = async () => {
+        const currentUrl = window.location.href;
+        const fragmentStart = currentUrl.indexOf('#');
+        
+        if (fragmentStart !== -1) {
+          const fragment = currentUrl.substring(fragmentStart + 1);
+          const params = new URLSearchParams(fragment);
+          const idToken = params.get('id_token');
+          
+          if (idToken) {
+            console.log('Google ID Token found in URL:', idToken);
+            setHasProcessedOAuth(true); // Prevent re-processing
+            try {
+              const res = await api.post('users/accounts/google/login/mobile/', { id_token: idToken });
+              const { access_token, refresh_token, user: userData } = res.data;
+              console.log('Backend response:', { access_token: access_token?.substring(0, 20) + '...', user: userData });
+              await login(access_token, refresh_token, userData);
+              console.log('Login successful, user:', userData);
+              
+              // Clean up the URL fragment
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (error) {
+              console.error('Backend login failed:', error);
+              setHasProcessedOAuth(false); // Reset flag on error
+            }
+          }
+        }
+      };
+      
+      handleWebOAuthRedirect();
+    }
+  }, [login, hasProcessedOAuth]);
+
+  const handleGoogleLogin = async () => {
+    try {
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+        `response_type=id_token&` +
+        `scope=${encodeURIComponent('openid profile email')}&` +
+        `response_mode=fragment&` +
+        `nonce=${Math.random().toString(36).substring(2, 15)}`;
+
+      console.log('Opening Google OAuth URL:', authUrl);
+      
+      if (Platform.OS === 'web') {
+        // Reset the flag to allow processing the new OAuth flow
+        setHasProcessedOAuth(false);
+        // On web, redirect to the auth URL
+        window.location.href = authUrl;
+      } else {
+        // On native, use WebBrowser
+        const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+        
+        if (result.type === 'success') {
+          const url = result.url;
+          const fragmentStart = url.indexOf('#');
+          if (fragmentStart !== -1) {
+            const fragment = url.substring(fragmentStart + 1);
+            const params = new URLSearchParams(fragment);
+            const idToken = params.get('id_token');
+            
+            if (idToken) {
+              console.log('Google ID Token obtained:', idToken);
+              await handleTokenExchange(idToken);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Google OAuth error:', error);
+    }
+  };
+
+  const handleTokenExchange = async (idToken: string) => {
+    try {
+      const res = await api.post('users/accounts/google/login/mobile/', { id_token: idToken });
+      const { access_token, refresh_token, user: userData } = res.data;
+      console.log('Backend response:', { access_token: access_token?.substring(0, 20) + '...', user: userData });
+      await login(access_token, refresh_token, userData);
+      console.log('Login successful, user:', userData);
+      // No need to call refreshUser since we already have the user data
+    } catch (error) {
+      console.error('Backend login failed:', error);
+    }
+  };
 
   const menuItems = [
     { icon: Heart, label: 'Saved Properties', count: 3 },
@@ -40,24 +118,6 @@ export default function ProfileScreen() {
     { icon: HelpCircle, label: 'Help Center' },
     { icon: Settings, label: 'Settings' },
   ];
-
-  useEffect(() => {
-    const handleOAuthResponse = async () => {
-      if (response?.type === 'success') {
-        const { id_token } = response.params;
-        console.log('Google ID Token obtained:', id_token);
-        try {
-          const res = await api.post('accounts/google/login/mobile/', { id_token });
-          const { access_token, refresh_token, user: userData } = res.data;
-          await login(access_token, refresh_token, userData);
-          console.log('Login successful, user:', userData);
-        } catch (error) {
-          console.error('Backend login failed:', error);
-        }
-      }
-    };
-    handleOAuthResponse();
-  }, [response, login]);
 
   const handleLogout = async () => {
     try {
@@ -88,9 +148,8 @@ export default function ProfileScreen() {
             <Text style={styles.subtitle}>Secure sign-in with your Google account</Text>
 
             <TouchableOpacity
-              onPress={() => promptAsync()}
+              onPress={handleGoogleLogin}
               style={styles.googleButton}
-              disabled={!request}
             >
               <Image
                 source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/1200px-Google_%22G%22_Logo.png' }}
@@ -98,6 +157,25 @@ export default function ProfileScreen() {
               />
 
               <Text style={styles.googleButtonText}>Continue with Google</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => {
+                const testUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                  `client_id=${CLIENT_ID}&` +
+                  `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+                  `response_type=id_token&` +
+                  `scope=${encodeURIComponent('openid profile email')}&` +
+                  `response_mode=fragment&` +
+                  `nonce=${Math.random().toString(36).substring(2, 15)}`;
+                console.log('Test OAuth URL:', testUrl);
+                if (Platform.OS === 'web') {
+                  window.open(testUrl, '_blank');
+                }
+              }}
+              style={[styles.googleButton, { backgroundColor: '#f0f0f0', marginTop: 10 }]}
+            >
+              <Text style={[styles.googleButtonText, { color: '#333' }]}>Test OAuth (Get Fresh Token)</Text>
             </TouchableOpacity>
           </View>
         </View>

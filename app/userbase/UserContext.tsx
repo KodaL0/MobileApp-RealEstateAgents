@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { fetchUser as apiFetchUser } from './middleware';
 
 
@@ -25,6 +26,23 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+// Platform-specific secure storage helpers
+const setRefreshToken = async (token: string) => {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.setItem('refresh_token', token);
+  } else {
+    await SecureStore.setItemAsync('refresh_token', token);
+  }
+};
+
+const deleteRefreshToken = async () => {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.removeItem('refresh_token');
+  } else {
+    await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+  }
+};
+
 interface UserProviderProps {
   children: ReactNode;
 }
@@ -39,6 +57,8 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     try {
       // Check if we have a token first
       const token = await AsyncStorage.getItem('access_token');
+      console.log('fetchUser: token found?', !!token, token ? token.substring(0, 20) + '...' : 'none');
+      
       if (!token) {
         console.log('No access token found, user not authenticated');
         setUser(null);
@@ -46,7 +66,10 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         return;
       }
 
+      console.log('fetchUser: calling apiFetchUser with token');
       const data = await apiFetchUser();
+      console.log('fetchUser: apiFetchUser response:', data);
+      
       // handle nested or direct response shapes
       let userData: User | null = null;
       if (data?.user?.user) userData = data.user.user;
@@ -54,15 +77,19 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       else if (data?.data?.user) userData = data.data.user;
       else if (data?.id) userData = data as User;
       
+      console.log('fetchUser: processed userData:', userData);
       setUser(userData);
       setIsAuthenticated(!!userData);
     } catch (e: any) {
       console.error('UserContext fetchUser error', e);
+      console.error('Error response status:', e?.response?.status);
+      console.error('Error response data:', e?.response?.data);
       // If 401, clear tokens and set user to null
       if (e?.response?.status === 401) {
+        console.log('401 error, clearing tokens');
         await AsyncStorage.removeItem('access_token');
         await AsyncStorage.removeItem('mobile_access_token');
-        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+        await deleteRefreshToken();
       }
       setUser(null);
       setIsAuthenticated(false);
@@ -73,10 +100,24 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
   const login = async (accessToken: string, refreshToken: string, userData: User) => {
     try {
+      console.log('login: storing tokens and user data');
+      console.log('login: accessToken length:', accessToken?.length);
+      console.log('login: refreshToken length:', refreshToken?.length);
+      console.log('login: userData:', userData);
+      
+      // Store tokens first
       await AsyncStorage.setItem('access_token', accessToken);
-      await SecureStore.setItemAsync('refresh_token', refreshToken);
+      await setRefreshToken(refreshToken);
+      
+      // Verify token was stored
+      const storedToken = await AsyncStorage.getItem('access_token');
+      console.log('login: token verification - stored?', !!storedToken, storedToken ? storedToken.substring(0, 20) + '...' : 'none');
+      
+      // Set user state immediately from the data we already have
       setUser(userData);
       setIsAuthenticated(true);
+      
+      console.log('login: tokens stored successfully, user state updated');
     } catch (error) {
       console.error('Error storing tokens:', error);
       throw error;
@@ -87,7 +128,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     try {
       await AsyncStorage.removeItem('access_token');
       await AsyncStorage.removeItem('mobile_access_token');
-      await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+      await deleteRefreshToken();
       setUser(null);
       setIsAuthenticated(false);
     } catch (error) {
