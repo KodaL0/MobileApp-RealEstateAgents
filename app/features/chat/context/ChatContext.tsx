@@ -240,8 +240,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       content: string,
       propertyId?: number
     ) => {
-      console.log('ChatContext sendMessage called:', { threadId, recipientId, content, propertyId });
-      
       // Validation
       if (!threadId) {
         console.error('sendMessage: threadId is required');
@@ -266,20 +264,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       };
       if (propertyId) payload.property_id = propertyId;
 
-      console.log('Sending WebSocket payload:', JSON.stringify(payload, null, 2));
-
       if (ws.current?.readyState === WebSocket.OPEN) {
-        console.log('Sending via WebSocket');
         ws.current.send(JSON.stringify(payload));
       } else {
-        console.log('WebSocket not available, using REST API fallback');
-        console.log('WebSocket state:', ws.current?.readyState);
         apiClient.post(`chat/${threadId}/messages/`, {
           content,
           property_id: propertyId,
           recipient_id: recipientId,
-        }).then((response) => {
-          console.log('REST API response:', response.data);
         }).catch((error) => {
           console.error('REST API error:', error);
         });
