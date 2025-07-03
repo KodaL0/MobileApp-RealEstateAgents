@@ -63,19 +63,12 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
           if (img && typeof img === 'object' && img.image) return img.image;
           return null;
         })
-        .filter(img => img && typeof img === 'string' && img.trim() !== '')
+        .filter((img): img is string => img !== null && typeof img === 'string' && img.trim() !== '')
     : [];
   const imgCount = images.length;
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Debug logging for images
-  console.log('PropertyCard Debug:', {
-    propertyId: property.id,
-    originalImages: property.images,
-    filteredImages: images,
-    imgCount: imgCount,
-    currentIndex: currentIndex
-  });
+
 
   // Ensure currentIndex is within bounds
   useEffect(() => {
@@ -136,18 +129,14 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
   let imageUri = '';
   if (imgCount > 0) {
     const raw = images[currentIndex];
-    console.log('Processing image:', { raw, currentIndex, imgCount });
     
     // Check if raw exists and is a string before calling startsWith
     if (raw && typeof raw === 'string') {
       imageUri = raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`;
-      console.log('Constructed imageUri:', imageUri);
     } else {
       console.warn('Invalid image data at index', currentIndex, ':', raw);
       imageUri = ''; // Fallback to empty string
     }
-  } else {
-    console.log('No images available for property', property.id);
   }
 
   return (
@@ -189,9 +178,11 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
             )}
           </>
         ) : (
-          <View style={[styles.image, styles.noImagePlaceholder]}>
-            <Text style={styles.noImageText}>No Image</Text>
-          </View>
+          <Image
+            source={{ uri: 'https://placehold.co/400x200/E5E7EB/6B7280?text=No+Image' }}
+            style={styles.image}
+            resizeMode="cover"
+          />
         )}
 
         {/* Type Tag */}
@@ -311,13 +302,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  noImagePlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noImageText: {
-    color: '#666',
-  },
+
   // Arrows overlay
   arrowLeft: {
     position: 'absolute',

@@ -19,7 +19,7 @@ import PropertyCard from '../components/property/PropertyCard';
 // Property type definition (matches what PropertyCard expects)
 interface Property {
   id: number;
-  images: string[];
+  images: (string | { image: string })[];
   forSale: boolean;
   price: number;
   title: string;
