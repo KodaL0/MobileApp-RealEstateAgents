@@ -10,7 +10,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useChat } from '../../features/chat/context/ChatContext';
 import { useUser } from '../../_userbase/UserContext';
 import { Home, Clock, User } from 'lucide-react-native';
@@ -18,11 +18,44 @@ import type { Thread } from '../../features/chat/types';
 
 export default function ThreadList() {
   const router = useRouter();
-  const { threads, messages } = useChat();
+  const params = useLocalSearchParams<{ ownerId?: string; propertyId?: string; title?: string }>();
+  const { threads, messages, getOrCreateThread } = useChat();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'property' | 'dm'>('dm');
   const [filtered, setFiltered] = useState<Thread[]>(threads);
+
+  // Handle URL parameters for creating new threads (from property details)
+  useEffect(() => {
+    const handleMessageOwner = async () => {
+      if (params.ownerId && params.propertyId) {
+        if (!user) {
+          // User not authenticated, redirect to login
+          console.log('User not authenticated, cannot create thread');
+          return;
+        }
+
+        try {
+          const ownerId = parseInt(params.ownerId);
+          const propertyId = parseInt(params.propertyId);
+          
+          if (!isNaN(ownerId) && !isNaN(propertyId)) {
+            console.log('Creating/finding thread for owner:', ownerId, 'property:', propertyId);
+            
+            // Create or find existing thread
+            const threadId = await getOrCreateThread(ownerId, propertyId, params.title);
+            
+            // Navigate to the specific thread
+            router.replace(`/chat/${threadId}`);
+          }
+        } catch (error) {
+          console.error('Failed to create thread:', error);
+        }
+      }
+    };
+
+    handleMessageOwner();
+  }, [params.ownerId, params.propertyId, user, getOrCreateThread, router]);
 
   useEffect(() => {
     // 1. Filter by tab (DM or property) **first** to avoid extra work

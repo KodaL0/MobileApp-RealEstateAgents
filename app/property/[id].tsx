@@ -661,6 +661,7 @@ export default function PropertyDetailScreen() {
                   params: {
                     ownerId: String(owner.id),
                     propertyId: String(property.id),
+                    title: title,
                   },
                 });
               }}
