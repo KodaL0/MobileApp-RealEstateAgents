@@ -246,7 +246,7 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
       <View style={styles.content}>
         <View style={styles.priceRow}>
           <Text style={styles.price}>
-            ${Number(property.price).toLocaleString()}
+            €{Number(property.price).toLocaleString()}
             {!property.forSale && <Text style={styles.period}>/mo</Text>}
           </Text>
           <View style={styles.propertyType}>
