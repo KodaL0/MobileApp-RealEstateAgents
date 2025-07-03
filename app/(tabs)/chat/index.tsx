@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useChat } from '../../features/chat/context/ChatContext';
-import { useUser } from '../../features/chat/context/UserContext';
+import { useUser } from '../../userbase/UserContext';
 import { Home, Clock } from 'lucide-react-native';
 import type { Thread } from '../../features/chat/types';
 

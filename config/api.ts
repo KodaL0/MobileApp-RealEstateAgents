@@ -9,7 +9,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 
 const API_BASE_URL = 'https://api.propertpro.com/api'; 
-export const WS_BASE_URL = 'wss://api.propertpro.com'; 
+
+// WebSocket URL - always use production since backend is always on api.propertpro.com
+const WS_BASE_URL = 'wss://api.propertpro.com';
+
+export { WS_BASE_URL };
 // WebSocket URLs are NOT under /api/ - they're at the root level
 // Django Channels routing: r"ws/chat/?$" -> wss://api.propertpro.com/ws/chat/
 

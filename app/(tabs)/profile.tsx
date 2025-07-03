@@ -5,18 +5,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
-import * as SecureStore from 'expo-secure-store';
 import * as AuthSession from 'expo-auth-session';
 
 import { api } from '@/config/api'; // mobile API client
+import { useUser, User } from '@/app/userbase/UserContext';
 
-type User = {
-  id: number;
-  name: string;
-  email: string;
-  profile_picture?: string;
-  is_premium?: boolean;
-};
+console.log('Expo Redirect URI:', AuthSession.makeRedirectUri());
 
 const CLIENT_ID = '447376864792-evogs0jbp18dbuake12po6oh8dlictbo.apps.googleusercontent.com';
 const REDIRECT_URI = AuthSession.makeRedirectUri();
@@ -27,8 +21,7 @@ const discovery = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading, isAuthenticated, login, logout } = useUser();
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -49,20 +42,6 @@ export default function ProfileScreen() {
   ];
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const currentUser = await api.auth.getUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Failed to fetch user:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  useEffect(() => {
     const handleOAuthResponse = async () => {
       if (response?.type === 'success') {
         const { id_token } = response.params;
@@ -70,9 +49,7 @@ export default function ProfileScreen() {
         try {
           const res = await api.post('accounts/google/login/mobile/', { id_token });
           const { access_token, refresh_token, user: userData } = res.data;
-          await SecureStore.setItemAsync('access_token', access_token);
-          await SecureStore.setItemAsync('refresh_token', refresh_token);
-          setUser(userData);
+          await login(access_token, refresh_token, userData);
           console.log('Login successful, user:', userData);
         } catch (error) {
           console.error('Backend login failed:', error);
@@ -80,20 +57,20 @@ export default function ProfileScreen() {
       }
     };
     handleOAuthResponse();
-  }, [response]);
+  }, [response, login]);
 
   const handleLogout = async () => {
     try {
       await api.auth.logout();
-      await SecureStore.deleteItemAsync('access_token');
-      await SecureStore.deleteItemAsync('refresh_token');
-      setUser(null);
+      await logout();
     } catch (error) {
       console.error('Logout failed:', error);
+      // Still logout locally even if backend call fails
+      await logout();
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ActivityIndicator size="large" color="#0F3460" style={{ marginTop: 100 }} />
@@ -101,7 +78,7 @@ export default function ProfileScreen() {
     );
   }
 
-  if (!user) {
+  if (!isAuthenticated || !user) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="dark" />

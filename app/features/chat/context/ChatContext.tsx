@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, WS_BASE_URL } from '@/config/api';
-import { useUser } from './UserContext';
+import { useUser } from '../../../userbase/UserContext';
 import { Thread, Message } from '../types';
 
 interface ChatContextValue {
@@ -62,8 +62,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   >({});
 
   const ws = useRef<WebSocket | null>(null);
-  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
-  const pingRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeout = useRef<number | null>(null);
+  const pingRef = useRef<number | null>(null);
 
   const openSocket = useCallback(async () => {
     // if already open or connecting, skip
@@ -180,16 +180,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user?.id]);
 
   useEffect(() => {
-    // initial fetch + open socket
-    apiClient.get<Thread[]>('chat/').then((r) => setThreads(r.data));
-    openSocket();
+    // Only fetch threads and open socket if user is authenticated
+    if (user) {
+      // initial fetch + open socket
+      apiClient.get<Thread[]>('chat/').then((r) => setThreads(r.data));
+      openSocket();
+    }
 
     return () => {
       if (pingRef.current) clearInterval(pingRef.current);
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
       ws.current?.close();
     };
-  }, [openSocket]);
+  }, [openSocket, user]);
 
   const getOrCreateThread = useCallback(
     async (sellerId: number, propertyId: number | null, title?: string) => {

@@ -11,7 +11,7 @@ import { useFonts,
          Poppins_700Bold 
        } from '@expo-google-fonts/poppins';
 
-import { UserProvider } from './features/chat/context/UserContext';
+import { UserProvider } from './userbase/UserContext';
 import { ChatProvider } from './features/chat/context/ChatContext';
 import SplashScreen from '../components/SplashScreen';
 

@@ -16,7 +16,7 @@ import {
 import { useLocalSearchParams } from 'expo-router';
 import type { Message } from '../../features/chat/types';
 import { useChat } from '../../features/chat/context/ChatContext';
-import { useUser } from '../../features/chat/context/UserContext';
+import { useUser } from '../../userbase/UserContext';
 import { Send } from 'lucide-react-native';
 
 export default function ChatThreadPage() {

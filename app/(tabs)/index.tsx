@@ -16,7 +16,7 @@ import FeaturedListings from '@/components/home/FeaturedListings';
 import PropertyTypeFilters from '@/components/home/PropertyTypeFilters';
 import TrendingProperties from '@/components/home/TrendingProperties';
 import Promotions from '@/components/home/Promotions';
-import { useUser } from '../features/chat/context/UserContext';
+import { useUser } from '../userbase/UserContext';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
