@@ -72,18 +72,76 @@ export default function ChatThreadPage() {
 
   // Figure out who we're sending *to* -- if last message was from me, flip
   const getRecipientId = (): number => {
-    if (!threadMessages.length || !user) return 0;
+    if (!user) {
+      console.warn('No user found for recipient ID calculation');
+      return 0;
+    }
+    
+    // If we have a thread, get the other user from the thread
+    if (thread) {
+      const otherUserId = thread.user1 === user.id ? thread.user2 : thread.user1;
+      console.log('Recipient ID from thread:', otherUserId);
+      return otherUserId;
+    }
+    
+    // Fallback to message history
+    if (!threadMessages.length) {
+      console.warn('No messages in thread to determine recipient');
+      return 0;
+    }
+    
     const last = threadMessages[threadMessages.length - 1];
-    return last.sender === user.id ? last.recipient : last.sender;
+    const recipientId = last.sender === user.id ? last.recipient : last.sender;
+    console.log('Recipient ID from messages:', recipientId);
+    return recipientId;
   };
 
   // Send handler
-  const onSend = () => {
+  const onSend = async () => {
+    console.log('=== Send button pressed ===');
     const text = input.trim();
-    if (!text) return;
+    
+    if (!text) {
+      console.warn('Empty message, not sending');
+      return;
+    }
+    
+    if (!threadId) {
+      console.error('No threadId available');
+      return;
+    }
+    
+    if (!user) {
+      console.error('No user logged in');
+      return;
+    }
+    
     const recipientId = getRecipientId();
-    sendMessage(threadId, recipientId, text);
-    setInput('');
+    if (!recipientId) {
+      console.error('Could not determine recipient ID');
+      return;
+    }
+    
+    console.log('Sending message:', {
+      threadId,
+      recipientId,
+      content: text,
+      propertyId,
+      user: user.id
+    });
+    
+    try {
+      // Clear input immediately for better UX
+      setInput('');
+      
+      // Send the message with proper parameter order
+      sendMessage(threadId, recipientId, text, propertyId || undefined);
+      console.log('Message sent successfully');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Restore input if sending failed
+      setInput(text);
+    }
   };
 
   // Render each bubble
@@ -104,6 +162,21 @@ export default function ChatThreadPage() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Debug Info - Remove in production */}
+      <View style={{ padding: 10, backgroundColor: '#f0f0f0', borderBottomWidth: 1, borderColor: '#ddd' }}>
+        <Text style={{ fontSize: 12, color: '#666' }}>
+          Debug: ThreadID={threadId}, User={user?.id}, Thread={thread ? 'found' : 'not found'}
+        </Text>
+        {thread && (
+          <Text style={{ fontSize: 12, color: '#666' }}>
+            Thread Users: {thread.user1} & {thread.user2}, Property: {thread.property || 'DM'}
+          </Text>
+        )}
+        <Text style={{ fontSize: 12, color: '#666' }}>
+          Messages: {threadMessages.length}, RecipientID: {getRecipientId()}
+        </Text>
+      </View>
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -146,6 +219,15 @@ export default function ChatThreadPage() {
           />
           <TouchableOpacity onPress={onSend} style={styles.sendButton}>
             <Send size={20} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => {
+              console.log('Test button pressed');
+              setInput('Test message from debug button');
+            }} 
+            style={[styles.sendButton, { backgroundColor: '#e0e0e0' }]}
+          >
+            <Text style={{ fontSize: 12 }}>Test</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
