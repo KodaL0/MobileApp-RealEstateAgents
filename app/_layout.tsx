@@ -3,13 +3,12 @@ import { Stack, SplashScreen as ExpoSplash } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { View, StyleSheet } from 'react-native';
-import GlobalOAuthHandler from './_userbase/GlobalOAuthHandler';
 
-import { useFonts,
-         Poppins_400Regular,
-         Poppins_500Medium,
-         Poppins_600SemiBold,
-         Poppins_700Bold
+import { useFonts, 
+         Poppins_400Regular, 
+         Poppins_500Medium, 
+         Poppins_600SemiBold, 
+         Poppins_700Bold 
        } from '@expo-google-fonts/poppins';
 
 import { UserProvider } from './_userbase/UserContext';
@@ -46,7 +45,6 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
         <UserProvider>
-          <GlobalOAuthHandler />
           <ChatProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
