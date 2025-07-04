@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert,
 } from 'react-native';
@@ -6,7 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
+
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 
@@ -348,7 +348,7 @@ export default function ProfileScreen() {
         console.log('Property Tours pressed');
         break;
       case 'Mortgage Calculator':
-        // TODO: Implement mortgage calculator
+        router.push('/mortgage-calculator');
         console.log('Mortgage Calculator pressed');
         break;
       case 'Help Center':

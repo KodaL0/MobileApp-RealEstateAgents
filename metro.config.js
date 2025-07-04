@@ -1,7 +1,11 @@
+// metro.config.js
 const { getDefaultConfig } = require('expo/metro-config');
 
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
+
+// Prefer compiled entrypoints (build/) over raw TS sources in node_modules
+config.resolver.resolverMainFields = ['react-native', 'main'];
 
 // Add resolver configuration to handle web-only modules
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
@@ -43,7 +47,10 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   }
   
   // Block native-only modules on web
-  if (platform === 'web' && moduleName.includes('react-native/Libraries/Utilities/codegenNativeCommands')) {
+  if (
+    platform === 'web' &&
+    moduleName.includes('react-native/Libraries/Utilities/codegenNativeCommands')
+  ) {
     return {
       filePath: require.resolve('./web-stubs/empty-module.js'),
       type: 'sourceFile',
@@ -54,4 +61,4 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
-module.exports = config; 
+module.exports = config;
