@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4
   },
-  textOwn: { color: '#fff' },
+  textOwn: { color: '#0F3460' },
   textOther: { color: '#0F3460' },
   time: { marginTop: 4, fontSize: 10, color: '#666' },
   inputBar: {

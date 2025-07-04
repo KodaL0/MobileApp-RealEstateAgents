@@ -652,26 +652,7 @@ export default function PropertyDetailScreen() {
               Contact details not provided.
             </Text>
           )}
-          {owner && (
-            <TouchableOpacity
-              style={styles.messageOwnerButton}
-              onPress={() => {
-                router.push({
-                  pathname: '/chat',
-                  params: {
-                    ownerId: String(owner.id),
-                    propertyId: String(property.id),
-                    title: title,
-                  },
-                });
-              }}
-            >
-              <MessageSquare size={16} color="#fff" />
-              <Text style={styles.messageOwnerText}>
-                Message Owner
-              </Text>
-            </TouchableOpacity>
-          )}
+
 
           {/* Agent Info */}
           {agent && (
@@ -770,16 +751,26 @@ export default function PropertyDetailScreen() {
               : 'Available Now'}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.scheduleButton}
-          onPress={() => {
-            // schedule tour or navigate elsewhere
-          }}
-        >
-          <Text style={styles.scheduleButtonText}>
-            Schedule Tour
-          </Text>
-        </TouchableOpacity>
+        {owner && (
+          <TouchableOpacity
+            style={styles.scheduleButton}
+            onPress={() => {
+              router.push({
+                pathname: '/chat',
+                params: {
+                  ownerId: String(owner.id),
+                  propertyId: String(property.id),
+                  title: title,
+                },
+              });
+            }}
+          >
+            <MessageSquare size={16} color="#fff" />
+            <Text style={styles.scheduleButtonText}>
+              Message Owner
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -1050,22 +1041,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 8,
   },
-  messageOwnerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0F3460',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 12,
-    alignSelf: 'flex-start',
-  },
-  messageOwnerText: {
-    marginLeft: 6,
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#fff',
-  },
+
   agentCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1154,14 +1130,18 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   scheduleButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#0F3460',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scheduleButtonText: {
     fontFamily: 'Poppins-Medium',
     fontSize: 14,
     color: '#fff',
+    marginLeft: 8,
   },
 });

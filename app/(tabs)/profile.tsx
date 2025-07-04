@@ -187,24 +187,71 @@ export default function ProfileScreen() {
         console.log('handleGoogleLogin: Native platform detected');
         console.log('handleGoogleLogin: Using WebBrowser.openBrowserAsync');
         
-        // For native, use WebBrowser.openBrowserAsync with Expo proxy
-        const nonce = Math.random().toString(36).substring(2, 15);
-        const state = nonce;
-        const authUrl = generateOAuthUrl(nonce, state);
+        // For native, use AuthSession for better OAuth handling
+        console.log('handleGoogleLogin: Using AuthSession for OAuth flow');
         
-        console.log('handleGoogleLogin: Opening OAuth URL with WebBrowser.openBrowserAsync');
-        console.log('handleGoogleLogin: Auth URL:', authUrl);
-        
-        // Open browser and let user complete OAuth flow
-        // The Expo proxy will handle redirecting back to the app
-        await WebBrowser.openBrowserAsync(authUrl);
-        
-        console.log('handleGoogleLogin: Browser opened. User should complete OAuth and app will handle the redirect.');
-        console.log('handleGoogleLogin: If you complete OAuth in browser, the redirect will be handled by the Expo proxy.');
-        
-        // Note: In a production app, you'd set up deep linking to handle the redirect
-        // For development with Expo Go, the user may need to manually return to the app
-        // The OAuth result will be handled by any registered URL handlers or the Expo proxy
+        try {
+          // Create AuthSession request
+          const request = new AuthSession.AuthRequest({
+            clientId: OAUTH_CONFIG.CLIENT_ID,
+            scopes: [...OAUTH_CONFIG.SCOPES], // Convert readonly array to mutable
+            redirectUri: OAUTH_CONFIG.REDIRECT_URI,
+            responseType: AuthSession.ResponseType.IdToken,
+            prompt: AuthSession.Prompt.SelectAccount,
+            extraParams: {
+              nonce: Math.random().toString(36).substring(2, 15),
+            },
+          });
+          
+          console.log('handleGoogleLogin: AuthSession request created');
+          console.log('handleGoogleLogin: Redirect URI:', OAUTH_CONFIG.REDIRECT_URI);
+          
+          // Start the OAuth flow
+          const result = await request.promptAsync({
+            authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+          });
+          
+          console.log('handleGoogleLogin: AuthSession result:', result);
+          
+          if (result.type === 'success') {
+            console.log('handleGoogleLogin: OAuth successful, checking for token');
+            // Check if we have the id_token in the result
+            const idToken = (result as any).params?.id_token;
+            
+            if (idToken) {
+              console.log('handleGoogleLogin: ID token found, length:', idToken.length);
+              // Exchange token with backend
+              await handleTokenExchange(idToken);
+            } else {
+              console.error('handleGoogleLogin: No id_token in successful result');
+              console.error('handleGoogleLogin: Result:', result);
+              Alert.alert(
+                'OAuth Error',
+                'Authentication completed but no token received. Please try again.',
+                [{ text: 'OK' }]
+              );
+            }
+          } else if (result.type === 'cancel') {
+            console.log('handleGoogleLogin: User cancelled OAuth flow');
+          } else {
+            console.error('handleGoogleLogin: OAuth failed');
+            console.error('handleGoogleLogin: Result type:', result.type);
+            console.error('handleGoogleLogin: Result:', result);
+            
+            Alert.alert(
+              'OAuth Error',
+              'Authentication was not completed. Please try again.',
+              [{ text: 'OK' }]
+            );
+          }
+        } catch (authError) {
+          console.error('handleGoogleLogin: AuthSession error:', authError);
+          Alert.alert(
+            'OAuth Error',
+            'Failed to start authentication. Please try again.',
+            [{ text: 'OK' }]
+          );
+        }
       }
     } catch (error: any) {
       console.error('=== ACCOUNT SELECTION FLOW ERROR ===');
@@ -214,6 +261,12 @@ export default function ProfileScreen() {
         stack: error?.stack,
         name: error?.name
       });
+      
+      Alert.alert(
+        'OAuth Error',
+        'Failed to start Google authentication. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
