@@ -7,6 +7,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as Google from 'expo-auth-session/providers/google';
+import { ResponseType } from 'expo-auth-session';
 import { useRouter } from 'expo-router';
 
 import { api } from '@/config/api'; // mobile API client
@@ -20,6 +22,18 @@ export default function ProfileScreen() {
   const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
   const [savedPropertiesCount, setSavedPropertiesCount] = useState<number>(0);
   const [hasFetchedSavedCount, setHasFetchedSavedCount] = useState<boolean>(false);
+
+  // Configure AuthSession (native platforms)
+  WebBrowser.maybeCompleteAuthSession();
+
+  const [request, response, promptAsync] = Google.useAuthRequest(
+    {
+      clientId: OAUTH_CONFIG.CLIENT_ID,
+      redirectUri: OAUTH_CONFIG.REDIRECT_URI,
+      scopes: [...OAUTH_CONFIG.SCOPES] as string[],
+      responseType: ResponseType.IdToken,
+    }
+  );
 
   // OAuth redirect on web
   useEffect(() => {
@@ -83,15 +97,32 @@ export default function ProfileScreen() {
 
   const handleGoogleLogin = async () => {
     if (Platform.OS === 'web') {
+      // Existing web flow
       setHasProcessedOAuth(false);
       const nonce = Math.random().toString(36).substring(2, 15);
       const state = nonce;
       const authUrl = generateOAuthUrl(nonce, state);
       window.location.href = authUrl;
     } else {
-      Alert.alert('Not implemented', 'Native OAuth login is not implemented here.');
+      // Native flow using expo-auth-session
+      try {
+        await promptAsync();
+      } catch (err) {
+        console.error('Google sign-in error:', err);
+        Alert.alert('Login Failed', 'There was an error initiating Google login. Please try again.');
+      }
     }
   };
+
+  // Handle native AuthSession response
+  useEffect(() => {
+    if (Platform.OS !== 'web' && response?.type === 'success') {
+      const idToken = (response.params as any)?.id_token;
+      if (idToken) {
+        handleTokenExchange(idToken);
+      }
+    }
+  }, [response]);
 
   const handleTokenExchange = async (idToken: string) => {
     try {
