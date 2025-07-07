@@ -90,6 +90,15 @@ export interface PublicProfileData {
   id: number;
   username: string;
   date_joined: string;
+  // New profile fields (public)
+  name?: string;
+  bio?: string;
+  location?: string;
+  office?: string;
+  avatar?: string;
+  website?: string;
+  phone?: string;
+  // Property and connection data
   properties_count: number;
   published_properties: Property[];
   connections_count: number;

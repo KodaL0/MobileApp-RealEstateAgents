@@ -10,13 +10,12 @@ export default function EditProfileScreen() {
   const router = useRouter();
 
   const [profileData, setProfileData] = useState({
+    username: '',
     name: '',
     bio: '',
     location: '',
     phone: '',
     office: '',
-    avatar: '',
-    website: '',
   });
 
   const [profileMessage, setProfileMessage] = useState('');
@@ -37,15 +36,14 @@ export default function EditProfileScreen() {
     try {
       const response = await api.auth.getUser();
       if (response.status === 200) {
-        const u = response.data.user;
+        const u = response.user;
         setProfileData({
+          username: u.username || '',
           name: u.name || '',
           bio: u.bio || '',
           location: u.location || '',
           phone: u.phone || '',
           office: u.office || '',
-          avatar: u.avatar || '',
-          website: u.website || '',
         });
       }
     } catch (err) {
@@ -86,10 +84,9 @@ export default function EditProfileScreen() {
     setProfileError('');
 
     const phoneError = validatePhone(profileData.phone);
-    const websiteError = validateWebsite(profileData.website);
 
-    if (phoneError || websiteError) {
-      setProfileError(phoneError || websiteError || '');
+    if (phoneError) {
+      setProfileError(phoneError);
       setIsSavingProfile(false);
       return;
     }
@@ -128,7 +125,7 @@ export default function EditProfileScreen() {
       {profileMessage ? <Text style={styles.success}>{profileMessage}</Text> : null}
       {profileError ? <Text style={styles.error}>{profileError}</Text> : null}
 
-      {['name', 'bio', 'location', 'phone', 'office', 'avatar', 'website'].map((field) => (
+      {['username', 'name', 'bio', 'location', 'phone', 'office'].map((field) => (
         <View key={field} style={styles.inputGroup}>
           <Text style={styles.label}>{field.charAt(0).toUpperCase() + field.slice(1)}</Text>
           <TextInput
