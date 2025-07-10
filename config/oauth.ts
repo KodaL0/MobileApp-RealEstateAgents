@@ -15,9 +15,15 @@ import { Platform } from 'react-native';
 
 // Get the appropriate redirect URI for the current platform
 export const getRedirectUri = (): string => {
-  return Platform.OS === 'web'
-    ? 'http://localhost:8081'
-    : 'https://auth.expo.io/@dalmiraskon/propertpro-mobile';
+  if (Platform.OS === 'web') {
+    // If running on production domain, use it; otherwise fallback to localhost
+    if (typeof window !== 'undefined' && window.location.hostname === 'm.propertpro.com') {
+      return 'https://m.propertpro.com';
+    }
+    return 'http://localhost:8081';
+  }
+  // Native / Expo proxy
+  return 'https://auth.expo.io/@dalmiraskon/propertpro-mobile';
 };
 
 export const OAUTH_CONFIG = {
