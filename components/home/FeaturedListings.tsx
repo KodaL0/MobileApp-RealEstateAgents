@@ -108,13 +108,8 @@ export default function FeaturedListings({
           const propertyType =
             rawType.charAt(0).toUpperCase() + rawType.slice(1);
 
-          // 4) Map size: convert area (m²) to sq ft if numeric; else fallback
-          let size: number | string = item.area;
-          if (typeof item.area === 'number') {
-            size = Math.round(item.area * 10.764);
-          } else if (!isNaN(Number(item.area))) {
-            size = Math.round(Number(item.area) * 10.764);
-          }
+          // 4) Map size: use raw area from backend
+          let size = item.area;
 
           // 5) Favorite status
           const isFavorite: boolean = item.is_favourite ?? false;
@@ -210,7 +205,7 @@ export default function FeaturedListings({
             <Text style={styles.featureText}>{item.bathrooms}</Text>
           </View>
 
-          <Text style={styles.size}>{item.size} sq ft</Text>
+          <Text style={styles.size}>{item.size} m²</Text>
         </View>
       </View>
     </TouchableOpacity>

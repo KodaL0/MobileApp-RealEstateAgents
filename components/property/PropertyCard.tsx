@@ -276,7 +276,7 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
             <Text style={styles.featureText}>{property.bathrooms} baths</Text>
           </View>
 
-          <Text style={styles.size}>{property.size} sq ft</Text>
+          <Text style={styles.size}>{property.size} m²</Text>
         </View>
       </View>
     </TouchableOpacity>

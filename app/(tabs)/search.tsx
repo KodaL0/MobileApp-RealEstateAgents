@@ -160,13 +160,7 @@ export default function SearchScreen() {
       location: item.location || '',
       bedrooms: Number(item.bedrooms) || 0,
       bathrooms: Number(item.bathrooms) || 0,
-      size: (() => {
-        // if backend gives area in m2, convert to sq ft:
-        if (item.area != null && !isNaN(Number(item.area))) {
-          return Math.round(Number(item.area) * 10.764);
-        }
-        return Number(item.size) || 0;
-      })(),
+      size: item.area, // Use raw area from backend
       propertyType: item.property_type || '',
       // plus any other fields your mobile card uses
     };

@@ -28,12 +28,24 @@ export default function ProfileScreen() {
 
   const [request, response, promptAsync] = Google.useAuthRequest(
     {
-      clientId: OAUTH_CONFIG.CLIENT_ID,
+      clientId: OAUTH_CONFIG.CLIENT_ID, // Web client ID while using Expo proxy
       redirectUri: OAUTH_CONFIG.REDIRECT_URI,
       scopes: [...OAUTH_CONFIG.SCOPES] as string[],
-      responseType: ResponseType.IdToken,
+      responseType: ResponseType.Code, // use authorization code flow
+      usePKCE: false,
     }
   );
+
+  // Log when the auth request object is ready
+  useEffect(() => {
+    console.log('=== AUTH REQUEST INITIALISED ===');
+    console.log('Platform:', Platform.OS);
+    console.log('Client ID:', OAUTH_CONFIG.CLIENT_ID);
+    console.log('Redirect URI:', OAUTH_CONFIG.REDIRECT_URI);
+    console.log('Scopes:', OAUTH_CONFIG.SCOPES);
+    console.log('Request loaded?', !!request);
+    console.log('===============================');
+  }, [request]);
 
   // OAuth redirect on web
   useEffect(() => {
@@ -68,25 +80,16 @@ export default function ProfileScreen() {
   // Deep links for OAuth
   useEffect(() => {
     const handleDeepLink = (url: string) => {
-      const isOAuthRedirect = url.includes('auth.expo.io') || url.includes('#id_token=') || url.includes('&id_token=') || url.includes('?id_token=');
+      const isOAuthRedirect = url.includes('auth.expo.io') && url.includes('code=');
       if (isOAuthRedirect) {
-        let idToken = null;
-        const fragmentStart = url.indexOf('#');
-        if (fragmentStart !== -1) {
-          const fragment = url.substring(fragmentStart + 1);
-          const params = new URLSearchParams(fragment);
-          idToken = params.get('id_token');
-        }
-        if (!idToken) {
-          const queryStart = url.indexOf('?');
-          if (queryStart !== -1) {
-            const query = url.substring(queryStart + 1);
-            const params = new URLSearchParams(query);
-            idToken = params.get('id_token');
+        const queryStart = url.indexOf('?');
+        if (queryStart !== -1) {
+          const query = url.substring(queryStart + 1);
+          const params = new URLSearchParams(query);
+          const authCode = params.get('code');
+          if (authCode) {
+            handleAuthCodeExchange(authCode);
           }
-        }
-        if (idToken) {
-          handleTokenExchange(idToken);
         }
       }
     };
@@ -104,34 +107,54 @@ export default function ProfileScreen() {
       const authUrl = generateOAuthUrl(nonce, state);
       window.location.href = authUrl;
     } else {
-      // Native flow using expo-auth-session
-      try {
-        await promptAsync();
-      } catch (err) {
-        console.error('Google sign-in error:', err);
-        Alert.alert('Login Failed', 'There was an error initiating Google login. Please try again.');
-      }
+      // For native, just open the browser and rely on the deep-link listener to
+      // capture the redirect from the Expo proxy.  Running a second AuthSession
+      // flow at the same time caused the redirect to be swallowed.
+
+      const nonce = Math.random().toString(36).substring(2, 15);
+      const state = nonce;
+      const authUrl = generateOAuthUrl(nonce, state);
+
+      console.log('handleGoogleLogin: Opening OAuth URL with WebBrowser.openBrowserAsync');
+      console.log('handleGoogleLogin: Auth URL:', authUrl);
+
+      await WebBrowser.openBrowserAsync(authUrl);
     }
   };
 
-  // Handle native AuthSession response
+  // Handle AuthSession response (also covers web)
   useEffect(() => {
-    if (Platform.OS !== 'web' && response?.type === 'success') {
-      const idToken = (response.params as any)?.id_token;
-      if (idToken) {
-        handleTokenExchange(idToken);
+    if (!response) return;
+
+    console.log('=== AUTH RESPONSE RECEIVED ===');
+    console.log('Response type:', response.type);
+    console.log('Response params:', (response as any).params);
+    console.log('================================');
+
+    if (response.type === 'success') {
+      const authCode = (response as any)?.params?.code;
+      if (authCode) {
+        handleAuthCodeExchange(authCode);
       }
     }
   }, [response]);
 
-  const handleTokenExchange = async (idToken: string) => {
+  // Exchange authorization code for backend JWT tokens
+  const handleAuthCodeExchange = async (code: string) => {
+    console.log('handleAuthCodeExchange: Exchanging code with backend');
     try {
-      const res = await api.post('users/accounts/google/login/mobile/', { id_token: idToken });
+      const res = await api.post('users/accounts/google/login/mobile/', {
+        code,
+        redirect_uri: OAUTH_CONFIG.REDIRECT_URI,
+        client_id: OAUTH_CONFIG.CLIENT_ID,
+      });
+      console.log('handleAuthCodeExchange: Backend response status:', res.status);
+      console.log('handleAuthCodeExchange: Backend response keys:', Object.keys(res.data));
       const { access_token, refresh_token, user: userData } = res.data;
       await login(access_token, refresh_token, userData);
       router.replace('/');
     } catch (error) {
-      console.error('Token exchange failed:', error);
+      console.error('Code exchange failed:', error);
       Alert.alert('Login Failed', 'There was an error logging you in. Please try again.', [{ text: 'OK' }]);
     }
   };
