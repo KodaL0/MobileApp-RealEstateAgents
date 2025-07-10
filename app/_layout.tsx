@@ -163,7 +163,7 @@ function InnerApp() {
     return (
       <View style={styles.loginWrapper}>
         <LinearGradient
-          colors={['#667eea', '#764ba2']}
+          colors={['#0F3460', '#1a4a7a', '#f8fafc']}
           style={styles.gradientBackground}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -268,16 +268,18 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 120,
     height: 120,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 25,
+    elevation: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   logo: {
     width: 80,
@@ -302,14 +304,16 @@ const styles = StyleSheet.create({
   },
   loginCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 32,
     marginHorizontal: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.15,
-    shadowRadius: 30,
-    elevation: 15,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 52, 96, 0.08)',
   },
   cardHeader: {
     alignItems: 'center',
@@ -318,7 +322,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: 'Poppins-Bold',
     fontSize: 24,
-    color: '#1a1a1a',
+    color: '#0F3460',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -334,14 +338,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: '#0F3460',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
     marginBottom: 24,
@@ -360,7 +364,7 @@ const styles = StyleSheet.create({
   googleButtonText: {
     fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
-    color: '#374151',
+    color: '#0F3460',
   },
   dividerContainer: {
     flexDirection: 'row',
@@ -370,12 +374,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: 'rgba(15, 52, 96, 0.15)',
   },
   dividerText: {
     fontFamily: 'Poppins-Regular',
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#666',
     marginHorizontal: 16,
   },
   alternativeOptions: {
@@ -384,7 +388,7 @@ const styles = StyleSheet.create({
   alternativeText: {
     fontFamily: 'Poppins-Regular',
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#666',
     textAlign: 'center',
   },
   footer: {
