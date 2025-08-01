@@ -111,14 +111,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
             if (list.some((m) => m.id === msg.id)) return prev;
             return { ...prev, [msg.thread_id]: [...list, msg] };
           });
-          // bump thread up
+          // bump thread up and update unread count
           setThreads((prev) =>
             [...prev]
-              .map((t) =>
-                t.id === msg.thread_id
-                  ? { ...t, updated_at: msg.created_at }
-                  : t
-              )
+              .map((t) => {
+                if (t.id === msg.thread_id) {
+                  // If the message is from another user, increment unread count
+                  const shouldIncrementUnread = msg.sender !== user?.id;
+                  return {
+                    ...t,
+                    updated_at: msg.created_at,
+                    unread_count: shouldIncrementUnread ? (t.unread_count || 0) + 1 : t.unread_count,
+                  };
+                }
+                return t;
+              })
               .sort(
                 (a, b) =>
                   new Date(b.updated_at).getTime() -
@@ -192,7 +199,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
       ws.current?.close();
     };
-  }, [openSocket, user]);
+  }, [user]); // Remove openSocket dependency to prevent infinite re-renders
 
   const getOrCreateThread = useCallback(
     async (sellerId: number, propertyId: number | null, title?: string) => {
@@ -296,9 +303,29 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           ),
         };
       });
+      
+      // Update threads state to reflect the new unread count
+      setThreads((prev) => {
+        return prev.map((thread) => {
+          if (thread.id === threadId) {
+            // Calculate new unread count based on unread messages
+            const threadMessages = messages[threadId] || [];
+            const newUnreadCount = threadMessages.filter(
+              (msg) => msg.sender !== user?.id && !msg.read_at
+            ).length;
+            
+            return {
+              ...thread,
+              unread_count: newUnreadCount,
+            };
+          }
+          return thread;
+        });
+      });
+      
       apiClient.post(`chat/${threadId}/mark_read/`).catch(() => {});
     },
-    [user?.id]
+    [user?.id, messages]
   );
 
   const sendTypingStart = useCallback((threadId: string, recipientId: number) => {
