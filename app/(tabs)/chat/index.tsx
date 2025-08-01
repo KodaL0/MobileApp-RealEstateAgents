@@ -67,7 +67,17 @@ export default function ThreadList() {
         const title = t.property_title || t.other_username || '';
         return title.toLowerCase().includes(searchTerm.toLowerCase());
       })
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      .sort((a, b) => {
+        // Sort by most recent message timestamp for better relevance
+        const aLastMessage = getLastMessage(a.id);
+        const bLastMessage = getLastMessage(b.id);
+        
+        // Use the most recent timestamp available
+        const aTimestamp = aLastMessage?.created_at || a.updated_at || new Date(0).toISOString();
+        const bTimestamp = bLastMessage?.created_at || b.updated_at || new Date(0).toISOString();
+        
+        return new Date(bTimestamp).getTime() - new Date(aTimestamp).getTime();
+      });
 
     setFiltered(list);
   }, [threads, searchTerm, activeTab]);
