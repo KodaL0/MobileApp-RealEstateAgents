@@ -153,6 +153,15 @@ export default function ChatThreadPage() {
               {headerTitle}
             </Text>
           </TouchableOpacity>
+        ) : thread?.other_username ? (
+          <TouchableOpacity 
+            onPress={() => router.push(`/profile/${thread.other_username}`)}
+            style={styles.headerTitleContainer}
+          >
+            <Text style={[styles.headerTitle, styles.clickableTitle]} numberOfLines={1}>
+              {headerTitle}
+            </Text>
+          </TouchableOpacity>
         ) : (
           <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
         )}
