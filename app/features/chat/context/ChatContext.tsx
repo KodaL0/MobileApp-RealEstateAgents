@@ -91,10 +91,47 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
     ws.current.onopen = () => console.log('Chat WS connected');
     ws.current.onerror = (e) => console.warn('Chat WS error', e);
-    ws.current.onclose = () => {
+    ws.current.onclose = async (event) => {
       // cleanup ping
       if (pingRef.current) clearInterval(pingRef.current);
       ws.current = null;
+      
+      // Check if this might be a token expiration issue
+      if (event.code === 4001 || event.code === 1008) {
+        console.log('WebSocket closed due to authentication issue, attempting token refresh...');
+        
+        try {
+          // Attempt to refresh the token
+          const refreshToken = await AsyncStorage.getItem('refresh_token');
+          if (refreshToken) {
+            const response = await fetch(`https://api.propertpro.com/api/users/refresh/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ refresh: refreshToken }),
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              // Store new tokens
+              await AsyncStorage.setItem('access_token', data.access_token);
+              await AsyncStorage.setItem('refresh_token', data.refresh_token);
+              console.log('Token refreshed successfully, reconnecting...');
+              
+              // Clear any existing reconnect timeout
+              if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+              
+              // Reconnect immediately with new token
+              reconnectTimeout.current = setTimeout(openSocket, 1000);
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('Token refresh failed:', error);
+        }
+      }
+      
       // schedule reconnect
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
       reconnectTimeout.current = setTimeout(openSocket, 5_000);
@@ -113,9 +150,18 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
             // Replace any optimistic message with the real one
             setMessages((prev) => {
               const list = prev[msg.thread_id] ?? [];
+              
+              // Check if we already have this exact message (prevent duplicates)
+              if (list.some((m) => m.id === msg.id)) {
+                console.log('Message already exists, skipping duplicate');
+                return prev;
+              }
+              
+              // Find and replace optimistic message, or add new message
               const hasOptimistic = list.some((m) => m.id.startsWith('temp_'));
               
               if (hasOptimistic) {
+                console.log('Replacing optimistic message with real message');
                 // Replace optimistic message with real message
                 return {
                   ...prev,
@@ -124,8 +170,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
                   ),
                 };
               } else {
-                // No optimistic message to replace, just add if not already present
-                if (list.some((m) => m.id === msg.id)) return prev;
+                console.log('Adding new message (no optimistic message to replace)');
+                // No optimistic message to replace, just add the new message
                 return { ...prev, [msg.thread_id]: [...list, msg] };
               }
             });

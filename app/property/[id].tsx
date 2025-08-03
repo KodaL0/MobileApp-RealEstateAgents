@@ -105,13 +105,7 @@ function normalizePropertyDetail(item: any) {
     : [];
 
   // 8) Additional features (not rendered here, but normalized if needed later)
-  const additionalFeatures: string[] = Array.isArray(
-    item.additional_features
-  )
-    ? item.additional_features.map((f: any) =>
-        typeof f === 'string' ? f : f.name || String(f)
-      )
-    : [];
+
 
   // 9) Contact info
   const contactPhone: string = item.contact_phone || item.contactPhone || '';
@@ -199,7 +193,7 @@ function normalizePropertyDetail(item: any) {
     propertyType,
     description,
     amenities,
-    additionalFeatures,
+    
     contactPhone,
     contactEmail,
     owner,
@@ -565,12 +559,90 @@ export default function PropertyDetailScreen() {
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Amenities</Text>
               <View style={styles.listContainer}>
-                {amenities.map((amenity: string, idx: number) => (
-                  <View key={idx} style={styles.listItem}>
-                    <Text style={styles.bullet}>{'\u2022'}</Text>
-                    <Text style={styles.listText}>{amenity}</Text>
-                  </View>
-                ))}
+                {amenities.map((amenityId: string, idx: number) => {
+                  // Map amenity IDs to user-friendly labels
+                  const amenityLabels: { [key: string]: string } = {
+                    // Building & Infrastructure
+                    elevator: 'Elevator',
+                    internal_staircase: 'Internal Staircase',
+                    secure_door: 'Secure Door',
+                    manned_reception: 'Manned Reception',
+                    attic: 'Attic',
+                    facade: 'Facade',
+                    corner: 'Corner',
+                    
+                    // Interior Features
+                    frames_wooden: 'Wooden Frames',
+                    floor_marble: 'Marble Floor',
+                    single_glass: 'Single Glass',
+                    bright: 'Bright',
+                    airy: 'Airy',
+                    fireplace: 'Fireplace',
+                    furnished: 'Furnished',
+                    storage: 'Storage Space',
+                    painted: 'Painted',
+                    luxury_home: 'Luxury Home',
+                    playroom: 'Playroom',
+                    
+                    // Climate & Comfort
+                    underfloor_heating: 'Underfloor Heating',
+                    air_conditioning: 'Air Conditioning',
+                    solar_water_heating: 'Solar Water Heating',
+                    night_power: 'Night Power',
+                    
+                    // Exterior & Outdoor
+                    garden: 'Garden',
+                    swimming_pool: 'Swimming Pool',
+                    awning: 'Awning',
+                    built_in_bbq: 'Built-in BBQ',
+                    window_screens: 'Window Screens',
+                    balcony: 'Balcony',
+                    
+                    // Parking & Access
+                    parking_space: 'Parking Space',
+                    garage: 'Garage',
+                    access_disabled: 'Access for People with Disabilities',
+                    ev_charging: 'Charging Facilities for Electric Car',
+                    
+                    // Security & Safety
+                    alarm: 'Alarm',
+                    security_system: 'Security System',
+                    doorman: 'Doorman',
+                    
+                    // Utilities & Technology
+                    satellite_receiver: 'Satellite Receiver',
+                    wifi: 'High-Speed Internet',
+                    dishwasher: 'Dishwasher',
+                    laundry: 'Laundry Facilities',
+                    
+                    // Location & Views
+                    residential_zone: 'Residential Zone',
+                    view: 'View',
+                    waterfront: 'Waterfront',
+                    
+                    // Community & Shared
+                    gym: 'Gym',
+                    pool: 'Swimming Pool',
+                    roof_deck: 'Roof Deck',
+                    
+                    // Policy & Lifestyle
+                    pets: 'Pet Friendly',
+                    
+                    // Legacy amenities
+                    parking: 'Parking',
+                    ac: 'Air Conditioning',
+                    heating: 'Central Heating',
+                  };
+                  
+                  const displayName = amenityLabels[amenityId] || amenityId;
+                  
+                  return (
+                    <View key={idx} style={styles.listItem}>
+                      <Text style={styles.bullet}>{'\u2022'}</Text>
+                      <Text style={styles.listText}>{displayName}</Text>
+                    </View>
+                  );
+                })}
               </View>
             </>
           )}
