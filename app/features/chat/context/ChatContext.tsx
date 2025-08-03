@@ -357,6 +357,47 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       
       openSocket();
+      
+      // Create optimistic message for immediate UI update
+      const optimisticMessage: Message = {
+        id: `temp_${Date.now()}_${Math.random()}`, // Temporary ID
+        thread_id: threadId,
+        property_id: propertyId || null,
+        sender: user?.id || 0,
+        recipient: recipientId,
+        content,
+        created_at: new Date().toISOString(),
+        read_at: null,
+        is_unsent: false,
+        unsent_at: null,
+      };
+
+      // Add optimistic message to UI immediately
+      setMessages((prev) => {
+        const list = prev[threadId] ?? [];
+        return {
+          ...prev,
+          [threadId]: [...list, optimisticMessage],
+        };
+      });
+
+      // Update thread timestamp (but don't increment unread count for own messages)
+      setThreads((prev) => {
+        const updated = prev.map((t) => {
+          if (t.id === threadId) {
+            return {
+              ...t,
+              updated_at: optimisticMessage.created_at,
+              // Don't increment unread_count for own messages
+            };
+          }
+          return t;
+        });
+        return updated.sort(
+          (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+      });
+      
       const payload: any = {
         type: 'chat.message',
         recipient_id: recipientId,
@@ -366,21 +407,45 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (ws.current?.readyState === WebSocket.OPEN) {
         // For WebSocket, we send and assume success (real-time)
+        // The server will send the message back to confirm, which will replace the optimistic message
         ws.current.send(JSON.stringify(payload));
         return Promise.resolve();
       } else {
-        // For REST API, we wait for the response
-        return apiClient.post(`chat/${threadId}/messages/`, {
-          content,
-          property_id: propertyId,
-          recipient_id: recipientId,
-        }).then(() => {
-          // Success - message sent via REST API
-          return;
-        });
+        // For REST API, we wait for the response and replace optimistic message
+        try {
+          const response = await apiClient.post<Message>(`chat/${threadId}/messages/`, {
+            content,
+            property_id: propertyId,
+            recipient_id: recipientId,
+          });
+          
+          // Replace optimistic message with real message from server
+          setMessages((prev) => {
+            const list = prev[threadId] ?? [];
+            return {
+              ...prev,
+              [threadId]: list.map((msg) => 
+                msg.id === optimisticMessage.id ? response.data : msg
+              ),
+            };
+          });
+          
+          return Promise.resolve();
+        } catch (error) {
+          console.error('Failed to send message:', error);
+          // Remove optimistic message on error
+          setMessages((prev) => {
+            const list = prev[threadId] ?? [];
+            return {
+              ...prev,
+              [threadId]: list.filter((msg) => msg.id !== optimisticMessage.id),
+            };
+          });
+          throw error;
+        }
       }
     },
-    [openSocket]
+    [openSocket, user?.id]
   );
 
   const markThreadRead = useCallback(
