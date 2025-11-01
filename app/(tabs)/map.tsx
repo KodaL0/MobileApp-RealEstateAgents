@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
-  Alert,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LeafletMap from '../../components/map/LeafletMap';

@@ -23,7 +23,6 @@ import {
   Phone,
   Mail,
   MessageSquare,
-  Square,
   Calendar,
   Layers,
 } from 'lucide-react-native';

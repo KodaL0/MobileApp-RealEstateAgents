@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 
 export default function MortgageCalculatorScreen() {
   const [propertyPrice, setPropertyPrice] = useState('');
@@ -10,11 +10,7 @@ export default function MortgageCalculatorScreen() {
   const [totalPayment, setTotalPayment] = useState<number | null>(null);
   const [totalInterestPaid, setTotalInterestPaid] = useState<number | null>(null);
 
-  useEffect(() => {
-    calculateMortgage();
-  }, [propertyPrice, downPaymentPercent, loanTermYears, interestRate]);
-
-  const calculateMortgage = () => {
+  const calculateMortgage = useCallback(() => {
     const priceNum = parseFloat(propertyPrice);
     const downPct = parseFloat(downPaymentPercent);
     const termYears = parseFloat(loanTermYears);
@@ -64,7 +60,11 @@ export default function MortgageCalculatorScreen() {
     setMonthlyPayment(payment);
     setTotalPayment(totalPaid);
     setTotalInterestPaid(totalPaid - principal);
-  };
+  }, [propertyPrice, downPaymentPercent, loanTermYears, interestRate]);
+
+  useEffect(() => {
+    calculateMortgage();
+  }, [calculateMortgage]);
 
   const formatCurrency = (value: number | null) => {
     if (value === null || isNaN(value)) return '--';

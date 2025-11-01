@@ -7,7 +7,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Filter, X, ChevronDown } from 'lucide-react-native';
+import { Filter, X } from 'lucide-react-native';
 
 // Platform-specific shadow styles
 const getShadowStyle = () => {

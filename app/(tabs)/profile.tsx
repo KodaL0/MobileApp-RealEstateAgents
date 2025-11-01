@@ -1,24 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Settings, Heart, Calculator, Calendar, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
+import { Settings, Heart, Calculator, LogOut, ChevronRight } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as Google from 'expo-auth-session/providers/google';
 import { ResponseType } from 'expo-auth-session';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 
 import { api } from '@/config/api'; // mobile API client
 import { useUser } from '@/app/_userbase/UserContext';
-import { OAUTH_CONFIG, generateOAuthUrl } from '@/config/oauth';
+import { OAUTH_CONFIG, buildBackendGoogleCallbackUrl, buildBackendGoogleLoginUrl } from '@/config/oauth';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const { user, isLoading, isAuthenticated, login, logout } = useUser();
+  const { user, isLoading, isAuthenticated, login, logout, refreshUser } = useUser();
   const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
   const [savedPropertiesCount, setSavedPropertiesCount] = useState<number>(0);
   const [hasFetchedSavedCount, setHasFetchedSavedCount] = useState<boolean>(false);
@@ -36,6 +35,26 @@ export default function ProfileScreen() {
     }
   );
 
+  const handleAuthCodeExchange = useCallback(async (code: string) => {
+    console.log('handleAuthCodeExchange: Exchanging code with backend');
+    try {
+      const res = await api.post('users/accounts/google/login/mobile/', {
+        code,
+        redirect_uri: OAUTH_CONFIG.REDIRECT_URI,
+        client_id: OAUTH_CONFIG.CLIENT_ID,
+      });
+      console.log('handleAuthCodeExchange: Backend response status:', res.status);
+      console.log('handleAuthCodeExchange: Backend response keys:', Object.keys(res.data));
+      const { access_token, refresh_token, user: userData } = res.data;
+      await login(access_token, refresh_token, userData);
+      setHasProcessedOAuth(true);
+      router.replace('/');
+    } catch (error) {
+      console.error('Code exchange failed:', error);
+      Alert.alert('Login Failed', 'There was an error logging you in. Please try again.', [{ text: 'OK' }]);
+    }
+  }, [login]);
+
   // Log when the auth request object is ready
   useEffect(() => {
     console.log('=== AUTH REQUEST INITIALISED ===');
@@ -47,38 +66,62 @@ export default function ProfileScreen() {
     console.log('===============================');
   }, [request]);
 
-  // OAuth redirect on web
+  // OAuth redirect on web - mirror propertprofrontend flow
   useEffect(() => {
-    if (Platform.OS === 'web' && !hasProcessedOAuth) {
-      const handleWebOAuthRedirect = async () => {
-        const currentUrl = window.location.href;
-        const fragmentStart = currentUrl.indexOf('#');
-        if (fragmentStart !== -1) {
-          const fragment = currentUrl.substring(fragmentStart + 1);
-          const params = new URLSearchParams(fragment);
-          const idToken = params.get('id_token');
-          if (idToken) {
-            console.log('Google ID Token found in URL:', idToken);
-            setHasProcessedOAuth(true);
-            try {
-              const res = await api.post('users/accounts/google/login/mobile/', { id_token: idToken });
-              const { access_token, refresh_token, user: userData } = res.data;
-              await login(access_token, refresh_token, userData);
-              window.history.replaceState({}, document.title, window.location.pathname);
-              router.replace('/');
-            } catch (error) {
-              console.error('Backend login failed:', error);
-              setHasProcessedOAuth(false);
-            }
-          }
-        }
-      };
-      handleWebOAuthRedirect();
+    if (Platform.OS !== 'web' || hasProcessedOAuth) {
+      return;
     }
-  }, [login, hasProcessedOAuth, router]);
+
+    const params = new URLSearchParams(window.location.search);
+    const authSuccess = params.get('auth_success');
+    const authError = params.get('error');
+    const hasOAuthParams = params.has('code') || params.has('state');
+
+    const cleanQueryParams = () => {
+      params.delete('auth_success');
+      params.delete('error');
+      const newSearch = params.toString();
+      const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}${window.location.hash || ''}`;
+      window.history.replaceState({}, document.title, newUrl);
+    };
+
+    const completeLoginFromCookies = async () => {
+      try {
+        await refreshUser();
+        cleanQueryParams();
+        router.replace('/');
+      } catch (error) {
+        console.error('Failed to refresh user after OAuth completion', error);
+      } finally {
+        setHasProcessedOAuth(true);
+      }
+    };
+
+    if (authSuccess === 'true') {
+      completeLoginFromCookies();
+      return;
+    }
+
+    if (authError) {
+      cleanQueryParams();
+      setHasProcessedOAuth(true);
+      Alert.alert('Login Failed', 'Authentication was cancelled or failed. Please try again.');
+      return;
+    }
+
+    if (hasOAuthParams) {
+      const callbackUrl = buildBackendGoogleCallbackUrl(window.location.search);
+      window.location.replace(callbackUrl);
+      return;
+    }
+  }, [hasProcessedOAuth, refreshUser]);
 
   // Deep links for OAuth
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
     const handleDeepLink = (url: string) => {
       const isOAuthRedirect = url.includes('auth.expo.io') && url.includes('code=');
       if (isOAuthRedirect) {
@@ -96,35 +139,27 @@ export default function ProfileScreen() {
     const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
     Linking.getInitialURL().then((url) => { if (url) handleDeepLink(url); });
     return () => { subscription?.remove(); };
-  }, []);
+  }, [handleAuthCodeExchange]);
 
   const handleGoogleLogin = async () => {
     if (Platform.OS === 'web') {
-      // Existing web flow
       setHasProcessedOAuth(false);
-      const nonce = Math.random().toString(36).substring(2, 15);
-      const state = nonce;
-      const authUrl = generateOAuthUrl(nonce, state);
-      window.location.href = authUrl;
+      const nextTarget = `${window.location.origin}${window.location.pathname}${window.location.search || ''}`;
+      const loginUrl = buildBackendGoogleLoginUrl(nextTarget);
+      window.location.href = loginUrl;
     } else {
-      // For native, just open the browser and rely on the deep-link listener to
-      // capture the redirect from the Expo proxy.  Running a second AuthSession
-      // flow at the same time caused the redirect to be swallowed.
-
-      const nonce = Math.random().toString(36).substring(2, 15);
-      const state = nonce;
-      const authUrl = generateOAuthUrl(nonce, state);
-
-      console.log('handleGoogleLogin: Opening OAuth URL with WebBrowser.openBrowserAsync');
-      console.log('handleGoogleLogin: Auth URL:', authUrl);
-
-      await WebBrowser.openBrowserAsync(authUrl);
+      try {
+        await promptAsync();
+      } catch (error) {
+        console.error('handleGoogleLogin: Unable to start AuthSession', error);
+        Alert.alert('Login Failed', 'Could not start Google login.');
+      }
     }
   };
 
   // Handle AuthSession response (also covers web)
   useEffect(() => {
-    if (!response) return;
+    if (!response || Platform.OS === 'web') return;
 
     console.log('=== AUTH RESPONSE RECEIVED ===');
     console.log('Response type:', response.type);
@@ -137,27 +172,7 @@ export default function ProfileScreen() {
         handleAuthCodeExchange(authCode);
       }
     }
-  }, [response]);
-
-  // Exchange authorization code for backend JWT tokens
-  const handleAuthCodeExchange = async (code: string) => {
-    console.log('handleAuthCodeExchange: Exchanging code with backend');
-    try {
-      const res = await api.post('users/accounts/google/login/mobile/', {
-        code,
-        redirect_uri: OAUTH_CONFIG.REDIRECT_URI,
-        client_id: OAUTH_CONFIG.CLIENT_ID,
-      });
-      console.log('handleAuthCodeExchange: Backend response status:', res.status);
-      console.log('handleAuthCodeExchange: Backend response keys:', Object.keys(res.data));
-      const { access_token, refresh_token, user: userData } = res.data;
-      await login(access_token, refresh_token, userData);
-      router.replace('/');
-    } catch (error) {
-      console.error('Code exchange failed:', error);
-      Alert.alert('Login Failed', 'There was an error logging you in. Please try again.', [{ text: 'OK' }]);
-    }
-  };
+  }, [response, handleAuthCodeExchange]);
 
   useEffect(() => {
     const fetchSavedCount = async () => {
@@ -176,13 +191,11 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
-      await api.auth.logout();
       await logout();
       setSavedPropertiesCount(0);
       setHasFetchedSavedCount(false);
     } catch (error) {
       console.error('Logout failed:', error);
-      await logout();
     }
   };
 

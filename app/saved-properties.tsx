@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -86,13 +85,6 @@ const SavedPropertiesPage: React.FC = () => {
     await fetchSavedProperties();
     setRefreshing(false);
   }, [fetchSavedProperties]);
-
-  const handleRemoveFromSaved = useCallback((propertyId: number) => {
-    setSavedProperties(prevProperties =>
-      prevProperties.filter(property => property.id !== propertyId)
-    );
-    console.log(`Removed property ${propertyId} from saved properties list.`);
-  }, []);
 
   const handleLoginPress = useCallback(() => {
     // Navigate to login/auth page

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MapPin, Star } from 'lucide-react-native';
 import { PROPERTIES } from '@/data/properties';

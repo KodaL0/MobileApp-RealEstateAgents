@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bed, Bath, MapPin, Square } from 'lucide-react-native';
+import { Bed, Bath, MapPin } from 'lucide-react-native';
 
 // Platform-specific shadow styles
 const getShadowStyle = () => {

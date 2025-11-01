@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Platform } from 'react-native';
 
 type Property = {
@@ -47,21 +47,26 @@ const ReactLeafletMap: React.FC<ReactLeafletMapProps> = ({
   console.log('Map container ref:', mapContainerRef.current);
 
   // Cyprus bounds
-  const cyprusBounds = {
+  const cyprusBounds = useMemo(() => ({
     north: 35.7,
     south: 34.5,
     east: 34.6,
     west: 32.2,
-  };
+  }), []);
 
   useEffect(() => {
     console.log('🎯 ReactLeafletMap useEffect triggered');
     console.log('Platform check:', Platform.OS);
     console.log('mapContainerRef.current:', mapContainerRef.current);
-    
+
     if (Platform.OS !== 'web' || !mapContainerRef.current) {
       console.log('❌ Early return - not web or no container');
       return;
+    }
+
+    if (mapRef.current) {
+      console.log('🧹 Removing previous iframe before creating a new one');
+      mapRef.current.remove();
     }
 
     console.log('✅ Creating map iframe...');
@@ -478,9 +483,10 @@ const ReactLeafletMap: React.FC<ReactLeafletMapProps> = ({
     };
 
     window.addEventListener('message', handleMessage);
-    
+
     console.log('🔗 Appending iframe to container...');
-    mapContainerRef.current.appendChild(iframe);
+    const container = mapContainerRef.current;
+    container.appendChild(iframe);
     mapRef.current = iframe;
 
     console.log('✅ Map setup complete in useEffect');
@@ -488,14 +494,18 @@ const ReactLeafletMap: React.FC<ReactLeafletMapProps> = ({
     return () => {
       console.log('🧹 Cleaning up ReactLeafletMap');
       window.removeEventListener('message', handleMessage);
-      if (mapContainerRef.current && iframe) {
-        mapContainerRef.current.removeChild(iframe);
+      if (container && iframe && container.contains(iframe)) {
+        container.removeChild(iframe);
       }
     };
-  }, [properties, center, zoom, selectedPropertyId, onMarkerClick, onMapMove]);
+  }, [properties, center, zoom, selectedPropertyId, onMarkerClick, onMapMove, cyprusBounds]);
 
   // Methods to control the map
   useEffect(() => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
     if (mapRef.current && selectedPropertyId) {
       console.log('🎯 Updating selected marker:', selectedPropertyId);
       mapRef.current.contentWindow?.postMessage({

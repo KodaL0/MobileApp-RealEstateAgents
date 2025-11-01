@@ -13,6 +13,8 @@ import { Platform } from 'react-native';
  * Mobile uses Expo's AuthSession proxy for reliable OAuth flow on real devices.
  */
 
+export const AUTH_BASE_URL = 'https://api.propertpro.com';
+
 // Get the appropriate redirect URI for the current platform
 export const getRedirectUri = (): string => {
   if (Platform.OS === 'web') {
@@ -93,3 +95,11 @@ export const logOAuthConfig = () => {
   console.log('Token Exchange Endpoint:', OAUTH_CONFIG.TOKEN_EXCHANGE_ENDPOINT);
   console.log('==========================');
 }; 
+
+export const buildBackendGoogleLoginUrl = (nextUrl: string): string => {
+  const encodedNext = encodeURIComponent(nextUrl);
+  return `${AUTH_BASE_URL}/accounts/google/login/?next=${encodedNext}`;
+};
+
+export const buildBackendGoogleCallbackUrl = (search: string): string =>
+  `${AUTH_BASE_URL}/accounts/google/login/callback${search}`;

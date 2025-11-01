@@ -47,7 +47,19 @@
     "experiments": {
       "typedRoutes": true
     },
-    
+
+    "lint": {
+      "patterns": [
+        "app/**/*.{js,jsx,ts,tsx}",
+        "components/**/*.{js,jsx,ts,tsx}",
+        "config/**/*.{js,ts,tsx}",
+        "data/**/*.{js,ts,tsx}",
+        "hooks/**/*.{js,ts,tsx}",
+        "utils/**/*.{js,ts,tsx}",
+        "web/**/*.{js,ts,tsx}"
+      ]
+    },
+
     "linking": {
       "prefixes": ["propertpro-mobile://", "https://auth.expo.io/@dalmiraskon/propertpro-mobile"]
     }

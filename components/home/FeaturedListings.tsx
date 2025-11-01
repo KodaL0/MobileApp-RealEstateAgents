@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bed, Bath, Heart, MapPin, Square } from 'lucide-react-native';
+import { Bed, Bath, Heart } from 'lucide-react-native';
 import { api } from '../../config/api'; // adjust the relative path if needed
 
 /**

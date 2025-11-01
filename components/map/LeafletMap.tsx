@@ -46,6 +46,20 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
   console.log('Zoom:', zoom);
   console.log('Properties sample:', properties.slice(0, 2));
 
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    if (selectedPropertyId && webViewRef.current) {
+      console.log('🎯 Updating selected marker:', selectedPropertyId);
+      webViewRef.current.postMessage(JSON.stringify({
+        type: 'updateSelectedMarker',
+        propertyId: selectedPropertyId,
+      }));
+    }
+  }, [selectedPropertyId]);
+
   // Cyprus bounds
   const cyprusBounds = {
     north: 35.7,
@@ -445,41 +459,6 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       console.error('❌ Error parsing WebView message:', error);
     }
   };
-
-  // Function to fly to a specific property
-  const flyToProperty = (property: Property) => {
-    webViewRef.current?.postMessage(JSON.stringify({
-      type: 'flyToProperty',
-      lat: property.latitude,
-      lng: property.longitude,
-      zoom: 16
-    }));
-  };
-
-  // Function to update selected marker
-  const updateSelectedMarker = (propertyId: number) => {
-    webViewRef.current?.postMessage(JSON.stringify({
-      type: 'updateSelectedMarker',
-      propertyId: propertyId
-    }));
-  };
-
-  // Function to set map view
-  const setMapView = (center: [number, number], zoom: number) => {
-    webViewRef.current?.postMessage(JSON.stringify({
-      type: 'setView',
-      center: center,
-      zoom: zoom
-    }));
-  };
-
-  // Update selected marker when selectedPropertyId changes
-  useEffect(() => {
-    if (selectedPropertyId && webViewRef.current) {
-      console.log('🎯 Updating selected marker:', selectedPropertyId);
-      updateSelectedMarker(selectedPropertyId);
-    }
-  }, [selectedPropertyId]);
 
   return (
     <View style={styles.container}>

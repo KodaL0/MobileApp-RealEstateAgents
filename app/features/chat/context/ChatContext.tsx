@@ -35,6 +35,7 @@ interface ChatContextValue {
   unsendMessage: (messageId: string) => Promise<void>;
   typingUsers: Record<string, boolean>;
   userStatuses: Record<number, 'online' | 'offline'>;
+  recalculateUnreadCounts: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -292,7 +293,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
       ws.current?.close();
     };
-  }, [user]); // Remove openSocket dependency to prevent infinite re-renders
+  }, [user, openSocket]);
 
   const getOrCreateThread = useCallback(
     async (sellerId: number, propertyId: number | null, title?: string) => {
@@ -515,6 +516,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     ws.current?.send(JSON.stringify({ type: 'message.unsend', message_id: messageId }));
   }, []);
 
+  const recalculateUnreadCounts = useCallback(() => {
+    setThreads((prev) =>
+      prev.map((thread) => {
+        const threadMessages = messages[thread.id] || [];
+        const newUnreadCount = threadMessages.filter(
+          (msg) => msg.sender !== user?.id && !msg.read_at
+        ).length;
+        return {
+          ...thread,
+          unread_count: newUnreadCount,
+        };
+      })
+    );
+  }, [messages, user?.id]);
+
   return (
     <ChatContext.Provider
       value={{
@@ -530,6 +546,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         unsendMessage,
         typingUsers,
         userStatuses,
+        recalculateUnreadCounts,
       }}
     >
       {children}

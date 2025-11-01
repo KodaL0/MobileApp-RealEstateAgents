@@ -8,7 +8,6 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
   Platform,
   Alert,
 } from 'react-native';
@@ -16,8 +15,6 @@ import { useRouter } from 'expo-router';
 import { Bed, Bath, Heart, MapPin, ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { api } from '../../config/api';
 import { useUser } from '../../app/_userbase/UserContext';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // Platform-specific shadow styles
 const getShadowStyle = () => {

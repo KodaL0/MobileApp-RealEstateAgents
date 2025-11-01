@@ -19,7 +19,6 @@ import { StatusBar } from 'expo-status-bar';
 import {
   Search as SearchIcon,
   X,
-  ArrowDown,
   Filter as FilterIcon,
 } from 'lucide-react-native';
 import PropertyCard from '@/components/property/PropertyCard';
@@ -274,6 +273,24 @@ export default function SearchScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+            </View>
+
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsCount}>
+                {showResults ? `${totalCount} properties found` : 'Search suggestions'}
+              </Text>
+              {loading && (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color="#0F3460" />
+                  <Text style={styles.loadingText}>Loading...</Text>
+                </View>
+              )}
             </View>
           </>
         )}

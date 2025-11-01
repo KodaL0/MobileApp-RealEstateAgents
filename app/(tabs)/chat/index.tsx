@@ -1,5 +1,5 @@
 // File: app/(tabs)/chat.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -55,7 +55,12 @@ export default function ThreadList() {
     };
 
     handleMessageOwner();
-  }, [params.ownerId, params.propertyId, user, getOrCreateThread, router]);
+  }, [params.ownerId, params.propertyId, params.title, user, getOrCreateThread, router]);
+
+  const getLastMessage = useCallback((threadId: string) => {
+    const msgs = messages[threadId] || [];
+    return msgs.length > 0 ? msgs[msgs.length - 1] : null;
+  }, [messages]);
 
   useEffect(() => {
     // 1. Filter by tab (DM or property) **first** to avoid extra work
@@ -80,12 +85,7 @@ export default function ThreadList() {
       });
 
     setFiltered(list);
-  }, [threads, searchTerm, activeTab]);
-
-  const getLastMessage = (threadId: string) => {
-    const msgs = messages[threadId] || [];
-    return msgs.length > 0 ? msgs[msgs.length - 1] : null;
-  };
+  }, [threads, searchTerm, activeTab, getLastMessage]);
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);

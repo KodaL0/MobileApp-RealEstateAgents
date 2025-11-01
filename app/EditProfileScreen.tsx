@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Save, Loader2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useUser } from '@/app/_userbase/UserContext';
@@ -29,7 +29,7 @@ export default function EditProfileScreen() {
       return;
     }
     loadProfile();
-  }, [user]);
+  }, [user, router]);
 
   const loadProfile = async () => {
     setIsLoadingProfile(true);
@@ -60,16 +60,6 @@ export default function EditProfileScreen() {
     const cleanedPhone = phone.replace(/\s+/g, '');
     if (!phoneRegex.test(cleanedPhone)) return 'Please enter a valid phone number (9-15 digits)';
     return null;
-  };
-
-  const validateWebsite = (website: string): string | null => {
-    if (!website) return null;
-    try {
-      new URL(website);
-      return null;
-    } catch {
-      return 'Please enter a valid website URL (e.g., https://example.com)';
-    }
   };
 
   const handleProfileChange = (field: keyof typeof profileData, value: string) => {

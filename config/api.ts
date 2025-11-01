@@ -2,6 +2,7 @@
 
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 /**
  * Mobile API client for PropertPro backend.
@@ -17,8 +18,11 @@ export { WS_BASE_URL };
 // WebSocket URLs are NOT under /api/ - they're at the root level
 // Django Channels routing: r"ws/chat/?$" -> wss://api.propertpro.com/ws/chat/
 
+const isWeb = Platform.OS === 'web';
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: isWeb,
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -34,6 +38,11 @@ apiClient.interceptors.request.use(
     console.log('API Request Interceptor - Base URL:', config.baseURL);
     console.log('API Request Interceptor - Full URL:', (config.baseURL || '') + (config.url || ''));
     
+    if (isWeb) {
+      console.log('API Request Interceptor - Running in web environment; relying on cookies for auth');
+      return config;
+    }
+
     try {
       const token = await AsyncStorage.getItem('access_token');
       console.log('API Request Interceptor - Token found:', !!token, token ? token.substring(0, 20) + '...' : 'none');

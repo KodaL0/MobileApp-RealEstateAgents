@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { fetchUser as apiFetchUser } from './middleware';
+import { fetchUser as apiFetchUser, logout as apiLogout } from './middleware';
 
 
 export type User = {
@@ -55,18 +55,24 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const fetchUser = async () => {
     setIsLoading(true);
     try {
-      // Check if we have a token first
-      const token = await AsyncStorage.getItem('access_token');
-      console.log('fetchUser: token found?', !!token, token ? token.substring(0, 20) + '...' : 'none');
-      
-      if (!token) {
-        console.log('No access token found, user not authenticated');
-        setUser(null);
-        setIsAuthenticated(false);
-        return;
+      let token: string | null = null;
+
+      if (Platform.OS !== 'web') {
+        // Native platforms rely on stored tokens
+        token = await AsyncStorage.getItem('access_token');
+        console.log('fetchUser: token found?', !!token, token ? token.substring(0, 20) + '...' : 'none');
+
+        if (!token) {
+          console.log('No access token found, user not authenticated');
+          setUser(null);
+          setIsAuthenticated(false);
+          return;
+        }
+      } else {
+        console.log('fetchUser: running on web, relying on cookies for authentication');
       }
 
-      console.log('fetchUser: calling apiFetchUser with token');
+      console.log('fetchUser: calling apiFetchUser');
       const data = await apiFetchUser();
       console.log('fetchUser: apiFetchUser response:', data);
       
@@ -78,14 +84,22 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       else if (data?.id) userData = data as User;
       
       console.log('fetchUser: processed userData:', userData);
+
+      if (!userData) {
+        console.log('fetchUser: no user data returned, treating as unauthenticated');
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
       setUser(userData);
-      setIsAuthenticated(!!userData);
+      setIsAuthenticated(true);
     } catch (e: any) {
       console.error('UserContext fetchUser error', e);
       console.error('Error response status:', e?.response?.status);
       console.error('Error response data:', e?.response?.data);
       // If 401, clear tokens and set user to null
-      if (e?.response?.status === 401) {
+      if (e?.response?.status === 401 && Platform.OS !== 'web') {
         console.log('401 error, clearing tokens');
         await AsyncStorage.removeItem('access_token');
         await AsyncStorage.removeItem('mobile_access_token');
@@ -120,6 +134,9 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       await setRefreshToken(refreshToken);
       console.log('UserContext.login: Refresh token stored successfully');
       
+      // Store mobile token fallback for parity with web cookies
+      await AsyncStorage.setItem('mobile_access_token', accessToken);
+
       // Verify token was stored
       console.log('UserContext.login: Verifying token storage');
       const storedToken = await AsyncStorage.getItem('access_token');
@@ -150,6 +167,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
   const logout = async () => {
     try {
+      await apiLogout();
       await AsyncStorage.removeItem('access_token');
       await AsyncStorage.removeItem('mobile_access_token');
       await deleteRefreshToken();
