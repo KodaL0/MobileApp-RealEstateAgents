@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert,
+  View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert, TextInput, KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Settings, Heart, Calculator, LogOut, ChevronRight } from 'lucide-react-native';
+import { Settings, Heart, Calculator, LogOut, ChevronRight, Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as Google from 'expo-auth-session/providers/google';
@@ -21,6 +21,20 @@ export default function ProfileScreen() {
   const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
   const [savedPropertiesCount, setSavedPropertiesCount] = useState<number>(0);
   const [hasFetchedSavedCount, setHasFetchedSavedCount] = useState<boolean>(false);
+  
+  // Email/Password login state
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  
+  // Register-specific fields
+  const [username, setUsername] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   // Configure AuthSession (native platforms)
   WebBrowser.maybeCompleteAuthSession();
@@ -141,6 +155,122 @@ export default function ProfileScreen() {
     return () => { subscription?.remove(); };
   }, [handleAuthCodeExchange]);
 
+  const handleEmailPasswordLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const response = await api.auth.login({ email, password });
+      console.log('Email login response:', response);
+      
+      const { access_token, refresh_token, user: userData } = response;
+      await login(access_token, refresh_token, userData);
+      
+      Alert.alert('Success', 'Logged in successfully!');
+      router.replace('/');
+    } catch (error: any) {
+      console.error('Email login failed:', error);
+      const errorMessage = error?.response?.data?.error || error?.message || 'Invalid email or password';
+      Alert.alert('Login Failed', errorMessage);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    // Validation
+    if (!username || !email || !password || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (username.length < 3) {
+      Alert.alert('Error', 'Username must be at least 3 characters');
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (!acceptedTerms) {
+      Alert.alert('Error', 'Please accept the Terms & Conditions and Privacy Policy');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const response = await api.auth.register({
+        username,
+        email,
+        password,
+        accepted_terms: acceptedTerms,
+        accepted_privacy: acceptedTerms, // Linked to same checkbox
+        marketing_consent: marketingConsent,
+      });
+
+      console.log('Registration response:', response);
+
+      Alert.alert(
+        'Success!',
+        `Account created! Please check ${email} for a verification email.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Clear form and switch to login
+              setEmail('');
+              setPassword('');
+              setUsername('');
+              setConfirmPassword('');
+              setAcceptedTerms(false);
+              setMarketingConsent(false);
+              setIsRegisterMode(false);
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('Registration failed:', error);
+      const errorData = error?.response?.data;
+      let errorMessage = 'Registration failed';
+
+      if (errorData?.details) {
+        // Handle field-specific errors from backend
+        const details = errorData.details;
+        if (details.email) {
+          errorMessage = Array.isArray(details.email) ? details.email[0] : details.email;
+        } else if (details.username) {
+          errorMessage = Array.isArray(details.username) ? details.username[0] : details.username;
+        } else if (details.password) {
+          errorMessage = Array.isArray(details.password) ? details.password[0] : details.password;
+        }
+      } else if (errorData?.error) {
+        errorMessage = errorData.error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert('Registration Failed', errorMessage);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     if (Platform.OS === 'web') {
       setHasProcessedOAuth(false);
@@ -228,16 +358,100 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="dark" />
-        <View style={styles.loginContainer}>
-          <View style={styles.loginCard}>
-            <Text style={styles.title}>Sign in to your account</Text>
-            <Text style={styles.subtitle}>Secure sign-in with your Google account</Text>
-            <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton}>
-              <Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/1200px-Google_%22G%22_Logo.png' }} style={styles.googleLogo} />
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.loginContainer}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.loginScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.loginCard}>
+              <Text style={styles.title}>Welcome Back</Text>
+              <Text style={styles.subtitle}>Sign in to your PropertPro account</Text>
+              
+              {/* Email/Password Login Form */}
+              <View style={styles.formContainer}>
+                <View style={styles.inputContainer}>
+                  <Mail size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email address"
+                    placeholderTextColor="#999"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!isLoggingIn}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Lock size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    placeholderTextColor="#999"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!isLoggingIn}
+                  />
+                  <TouchableOpacity 
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} color="#666" />
+                    ) : (
+                      <Eye size={20} color="#666" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.loginButton, isLoggingIn && styles.loginButtonDisabled]}
+                  onPress={handleEmailPasswordLogin}
+                  disabled={isLoggingIn}
+                >
+                  {isLoggingIn ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.loginButtonText}>Sign In</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Divider */}
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Google OAuth Button */}
+              <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton} disabled={isLoggingIn}>
+                <Image 
+                  source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Google_%22G%22_Logo.svg/1200px-Google_%22G%22_Logo.png' }} 
+                  style={styles.googleLogo} 
+                />
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </TouchableOpacity>
+
+              {/* Register Link */}
+              <View style={styles.registerContainer}>
+                <Text style={styles.registerText}>Don't have an account? </Text>
+                <TouchableOpacity>
+                  <Text style={styles.registerLink}>Sign Up</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -298,13 +512,36 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fff' },
   container: { backgroundColor: '#fff' },
-  loginContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#f4f6fa' },
-  loginCard: { width: '100%', maxWidth: 360, backgroundColor: '#fff', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, alignItems: 'center' },
-  title: { fontFamily: 'Poppins-Bold', fontSize: 24, color: '#0F3460', marginBottom: 8, textAlign: 'center' },
-  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666', marginBottom: 32, textAlign: 'center' },
-  googleButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, marginTop: 20, borderWidth: 1, borderColor: '#ccc' },
+  loginContainer: { flex: 1, backgroundColor: '#f4f6fa' },
+  loginScrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  loginCard: { width: '100%', maxWidth: 400, backgroundColor: '#fff', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  title: { fontFamily: 'Poppins-Bold', fontSize: 26, color: '#0F3460', marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666', marginBottom: 24, textAlign: 'center' },
+  
+  // Form styles
+  formContainer: { width: '100%', marginBottom: 16 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 4, marginBottom: 16, borderWidth: 1, borderColor: '#e9ecef' },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 15, color: '#333', paddingVertical: 12 },
+  eyeIcon: { padding: 4 },
+  loginButton: { backgroundColor: '#0F3460', borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  loginButtonDisabled: { backgroundColor: '#8899aa' },
+  loginButtonText: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#fff' },
+  
+  // Divider
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#e9ecef' },
+  dividerText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#999', marginHorizontal: 16 },
+  
+  // Google button
+  googleButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, borderWidth: 1, borderColor: '#ddd', width: '100%' },
   googleLogo: { width: 20, height: 20, marginRight: 12 },
-  googleButtonText: { fontSize: 16, color: '#333', fontWeight: '500' },
+  googleButtonText: { fontFamily: 'Poppins-Medium', fontSize: 15, color: '#333' },
+  
+  // Register link
+  registerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+  registerText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666' },
+  registerLink: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#0F3460' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 },
   settingsButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },
   profileCard: { backgroundColor: '#F5F7FA', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 16 },

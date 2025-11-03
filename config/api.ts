@@ -223,6 +223,36 @@ export const api = {
      */
     getPublicProfile: (username: string) =>
       apiGet(`users/profiles/${username}`).then(res => res.data),
+
+    /**
+     * Email verification: verify email with token from email link
+     */
+    verifyEmail: (data: { token: string }) =>
+      apiPost('users/verify-email', data),
+
+    /**
+     * Resend verification email for current user
+     */
+    resendVerification: () =>
+      apiPost('users/resend-verification'),
+
+    /**
+     * Request password reset: send reset email to user
+     */
+    requestPasswordReset: (email: string) =>
+      apiPost('users/password-reset/request', { email }),
+
+    /**
+     * Confirm password reset: set new password with token
+     */
+    confirmPasswordReset: (token: string, newPassword: string) =>
+      apiPost('users/password-reset/confirm', { token, new_password: newPassword }),
+
+    /**
+     * Validate reset token: check if token is still valid
+     */
+    validateResetToken: (token: string) =>
+      apiGet('users/password-reset/validate', { params: { token } }),
   },
 
   // Property-related endpoints
