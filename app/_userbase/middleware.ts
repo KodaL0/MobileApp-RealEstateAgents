@@ -27,6 +27,26 @@ export async function logout() {
   }
 }
 
+export async function register(
+  username: string,
+  email: string,
+  password: string,
+  acceptedTerms: boolean = false,
+  acceptedPrivacy: boolean = false,
+  marketingConsent: boolean = false
+) {
+  const res = await apiService.auth.register({
+    username: username.toLowerCase(),
+    email,
+    password,
+    accepted_terms: acceptedTerms,
+    accepted_privacy_policy: acceptedPrivacy,
+    marketing_consent: marketingConsent,
+    terms_accepted_at: new Date().toISOString(),
+  });
+  return res;
+}
+
 export async function fetchUser() {
   const res = await apiService.auth.getUser();
   return res.user ?? null;

@@ -442,10 +442,18 @@ export default function ProfileScreen() {
                 <Text style={styles.googleButtonText}>Continue with Google</Text>
               </TouchableOpacity>
 
+              {/* Native Login Screen Link */}
+              <TouchableOpacity 
+                onPress={() => router.push('/auth/login')}
+                style={styles.nativeLoginButton}
+              >
+                <Text style={styles.nativeLoginText}>Use Native Login Screen →</Text>
+              </TouchableOpacity>
+
               {/* Register Link */}
               <View style={styles.registerContainer}>
                 <Text style={styles.registerText}>Don't have an account? </Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/auth/register')}>
                   <Text style={styles.registerLink}>Sign Up</Text>
                 </TouchableOpacity>
               </View>
@@ -539,6 +547,19 @@ const styles = StyleSheet.create({
   googleButtonText: { fontFamily: 'Poppins-Medium', fontSize: 15, color: '#333' },
   
   // Register link
+  nativeLoginButton: { 
+    marginTop: 16, 
+    padding: 12, 
+    alignItems: 'center', 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: '#2563eb' 
+  },
+  nativeLoginText: { 
+    fontFamily: 'Poppins-SemiBold', 
+    fontSize: 14, 
+    color: '#2563eb' 
+  },
   registerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   registerText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666' },
   registerLink: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#0F3460' },
