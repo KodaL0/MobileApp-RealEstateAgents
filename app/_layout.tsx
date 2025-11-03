@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
-  ActivityIndicator, Alert, Platform
+  ActivityIndicator, Alert, Platform, ScrollView, KeyboardAvoidingView
 } from 'react-native';
 import { Stack, SplashScreen as ExpoSplash, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +26,7 @@ import { useUser, UserProvider } from './_userbase/UserContext';
 import { OAUTH_CONFIG, buildBackendGoogleCallbackUrl, buildBackendGoogleLoginUrl } from '@/config/oauth';
 import { ChatProvider } from './features/chat/context/ChatContext';
 import SplashScreen from '../components/SplashScreen';
+import { NativeLogin } from './_userbase/NativeLogin';
 
 ExpoSplash.preventAutoHideAsync();
 
@@ -51,6 +52,7 @@ function InnerApp() {
   const [showCustomSplash, setShowCustomSplash] = useState(true);
   const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
   const [splashFinished, setSplashFinished] = useState(false);
+  const [showNativeLogin, setShowNativeLogin] = useState(false);
 
   // Framework ready hook
   useFrameworkReady();
@@ -190,10 +192,13 @@ function InnerApp() {
     );
   }
 
-  // 4) login UI - ONLY THE UI IS CHANGED HERE
+  // 4) login UI - Refactored with Native Login Integration
   if (!isAuthenticated || !user) {
     return (
-      <View style={styles.loginWrapper}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.loginWrapper}
+      >
         <LinearGradient
           colors={['#0F3460', '#1a4a7a', '#f8fafc']}
           style={styles.gradientBackground}
@@ -202,52 +207,98 @@ function InnerApp() {
         />
         <StatusBar style="light" />
         <SafeAreaView style={styles.loginContainer}>
-          <View style={styles.logoSection}>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../assets/images/propertprologo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.welcomeText}>Welcome Back</Text>
-            <Text style={styles.welcomeSubtext}>Sign in to continue to your account</Text>
-          </View>
-
-          <View style={styles.loginCard}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Sign In</Text>
-              <Text style={styles.cardSubtitle}>Choose your preferred sign-in method</Text>
-            </View>
-
-            <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton}>
-              <View style={styles.googleIconContainer}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Logo Section */}
+            <View style={styles.logoSection}>
+              <View style={styles.logoContainer}>
                 <Image
-                  source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-                  style={styles.googleLogo}
+                  source={require('../assets/images/propertprologo.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
                 />
               </View>
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
-            </TouchableOpacity>
-
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
+              <Text style={styles.welcomeText}>Welcome to PropertPro</Text>
+              <Text style={styles.welcomeSubtext}>
+                {showNativeLogin 
+                  ? 'Sign in with your account' 
+                  : 'Choose your preferred sign-in method'}
+              </Text>
             </View>
 
-            <View style={styles.alternativeOptions}>
-              <Text style={styles.alternativeText}>More sign-in options coming soon</Text>
+            {/* Login Methods Toggle */}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[styles.toggleButton, !showNativeLogin && styles.toggleButtonActive]}
+                onPress={() => setShowNativeLogin(false)}
+              >
+                <Text style={[styles.toggleButtonText, !showNativeLogin && styles.toggleButtonTextActive]}>
+                  Quick Sign-In
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButton, showNativeLogin && styles.toggleButtonActive]}
+                onPress={() => setShowNativeLogin(true)}
+              >
+                <Text style={[styles.toggleButtonText, showNativeLogin && styles.toggleButtonTextActive]}>
+                  Email/Password
+                </Text>
+              </TouchableOpacity>
             </View>
-          </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              By continuing, you agree to our Terms of Service and Privacy Policy
-            </Text>
-          </View>
+            {/* Login Card */}
+            <View style={styles.loginCard}>
+              {!showNativeLogin ? (
+                // Google OAuth Login
+                <>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardTitle}>Quick Sign-In</Text>
+                    <Text style={styles.cardSubtitle}>
+                      Sign in with your Google account
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton}>
+                    <View style={styles.googleIconContainer}>
+                      <Image
+                        source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                        style={styles.googleLogo}
+                      />
+                    </View>
+                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.benefitsContainer}>
+                    <Text style={styles.benefitsTitle}>Why use Quick Sign-In?</Text>
+                    <Text style={styles.benefitText}>✓ Faster login process</Text>
+                    <Text style={styles.benefitText}>✓ No need to remember passwords</Text>
+                    <Text style={styles.benefitText}>✓ Secure Google authentication</Text>
+                  </View>
+                </>
+              ) : (
+                // Native Email/Password Login
+                <NativeLogin
+                  onSuccess={() => {
+                    // Successfully logged in, user state will update automatically
+                    console.log('Login successful from _layout.tsx');
+                  }}
+                  initialMode="login"
+                />
+              )}
+            </View>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>
+                By continuing, you agree to our Terms of Service and Privacy Policy
+              </Text>
+            </View>
+          </ScrollView>
         </SafeAreaView>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -287,15 +338,18 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   loginContainer: { 
-    flex: 1, 
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 20,
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   logoSection: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 20,
+    marginBottom: 24,
   },
   logoContainer: {
     width: 120,
@@ -334,10 +388,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+    marginHorizontal: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  toggleButtonText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  toggleButtonTextActive: {
+    fontFamily: 'Poppins-SemiBold',
+    color: '#0F3460',
+  },
   loginCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 32,
+    padding: 24,
     marginHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -398,34 +483,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#0F3460',
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
+  benefitsContainer: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(15, 52, 96, 0.1)',
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(15, 52, 96, 0.15)',
-  },
-  dividerText: {
-    fontFamily: 'Poppins-Regular',
+  benefitsTitle: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 14,
-    color: '#666',
-    marginHorizontal: 16,
-  },
-  alternativeOptions: {
-    alignItems: 'center',
-  },
-  alternativeText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#666',
+    color: '#0F3460',
+    marginBottom: 12,
     textAlign: 'center',
+  },
+  benefitText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
+    paddingLeft: 8,
   },
   footer: {
     alignItems: 'center',
     paddingHorizontal: 16,
+    marginTop: 24,
   },
   footerText: {
     fontFamily: 'Poppins-Regular',
