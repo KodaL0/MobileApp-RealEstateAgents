@@ -50,21 +50,46 @@ const clearAuthCookies = () => {
       'access_token',
       'refresh_token',
       'mobile_access_token',
+      'mobile_refresh_token',
       'csrftoken',
       'sessionid'
     ];
     
+    // Get current hostname to determine domains
+    const hostname = window.location.hostname;
+    
+    // Define all possible domain combinations
+    // Cookies can only be set with: undefined (host-only) or '.propertpro.com' (with leading dot)
+    // Specific subdomains like 'm.propertpro.com' are NOT valid cookie domains
+    const domains: (string | undefined)[] = [
+      undefined,  // Host-only (no domain) - covers current domain
+    ];
+    
+    // Add .propertpro.com domain if we're on a propertpro.com domain (covers all subdomains)
+    if (hostname.includes('propertpro.com')) {
+      domains.push('.propertpro.com');
+    }
+    
+    // Clear each cookie with all domain combinations and SameSite attributes
     cookieNames.forEach(name => {
-      // Clear without domain (for current domain)
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=None; Secure`;
-      
-      // Clear with domain (for .propertpro.com in production)
-      if (window.location.hostname.includes('propertpro.com')) {
-        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.propertpro.com; SameSite=None; Secure`;
-      }
+      domains.forEach(domain => {
+        // Clear with SameSite=None; Secure (for cross-origin cookies in production)
+        let cookieString = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=None; Secure`;
+        if (domain) {
+          cookieString += `; domain=${domain}`;
+        }
+        document.cookie = cookieString;
+        
+        // Clear with SameSite=Lax (for mobile browsers and same-site cookies)
+        cookieString = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+        if (domain) {
+          cookieString += `; domain=${domain}`;
+        }
+        document.cookie = cookieString;
+      });
     });
     
-    console.log('✅ Web cookies cleared');
+    console.log('✅ Web cookies cleared with all domain combinations');
   }
 };
 
@@ -214,11 +239,27 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         setIsAuthenticated(false);
         
         console.log('✅ Logout complete - all storage cleared');
+        
+        // Force page reload on web to ensure complete state reset
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          console.log('🔄 Forcing page reload to complete logout');
+          // Small delay to ensure state updates
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 100);
+        }
       } catch (error) {
         console.error('❌ Error clearing storage:', error);
         // Even if clearing fails, reset state
         setUser(null);
         setIsAuthenticated(false);
+        
+        // Still try to reload on web
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 100);
+        }
       }
     }
   };
