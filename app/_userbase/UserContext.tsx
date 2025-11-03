@@ -43,6 +43,31 @@ const deleteRefreshToken = async () => {
   }
 };
 
+// Clear authentication cookies (for web platform)
+const clearAuthCookies = () => {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const cookieNames = [
+      'access_token',
+      'refresh_token',
+      'mobile_access_token',
+      'csrftoken',
+      'sessionid'
+    ];
+    
+    cookieNames.forEach(name => {
+      // Clear without domain (for current domain)
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=None; Secure`;
+      
+      // Clear with domain (for .propertpro.com in production)
+      if (window.location.hostname.includes('propertpro.com')) {
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.propertpro.com; SameSite=None; Secure`;
+      }
+    });
+    
+    console.log('✅ Web cookies cleared');
+  }
+};
+
 interface UserProviderProps {
   children: ReactNode;
 }
@@ -167,14 +192,34 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
   const logout = async () => {
     try {
+      // Try to call backend logout endpoint
       await apiLogout();
-      await AsyncStorage.removeItem('access_token');
-      await AsyncStorage.removeItem('mobile_access_token');
-      await deleteRefreshToken();
-      setUser(null);
-      setIsAuthenticated(false);
+      console.log('✅ Backend logout successful');
     } catch (error) {
-      console.error('Error clearing tokens:', error);
+      console.error('⚠️ Backend logout failed (will still clear local storage):', error);
+      // Don't throw - we still want to clear local storage
+    } finally {
+      // ALWAYS clear all storage, regardless of backend API success
+      try {
+        // Clear AsyncStorage (for native platforms and web fallback)
+        await AsyncStorage.removeItem('access_token');
+        await AsyncStorage.removeItem('mobile_access_token');
+        await deleteRefreshToken();
+        
+        // Clear cookies (for web platform)
+        clearAuthCookies();
+        
+        // Reset state
+        setUser(null);
+        setIsAuthenticated(false);
+        
+        console.log('✅ Logout complete - all storage cleared');
+      } catch (error) {
+        console.error('❌ Error clearing storage:', error);
+        // Even if clearing fails, reset state
+        setUser(null);
+        setIsAuthenticated(false);
+      }
     }
   };
 
