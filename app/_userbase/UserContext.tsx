@@ -43,6 +43,27 @@ const deleteRefreshToken = async () => {
   }
 };
 
+// Check if auth cookies exist (for web platform)
+const hasAuthCookies = (): boolean => {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const cookieString = document.cookie;
+    // Check for any auth-related cookies
+    const authCookieNames = [
+      'access_token',
+      'refresh_token',
+      'mobile_access_token',
+      'mobile_refresh_token',
+      'sessionid'
+    ];
+    
+    return authCookieNames.some(name => {
+      const regex = new RegExp(`(^|; )${name}=`);
+      return regex.test(cookieString);
+    });
+  }
+  return false;
+};
+
 // Clear authentication cookies (for web platform)
 const clearAuthCookies = () => {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -119,7 +140,19 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           return;
         }
       } else {
-        console.log('fetchUser: running on web, relying on cookies for authentication');
+        // Web platform: check if auth cookies exist before making API call
+        console.log('fetchUser: running on web, checking for auth cookies');
+        const hasAuth = hasAuthCookies();
+        console.log('fetchUser: auth cookies present?', hasAuth);
+        
+        if (!hasAuth) {
+          console.log('No auth cookies found, user not authenticated');
+          setUser(null);
+          setIsAuthenticated(false);
+          return;
+        }
+        
+        console.log('fetchUser: auth cookies found, proceeding with API call');
       }
 
       console.log('fetchUser: calling apiFetchUser');
@@ -149,11 +182,16 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       console.error('Error response status:', e?.response?.status);
       console.error('Error response data:', e?.response?.data);
       // If 401, clear tokens and set user to null
-      if (e?.response?.status === 401 && Platform.OS !== 'web') {
-        console.log('401 error, clearing tokens');
-        await AsyncStorage.removeItem('access_token');
-        await AsyncStorage.removeItem('mobile_access_token');
-        await deleteRefreshToken();
+      if (e?.response?.status === 401) {
+        console.log('401 error, clearing authentication');
+        if (Platform.OS !== 'web') {
+          await AsyncStorage.removeItem('access_token');
+          await AsyncStorage.removeItem('mobile_access_token');
+          await deleteRefreshToken();
+        } else {
+          // On web, also clear cookies on 401
+          clearAuthCookies();
+        }
       }
       setUser(null);
       setIsAuthenticated(false);
@@ -163,104 +201,39 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   };
 
   const login = async (accessToken: string, refreshToken: string, userData: User) => {
-    console.log('=== USERCONTEXT LOGIN START ===');
-    console.log('UserContext.login: Starting login process');
-    console.log('UserContext.login: Access token length:', accessToken?.length);
-    console.log('UserContext.login: Refresh token length:', refreshToken?.length);
-    console.log('UserContext.login: User data:', userData);
-    
     try {
-      console.log('UserContext.login: Storing tokens and user data');
-      console.log('UserContext.login: accessToken length:', accessToken?.length);
-      console.log('UserContext.login: refreshToken length:', refreshToken?.length);
-      console.log('UserContext.login: userData:', userData);
-      
-      // Store tokens first
-      console.log('UserContext.login: Storing access token in AsyncStorage');
+      // Store tokens
       await AsyncStorage.setItem('access_token', accessToken);
-      console.log('UserContext.login: Access token stored successfully');
-      
-      console.log('UserContext.login: Storing refresh token');
       await setRefreshToken(refreshToken);
-      console.log('UserContext.login: Refresh token stored successfully');
-      
-      // Store mobile token fallback for parity with web cookies
       await AsyncStorage.setItem('mobile_access_token', accessToken);
-
-      // Verify token was stored
-      console.log('UserContext.login: Verifying token storage');
-      const storedToken = await AsyncStorage.getItem('access_token');
-      console.log('UserContext.login: token verification - stored?', !!storedToken, storedToken ? storedToken.substring(0, 20) + '...' : 'none');
       
-      // Set user state immediately from the data we already have
-      console.log('UserContext.login: Updating user state');
+      // Set user state
       setUser(userData);
-      console.log('UserContext.login: User state updated');
-      
-      console.log('UserContext.login: Setting authentication state');
       setIsAuthenticated(true);
-      console.log('UserContext.login: Authentication state updated');
-      
-      console.log('UserContext.login: tokens stored successfully, user state updated');
-      console.log('=== USERCONTEXT LOGIN COMPLETE ===');
     } catch (error: any) {
-      console.error('=== USERCONTEXT LOGIN ERROR ===');
-      console.error('UserContext.login: Error storing tokens:', error);
-      console.error('UserContext.login: Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name
-      });
+      console.error('Login error:', error);
       throw error;
     }
   };
 
   const logout = async () => {
     try {
-      // Try to call backend logout endpoint
+      // Call backend logout endpoint
       await apiLogout();
-      console.log('✅ Backend logout successful');
     } catch (error) {
-      console.error('⚠️ Backend logout failed (will still clear local storage):', error);
-      // Don't throw - we still want to clear local storage
+      console.error('Backend logout failed (will still clear local storage):', error);
     } finally {
-      // ALWAYS clear all storage, regardless of backend API success
-      try {
-        // Clear AsyncStorage (for native platforms and web fallback)
-        await AsyncStorage.removeItem('access_token');
-        await AsyncStorage.removeItem('mobile_access_token');
-        await deleteRefreshToken();
-        
-        // Clear cookies (for web platform)
-        clearAuthCookies();
-        
-        // Reset state
-        setUser(null);
-        setIsAuthenticated(false);
-        
-        console.log('✅ Logout complete - all storage cleared');
-        
-        // Force page reload on web to ensure complete state reset
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          console.log('🔄 Forcing page reload to complete logout');
-          // Small delay to ensure state updates
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 100);
-        }
-      } catch (error) {
-        console.error('❌ Error clearing storage:', error);
-        // Even if clearing fails, reset state
-        setUser(null);
-        setIsAuthenticated(false);
-        
-        // Still try to reload on web
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 100);
-        }
-      }
+      // Always clear all storage, regardless of backend API success
+      await AsyncStorage.removeItem('access_token');
+      await AsyncStorage.removeItem('mobile_access_token');
+      await deleteRefreshToken();
+      
+      // Clear cookies (for web platform)
+      clearAuthCookies();
+      
+      // Reset state
+      setUser(null);
+      setIsAuthenticated(false);
     }
   };
 
