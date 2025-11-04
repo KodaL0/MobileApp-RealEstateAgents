@@ -49,5 +49,15 @@ export async function register(
 
 export async function fetchUser() {
   const res = await apiService.auth.getUser();
-  return res.user ?? null;
+  console.log('middleware.fetchUser: API response:', res);
+  // API returns { user: {...} } or { status: 200, user: {...} }
+  // Extract user from response
+  if (res?.user) {
+    return res.user;
+  }
+  // If no user property, check if the response itself is a user object
+  if (res?.id && res?.email) {
+    return res;
+  }
+  return null;
 }

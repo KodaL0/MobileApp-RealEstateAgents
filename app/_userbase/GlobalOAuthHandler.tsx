@@ -21,7 +21,7 @@ import { OAUTH_CONFIG, buildBackendGoogleCallbackUrl, buildBackendGoogleLoginUrl
  */
 export default function GlobalOAuthHandler() {
   const router = useRouter();
-  const { login, refreshUser } = useUser();
+  const { login, refreshUser, user } = useUser();
   const [hasProcessed, setHasProcessed] = useState(false);
 
   // Setup Google AuthRequest for native platforms (ID token flow)
@@ -93,18 +93,18 @@ export default function GlobalOAuthHandler() {
 
     const completeLoginFromCookies = async () => {
       try {
+        console.log('GlobalOAuthHandler: Starting OAuth completion, refreshing user...');
+        setHasProcessed(true); // Mark as processed immediately to prevent double execution
+        // Clean query params first
+        cleanQueryParams();
         // Pass true to force check - HttpOnly cookies aren't visible in document.cookie
         // but will be sent automatically with the API request
         await refreshUser(true);
-        // Small delay to ensure state updates propagate before navigation
-        setTimeout(() => {
-          cleanQueryParams();
-          router.replace('/');
-        }, 200);
+        console.log('GlobalOAuthHandler: User refreshed successfully, state should update automatically');
       } catch (error) {
         console.error('GlobalOAuthHandler: Failed to refresh user after OAuth completion', error);
         Alert.alert('Login Failed', 'Failed to retrieve user data after OAuth login');
-        setHasProcessed(true);
+        setHasProcessed(false); // Reset so user can try again
       }
     };
 

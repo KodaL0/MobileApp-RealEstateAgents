@@ -145,22 +145,18 @@ export const UserProvider = ({ children }: UserProviderProps) => {
         }
       }
 
-      // Fetch user data
-      const data = await apiFetchUser();
-      
-      // Handle different response shapes
-      let userData: User | null = null;
-      if (data?.user?.user) userData = data.user.user;
-      else if (data?.user?.id) userData = data.user;
-      else if (data?.data?.user) userData = data.data.user;
-      else if (data?.id) userData = data as User;
+      // Fetch user data - fetchUser now returns user object directly or null
+      const userData = await apiFetchUser();
+      console.log('UserContext: fetchUser returned:', userData);
 
-      if (!userData) {
+      if (!userData || !userData.id) {
+        console.warn('UserContext: No valid user data found');
         setUser(null);
         setIsAuthenticated(false);
         return;
       }
 
+      console.log('UserContext: Setting user and isAuthenticated to true');
       setUser(userData);
       setIsAuthenticated(true);
     } catch (e: any) {

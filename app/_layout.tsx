@@ -54,6 +54,15 @@ function InnerApp() {
   // Get Google login handler from hook
   const handleGoogleLogin = useGoogleLogin();
 
+  // Debug: Log auth state changes
+  useEffect(() => {
+    console.log('_layout.tsx: Auth state changed -', { 
+      user: user?.email || 'null', 
+      isAuthenticated, 
+      isLoading 
+    });
+  }, [user, isAuthenticated, isLoading]);
+
   // Wait for fonts to load
   useEffect(() => {
     if (fontsLoaded) {
