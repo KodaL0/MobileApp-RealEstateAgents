@@ -123,7 +123,7 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const fetchUser = async () => {
+  const fetchUser = async (forceCheck: boolean = false) => {
     setIsLoading(true);
     try {
       // Check for authentication
@@ -135,7 +135,10 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           return;
         }
       } else {
-        if (!hasAuthCookies()) {
+        // On web, HttpOnly cookies aren't visible in document.cookie
+        // If forceCheck is true (e.g., after login), skip the cookie check
+        // and attempt to fetch user - cookies will be sent automatically if present
+        if (!forceCheck && !hasAuthCookies()) {
           setUser(null);
           setIsAuthenticated(false);
           return;

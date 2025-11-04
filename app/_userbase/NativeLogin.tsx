@@ -129,15 +129,18 @@ export const NativeLogin: React.FC<NativeLoginProps> = ({
           // Handle web platform (cookies) vs mobile platform (tokens in body)
           if (Platform.OS === 'web') {
             // On web, tokens are in HttpOnly cookies set by backend
-            // Refresh user state from cookies
+            // Refresh user state from cookies - force check since HttpOnly cookies aren't visible
             try {
-              await refreshUser();
-              Alert.alert('Success', 'Login successful!');
-              // Call onSuccess to trigger navigation
-              // The useEffect in login screen will also handle navigation, but calling onSuccess ensures it happens
-              if (onSuccess) {
-                onSuccess();
-              }
+              // Pass true to force check - cookies will be sent automatically even if not visible
+              await refreshUser(true);
+              // Small delay to ensure state propagation before navigation
+              setTimeout(() => {
+                Alert.alert('Success', 'Login successful!');
+                // Call onSuccess to trigger navigation
+                if (onSuccess) {
+                  onSuccess();
+                }
+              }, 100);
             } catch (error) {
               console.error('Failed to refresh user after login:', error);
               Alert.alert('Login Failed', 'Failed to retrieve user data');
