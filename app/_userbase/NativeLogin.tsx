@@ -120,24 +120,56 @@ export const NativeLogin: React.FC<NativeLoginProps> = ({
         const response = await apiLogin(formData.email, formData.password);
         console.log('Login response:', response);
 
-        if (response?.access_token && response?.user) {
-          // Success - tokens are already stored in AsyncStorage by apiLogin
-          await contextLogin(
-            response.access_token,
-            response.refresh_token || '',
-            response.user
-          );
-          
-          Alert.alert('Success', 'Login successful!');
-          
-          if (onSuccess) {
-            onSuccess();
+        // Check if login was successful
+        const isSuccess = response?.status === 200 || (response?.access_token && response?.user);
+        const hasUser = response?.user;
+        const hasTokens = response?.access_token;
+
+        if (isSuccess && hasUser) {
+          // Handle web platform (cookies) vs mobile platform (tokens in body)
+          if (Platform.OS === 'web') {
+            // On web, tokens are in HttpOnly cookies set by backend
+            // Refresh user state from cookies
+            try {
+              await refreshUser();
+              Alert.alert('Success', 'Login successful!');
+              // Call onSuccess to trigger navigation
+              // The useEffect in login screen will also handle navigation, but calling onSuccess ensures it happens
+              if (onSuccess) {
+                onSuccess();
+              }
+            } catch (error) {
+              console.error('Failed to refresh user after login:', error);
+              Alert.alert('Login Failed', 'Failed to retrieve user data');
+              setErrors({ general: 'Failed to retrieve user data' });
+            }
+          } else {
+            // On mobile, tokens should be in response body
+            if (hasTokens) {
+              // Success - tokens are already stored in AsyncStorage by apiLogin
+              await contextLogin(
+                response.access_token,
+                response.refresh_token || '',
+                response.user
+              );
+              
+              Alert.alert('Success', 'Login successful!');
+              
+              if (onSuccess) {
+                onSuccess();
+              }
+            } else {
+              // Mobile login but no tokens in response
+              console.warn('Mobile login: tokens not present in response payload');
+              Alert.alert('Login Failed', 'Authentication tokens not received');
+              setErrors({ general: 'Authentication tokens not received' });
+            }
           }
         } else if (response?.error?.includes('Email not verified')) {
           Alert.alert('Email Not Verified', 'Please check your email for verification link');
           setErrors({ general: 'Check your email for verification link' });
         } else {
-          const errorMsg = response?.error || 'Login failed';
+          const errorMsg = response?.error || response?.message || 'Login failed';
           Alert.alert('Login Failed', errorMsg);
           setErrors({ general: errorMsg });
         }
