@@ -96,12 +96,14 @@ export default function GlobalOAuthHandler() {
         // Pass true to force check - HttpOnly cookies aren't visible in document.cookie
         // but will be sent automatically with the API request
         await refreshUser(true);
-        cleanQueryParams();
-        router.replace('/');
+        // Small delay to ensure state updates propagate before navigation
+        setTimeout(() => {
+          cleanQueryParams();
+          router.replace('/');
+        }, 200);
       } catch (error) {
         console.error('GlobalOAuthHandler: Failed to refresh user after OAuth completion', error);
         Alert.alert('Login Failed', 'Failed to retrieve user data after OAuth login');
-      } finally {
         setHasProcessed(true);
       }
     };

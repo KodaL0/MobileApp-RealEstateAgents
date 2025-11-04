@@ -89,18 +89,20 @@ function InnerApp() {
   // 4) login UI - Simplified flow with social login and register button
   if (!isAuthenticated || !user) {
     return (
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.loginWrapper}
-      >
-        <LinearGradient
-          colors={['#0F3460', '#1a4a7a', '#f8fafc']}
-          style={styles.gradientBackground}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
-        <StatusBar style="light" />
-        <SafeAreaView style={styles.loginContainer}>
+      <>
+        <GlobalOAuthHandler />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.loginWrapper}
+        >
+          <LinearGradient
+            colors={['#0F3460', '#1a4a7a', '#f8fafc']}
+            style={styles.gradientBackground}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+          <StatusBar style="light" />
+          <SafeAreaView style={styles.loginContainer}>
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -177,6 +179,7 @@ function InnerApp() {
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
+      </>
     );
   }
 
