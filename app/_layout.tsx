@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
-  ActivityIndicator, Alert, Platform, ScrollView, KeyboardAvoidingView
+  ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView
 } from 'react-native';
 import { Stack, SplashScreen as ExpoSplash, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import * as Google from 'expo-auth-session/providers/google';
-import { ResponseType } from 'expo-auth-session';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import {
@@ -21,12 +17,11 @@ import {
 } from '@expo-google-fonts/poppins';
 
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { api } from '@/config/api';
 import { useUser, UserProvider } from './_userbase/UserContext';
-import { OAUTH_CONFIG, buildBackendGoogleCallbackUrl, buildBackendGoogleLoginUrl } from '@/config/oauth';
 import { ChatProvider } from './features/chat/context/ChatContext';
 import SplashScreen from '../components/SplashScreen';
 import { NativeLogin } from './_userbase/NativeLogin';
+import GlobalOAuthHandler, { useGoogleLogin } from './_userbase/GlobalOAuthHandler';
 
 ExpoSplash.preventAutoHideAsync();
 
@@ -40,7 +35,7 @@ export default function RootLayout() {
 
 function InnerApp() {
   const router = useRouter();
-  const { user, isLoading, isAuthenticated, login, refreshUser } = useUser();
+  const { user, isLoading, isAuthenticated } = useUser();
 
   const [fontsLoaded, fontError] = useFonts({
     'Poppins-Regular':  Poppins_400Regular,
@@ -50,115 +45,14 @@ function InnerApp() {
   });
 
   const [showCustomSplash, setShowCustomSplash] = useState(true);
-  const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
   const [splashFinished, setSplashFinished] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
 
   // Framework ready hook
   useFrameworkReady();
 
-  WebBrowser.maybeCompleteAuthSession();
-  const [, response, promptAsync] = Google.useAuthRequest({
-    clientId:     OAUTH_CONFIG.CLIENT_ID,
-    redirectUri:  OAUTH_CONFIG.REDIRECT_URI,
-    scopes:       [...OAUTH_CONFIG.SCOPES],
-    responseType: ResponseType.IdToken,
-  });
-
-  const handleTokenExchange = useCallback(async (idToken: string) => {
-    try {
-      const res = await api.post('users/accounts/google/login/mobile/', { id_token: idToken });
-      const { access_token, refresh_token, user: u } = res.data;
-      await login(access_token, refresh_token, u);
-      router.replace('/');
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Login Failed', 'Please try again.');
-    }
-  }, [login, router]);
-
-  // web OAuth callback handling aligning with web frontend flow
-  useEffect(() => {
-    if (Platform.OS !== 'web' || hasProcessedOAuth) {
-      return;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    const authSuccess = params.get('auth_success');
-    const authError = params.get('error');
-    const hasOAuthParams = params.has('code') || params.has('state');
-
-    const cleanQueryParams = () => {
-      params.delete('auth_success');
-      params.delete('error');
-      const newSearch = params.toString();
-      const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}${window.location.hash || ''}`;
-      window.history.replaceState({}, document.title, newUrl);
-    };
-
-    const completeLoginFromCookies = async () => {
-      try {
-        await refreshUser();
-        cleanQueryParams();
-        router.replace('/');
-      } catch (error) {
-        console.error('Failed to refresh user after OAuth completion', error);
-      } finally {
-        setHasProcessedOAuth(true);
-      }
-    };
-
-    if (authSuccess === 'true') {
-      completeLoginFromCookies();
-      return;
-    }
-
-    if (authError) {
-      cleanQueryParams();
-      setHasProcessedOAuth(true);
-      Alert.alert('Login Failed', 'Authentication was cancelled or failed. Please try again.');
-      return;
-    }
-
-    if (hasOAuthParams) {
-      const callbackUrl = buildBackendGoogleCallbackUrl(window.location.search);
-      window.location.replace(callbackUrl);
-      return;
-    }
-  }, [hasProcessedOAuth, refreshUser, router]);
-
-  // native deep link
-  useEffect(() => {
-    const handler = ({ url }: { url: string }) => {
-      const m = url.match(/(?:[#?&]id_token=)([^&]+)/);
-      if (m?.[1]) handleTokenExchange(m[1]);
-    };
-    const sub = Linking.addEventListener('url', handler);
-    Linking.getInitialURL().then(u => u && handler({ url: u }));
-    return () => sub.remove();
-  }, [handleTokenExchange]);
-
-  // response from promptAsync
-  useEffect(() => {
-    if (Platform.OS !== 'web' && response?.type === 'success') {
-      const idToken = (response.params as any)?.id_token;
-      if (idToken) handleTokenExchange(idToken);
-    }
-  }, [response, handleTokenExchange]);
-
-  function handleGoogleLogin() {
-    if (Platform.OS === 'web') {
-      setHasProcessedOAuth(false);
-      const nextTarget = `${window.location.origin}${window.location.pathname}${window.location.search || ''}`;
-      const loginUrl = buildBackendGoogleLoginUrl(nextTarget);
-      window.location.href = loginUrl;
-    } else {
-      promptAsync().catch(e => {
-        console.error(e);
-        Alert.alert('Login Failed', 'Could not start Google login.');
-      });
-    }
-  }
+  // Get Google login handler from hook
+  const handleGoogleLogin = useGoogleLogin();
 
   // Wait for fonts to load
   useEffect(() => {
@@ -290,6 +184,7 @@ function InnerApp() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
+        <GlobalOAuthHandler />
         <ChatProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />

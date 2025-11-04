@@ -17,6 +17,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Message } from '../../features/chat/types';
 import { useChat } from '../../features/chat/context/ChatContext';
 import { useUser } from '../../_userbase/UserContext';
+import { useRequireAuth } from '../../_userbase/hooks/useRequireAuth';
 import { Send } from 'lucide-react-native';
 import { apiClient } from '../../../config/api';
 
@@ -27,6 +28,7 @@ export default function ChatThreadPage() {
   // Hooks from your context providers
   const { threads, messages, sendMessage, setMessages } = useChat();
   const { user } = useUser();
+  const { isLoading: authLoading } = useRequireAuth();
   const router = useRouter();
 
   // Local state & refs
@@ -99,7 +101,7 @@ export default function ChatThreadPage() {
     
     if (!text) return;
     if (!threadId) return;
-    if (!user) return;
+    if (!user || authLoading) return;
     if (isSending) return; // Prevent double sends
     
     const recipientId = getRecipientId();

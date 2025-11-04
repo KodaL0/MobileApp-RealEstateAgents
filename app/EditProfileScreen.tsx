@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Save, Loader2 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
 import { useUser } from '@/app/_userbase/UserContext';
+import { useRequireAuth } from '@/app/_userbase/hooks/useRequireAuth';
 import { api } from '@/config/api';
 
 export default function EditProfileScreen() {
   const { user, setUser } = useUser();
-  const router = useRouter();
+  const { isLoading: authLoading } = useRequireAuth();
 
   const [profileData, setProfileData] = useState({
     username: '',
@@ -24,12 +24,10 @@ export default function EditProfileScreen() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      router.replace('/');
-      return;
+    if (user && !authLoading) {
+      loadProfile();
     }
-    loadProfile();
-  }, [user, router]);
+  }, [user, authLoading]);
 
   const loadProfile = async () => {
     setIsLoadingProfile(true);
