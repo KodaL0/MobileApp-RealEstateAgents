@@ -19,12 +19,14 @@ interface NativeLoginProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   initialMode?: 'login' | 'register';
+  hideToggle?: boolean;
 }
 
 export const NativeLogin: React.FC<NativeLoginProps> = ({
   onSuccess,
   onCancel,
   initialMode = 'login',
+  hideToggle = false,
 }) => {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [isLoading, setIsLoading] = useState(false);
@@ -429,16 +431,18 @@ export const NativeLogin: React.FC<NativeLoginProps> = ({
           </View>
 
           {/* Toggle Mode */}
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleText}>
-              {isLogin ? "Don't have an account? " : 'Already have an account? '}
-            </Text>
-            <TouchableOpacity onPress={handleToggleMode} disabled={isLoading}>
-              <Text style={styles.toggleLink}>
-                {isLogin ? 'Sign up' : 'Sign in'}
+          {!hideToggle && (
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleText}>
+                {isLogin ? "Don't have an account? " : 'Already have an account? '}
               </Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity onPress={handleToggleMode} disabled={isLoading}>
+                <Text style={styles.toggleLink}>
+                  {isLogin ? 'Sign up' : 'Sign in'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

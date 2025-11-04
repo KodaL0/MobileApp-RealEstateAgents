@@ -52,7 +52,7 @@ function InnerApp() {
   const [showCustomSplash, setShowCustomSplash] = useState(true);
   const [hasProcessedOAuth, setHasProcessedOAuth] = useState(false);
   const [splashFinished, setSplashFinished] = useState(false);
-  const [showNativeLogin, setShowNativeLogin] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
 
   // Framework ready hook
   useFrameworkReady();
@@ -192,7 +192,7 @@ function InnerApp() {
     );
   }
 
-  // 4) login UI - Refactored with Native Login Integration
+  // 4) login UI - Simplified flow with social login and register button
   if (!isAuthenticated || !user) {
     return (
       <KeyboardAvoidingView 
@@ -221,73 +221,57 @@ function InnerApp() {
                   resizeMode="contain"
                 />
               </View>
-              <Text style={styles.welcomeText}>Welcome to PropertPro</Text>
+              <Text style={styles.welcomeText}>
+                {isRegisterMode ? 'Join PropertPro' : 'Welcome Back'}
+              </Text>
               <Text style={styles.welcomeSubtext}>
-                {showNativeLogin 
-                  ? 'Sign in with your account' 
-                  : 'Choose your preferred sign-in method'}
+                {isRegisterMode 
+                  ? 'Create your account to get started' 
+                  : 'Sign in to your account'}
               </Text>
             </View>
 
-            {/* Login Methods Toggle */}
-            <View style={styles.toggleContainer}>
-              <TouchableOpacity
-                style={[styles.toggleButton, !showNativeLogin && styles.toggleButtonActive]}
-                onPress={() => setShowNativeLogin(false)}
-              >
-                <Text style={[styles.toggleButtonText, !showNativeLogin && styles.toggleButtonTextActive]}>
-                  Quick Sign-In
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleButton, showNativeLogin && styles.toggleButtonActive]}
-                onPress={() => setShowNativeLogin(true)}
-              >
-                <Text style={[styles.toggleButtonText, showNativeLogin && styles.toggleButtonTextActive]}>
-                  Email/Password
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Login Card */}
+            {/* Native Login/Register Form */}
             <View style={styles.loginCard}>
-              {!showNativeLogin ? (
-                // Google OAuth Login
-                <>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Quick Sign-In</Text>
-                    <Text style={styles.cardSubtitle}>
-                      Sign in with your Google account
-                    </Text>
-                  </View>
+              <NativeLogin
+                key={isRegisterMode ? 'register' : 'login'}
+                onSuccess={() => {
+                  // Successfully logged in, user state will update automatically
+                  console.log('Auth successful from _layout.tsx');
+                }}
+                initialMode={isRegisterMode ? 'register' : 'login'}
+                hideToggle={true}
+              />
 
-                  <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton}>
-                    <View style={styles.googleIconContainer}>
-                      <Image
-                        source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-                        style={styles.googleLogo}
-                      />
-                    </View>
-                    <Text style={styles.googleButtonText}>Continue with Google</Text>
-                  </TouchableOpacity>
+              {/* Divider */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or continue with</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-                  <View style={styles.benefitsContainer}>
-                    <Text style={styles.benefitsTitle}>Why use Quick Sign-In?</Text>
-                    <Text style={styles.benefitText}>✓ Faster login process</Text>
-                    <Text style={styles.benefitText}>✓ No need to remember passwords</Text>
-                    <Text style={styles.benefitText}>✓ Secure Google authentication</Text>
-                  </View>
-                </>
-              ) : (
-                // Native Email/Password Login
-                <NativeLogin
-                  onSuccess={() => {
-                    // Successfully logged in, user state will update automatically
-                    console.log('Login successful from _layout.tsx');
-                  }}
-                  initialMode="login"
-                />
-              )}
+              {/* Social Login */}
+              <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton}>
+                <View style={styles.googleIconContainer}>
+                  <Image
+                    source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                    style={styles.googleLogo}
+                  />
+                </View>
+                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+              </TouchableOpacity>
+
+              {/* Register/Login Toggle */}
+              <View style={styles.toggleModeContainer}>
+                <Text style={styles.toggleModeText}>
+                  {isRegisterMode ? 'Already have an account?' : "Don't have an account?"}
+                </Text>
+                <TouchableOpacity onPress={() => setIsRegisterMode(!isRegisterMode)}>
+                  <Text style={styles.toggleModeLink}>
+                    {isRegisterMode ? 'Sign In' : 'Register'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Footer */}
@@ -388,37 +372,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  toggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-    marginHorizontal: 4,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  toggleButtonActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  toggleButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  toggleButtonTextActive: {
-    fontFamily: 'Poppins-SemiBold',
-    color: '#0F3460',
-  },
   loginCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -483,25 +436,38 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#0F3460',
   },
-  benefitsContainer: {
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(15, 52, 96, 0.1)',
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
   },
-  benefitsTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: '#0F3460',
-    marginBottom: 12,
-    textAlign: 'center',
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
   },
-  benefitText: {
+  dividerText: {
     fontFamily: 'Poppins-Regular',
     fontSize: 13,
-    color: '#666',
-    marginBottom: 8,
-    paddingLeft: 8,
+    color: '#6b7280',
+    marginHorizontal: 12,
+  },
+  toggleModeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 6,
+  },
+  toggleModeText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  toggleModeLink: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: '#2563eb',
   },
   footer: {
     alignItems: 'center',

@@ -9,10 +9,58 @@ import { Platform } from 'react-native';
  * Mirrors the web API endpoints but uses token-based auth via AsyncStorage.
  */
 
-const API_BASE_URL = 'https://api.propertpro.com/api'; 
+// Determine API base URL based on environment
+const __DEV__ = process.env.NODE_ENV !== 'production';
 
-// WebSocket URL - always use production since backend is always on api.propertpro.com
-const WS_BASE_URL = 'wss://api.propertpro.com';
+// For local development, you can set your computer's local IP here
+// Find it with: ipconfig (Windows) or ifconfig (Mac/Linux)
+const LOCAL_IP = process.env.EXPO_PUBLIC_LOCAL_IP || '192.168.0.17'; // Update this to your computer's IP
+const DEV_PORT = process.env.EXPO_PUBLIC_DEV_PORT || '8000';
+
+const getApiBaseUrl = () => {
+  // Allow override via environment variable
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  
+  if (__DEV__) {
+    // iOS Simulator can use localhost (shares host network)
+    // Android Emulator needs 10.0.2.2
+    // Physical devices need local IP
+    if (Platform.OS === 'ios' || Platform.OS === 'web') {
+      return `http://localhost:${DEV_PORT}/api`;
+    } else if (Platform.OS === 'android') {
+      // Android emulator special localhost alias
+      return `http://10.0.2.2:${DEV_PORT}/api`;
+    }
+    // For physical devices, use local IP
+    return `http://${LOCAL_IP}:${DEV_PORT}/api`;
+  }
+  // Production
+  return 'https://api.propertpro.com/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log the API URL being used for debugging
+console.log('🌐 API Base URL:', API_BASE_URL);
+console.log('📱 Platform:', Platform.OS);
+console.log('🔧 Development Mode:', __DEV__);
+
+// WebSocket URL - similar logic for dev/prod
+const getWebSocketUrl = () => {
+  if (__DEV__) {
+    if (Platform.OS === 'ios' || Platform.OS === 'web') {
+      return `ws://localhost:${DEV_PORT}`;
+    } else if (Platform.OS === 'android') {
+      return `ws://10.0.2.2:${DEV_PORT}`;
+    }
+    return `ws://${LOCAL_IP}:${DEV_PORT}`;
+  }
+  return 'wss://api.propertpro.com';
+};
+
+const WS_BASE_URL = getWebSocketUrl();
 
 export { WS_BASE_URL };
 // WebSocket URLs are NOT under /api/ - they're at the root level
