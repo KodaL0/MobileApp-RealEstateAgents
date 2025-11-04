@@ -133,14 +133,16 @@ export const NativeLogin: React.FC<NativeLoginProps> = ({
             try {
               // Pass true to force check - cookies will be sent automatically even if not visible
               await refreshUser(true);
-              // Small delay to ensure state propagation before navigation
-              setTimeout(() => {
-                Alert.alert('Success', 'Login successful!');
-                // Call onSuccess to trigger navigation
-                if (onSuccess) {
-                  onSuccess();
-                }
-              }, 100);
+              // Set user state directly from response as well to ensure immediate update
+              if (response.user) {
+                setUser(response.user);
+              }
+              // Call onSuccess immediately to trigger navigation
+              // The useEffect in login screen will also handle navigation based on user state
+              if (onSuccess) {
+                onSuccess();
+              }
+              Alert.alert('Success', 'Login successful!');
             } catch (error) {
               console.error('Failed to refresh user after login:', error);
               Alert.alert('Login Failed', 'Failed to retrieve user data');

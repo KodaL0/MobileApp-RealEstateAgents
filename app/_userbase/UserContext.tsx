@@ -19,7 +19,7 @@ interface UserContextType {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   isLoading: boolean;
   isAuthenticated: boolean;
-  refreshUser: () => Promise<void>;
+  refreshUser: (forceCheck?: boolean) => Promise<void>;
   login: (accessToken: string, refreshToken: string, userData: User) => Promise<void>;
   logout: () => Promise<void>;
 }
