@@ -9,58 +9,28 @@ import { Platform } from 'react-native';
  * Mirrors the web API endpoints but uses token-based auth via AsyncStorage.
  */
 
-// Determine API base URL based on environment
-const __DEV__ = process.env.NODE_ENV !== 'production';
+/**
+ * API Configuration
+ * 
+ * Set EXPO_PUBLIC_API_URL to override (for both dev and prod)
+ * 
+ * Development: Automatically uses your local IP when running `npm start`
+ * Production: Automatically uses production API when building
+ */
 
-// For local development, you can set your computer's local IP here
-// Find it with: ipconfig (Windows) or ifconfig (Mac/Linux)
-const LOCAL_IP = process.env.EXPO_PUBLIC_LOCAL_IP || '192.168.0.17'; // Update this to your computer's IP
+// Production API
+const PRODUCTION_API = 'https://api.propertpro.com/api';
+const PRODUCTION_WS = 'wss://api.propertpro.com';
+
+// Development API (update IP to your computer's IP)
+const DEV_IP = process.env.EXPO_PUBLIC_DEV_IP || '192.168.0.17';
 const DEV_PORT = process.env.EXPO_PUBLIC_DEV_PORT || '8000';
+const DEV_API = `http://${DEV_IP}:${DEV_PORT}/api`;
+const DEV_WS = `ws://${DEV_IP}:${DEV_PORT}`;
 
-const getApiBaseUrl = () => {
-  // Allow override via environment variable
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  if (__DEV__) {
-    // iOS Simulator can use localhost (shares host network)
-    // Android Emulator needs 10.0.2.2
-    // Physical devices need local IP
-    if (Platform.OS === 'ios' || Platform.OS === 'web') {
-      return `http://localhost:${DEV_PORT}/api`;
-    } else if (Platform.OS === 'android') {
-      // Android emulator special localhost alias
-      return `http://10.0.2.2:${DEV_PORT}/api`;
-    }
-    // For physical devices, use local IP
-    return `http://${LOCAL_IP}:${DEV_PORT}/api`;
-  }
-  // Production
-  return 'https://api.propertpro.com/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
-
-// Log the API URL being used for debugging
-console.log('🌐 API Base URL:', API_BASE_URL);
-console.log('📱 Platform:', Platform.OS);
-console.log('🔧 Development Mode:', __DEV__);
-
-// WebSocket URL - similar logic for dev/prod
-const getWebSocketUrl = () => {
-  if (__DEV__) {
-    if (Platform.OS === 'ios' || Platform.OS === 'web') {
-      return `ws://localhost:${DEV_PORT}`;
-    } else if (Platform.OS === 'android') {
-      return `ws://10.0.2.2:${DEV_PORT}`;
-    }
-    return `ws://${LOCAL_IP}:${DEV_PORT}`;
-  }
-  return 'wss://api.propertpro.com';
-};
-
-const WS_BASE_URL = getWebSocketUrl();
+// Use environment override if set, otherwise auto-detect
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? DEV_API : PRODUCTION_API);
+const WS_BASE_URL = process.env.EXPO_PUBLIC_WS_URL || (__DEV__ ? DEV_WS : PRODUCTION_WS);
 
 export { WS_BASE_URL };
 // WebSocket URLs are NOT under /api/ - they're at the root level
@@ -77,82 +47,34 @@ export const apiClient = axios.create({
   },
 });
 
-// Request interceptor: attach Bearer token from AsyncStorage if present.
+// Request interceptor: attach Bearer token from AsyncStorage if present
 apiClient.interceptors.request.use(
   async config => {
-    console.log('=== API REQUEST INTERCEPTOR START ===');
-    console.log('API Request Interceptor - Method:', config.method?.toUpperCase());
-    console.log('API Request Interceptor - URL:', config.url);
-    console.log('API Request Interceptor - Base URL:', config.baseURL);
-    console.log('API Request Interceptor - Full URL:', (config.baseURL || '') + (config.url || ''));
-    
     if (isWeb) {
-      console.log('API Request Interceptor - Running in web environment; relying on cookies for auth');
-      return config;
+      return config; // Web uses cookies
     }
 
     try {
       const token = await AsyncStorage.getItem('access_token');
-      console.log('API Request Interceptor - Token found:', !!token, token ? token.substring(0, 20) + '...' : 'none');
-      console.log('API Request Interceptor - URL:', config.url);
-      
-      if (token) {
-        console.log('API Request Interceptor - Token available, setting Authorization header');
-        if (config.headers) {
-          // Mutate existing headers object
-          (config.headers as any).Authorization = `Bearer ${token}`;
-          console.log('API Request Interceptor - Authorization header added to existing headers');
-        } else {
-          // Initialize headers if missing
-          config.headers = { Authorization: `Bearer ${token}` } as any;
-          console.log('API Request Interceptor - Authorization header set in new headers object');
-        }
-        console.log('API Request Interceptor - Authorization header set');
-        console.log('API Request Interceptor - Headers:', config.headers);
-      } else {
-        console.log('API Request Interceptor - No token found, request will be unauthenticated');
-        console.log('API Request Interceptor - Headers:', config.headers);
+      if (token && config.headers) {
+        (config.headers as any).Authorization = `Bearer ${token}`;
       }
-    } catch (e: any) {
-      console.error('=== API REQUEST INTERCEPTOR ERROR ===');
-      console.error('API Request Interceptor - Error reading token from storage:', e);
-      console.error('API Request Interceptor - Error details:', {
-        message: e?.message,
-        stack: e?.stack,
-        name: e?.name
-      });
+    } catch (e) {
+      // Silently fail - token may not be available
     }
     
-    console.log('=== API REQUEST INTERCEPTOR COMPLETE ===');
     return config;
   },
-  error => {
-    console.error('=== API REQUEST INTERCEPTOR REJECTION ===');
-    console.error('API Request Interceptor - Request rejected:', error);
-    return Promise.reject(error);
-  }
+  error => Promise.reject(error)
 );
 
-// Response interceptor: log errors
+// Response interceptor: log errors only
 apiClient.interceptors.response.use(
-  response => {
-    console.log('=== API RESPONSE INTERCEPTOR SUCCESS ===');
-    console.log('API Response Interceptor - Status:', response.status);
-    console.log('API Response Interceptor - URL:', response.config.url);
-    console.log('API Response Interceptor - Method:', response.config.method?.toUpperCase());
-    console.log('API Response Interceptor - Data keys:', Object.keys(response.data || {}));
-    console.log('API Response Interceptor - Response size:', JSON.stringify(response.data).length, 'characters');
-    return response;
-  },
+  response => response,
   error => {
-    console.error('=== API RESPONSE INTERCEPTOR ERROR ===');
-    console.error('API Response Interceptor - Error status:', error.response?.status);
-    console.error('API Response Interceptor - Error status text:', error.response?.statusText);
-    console.error('API Response Interceptor - Error URL:', error.config?.url);
-    console.error('API Response Interceptor - Error method:', error.config?.method?.toUpperCase());
-    console.error('API Response Interceptor - Error data:', error.response?.data);
-    console.error('API Response Interceptor - Error message:', error.message);
-    console.error('API Response Interceptor - Full error:', error);
+    if (__DEV__) {
+      console.error('API Error:', error.response?.status, error.config?.url, error.message);
+    }
     return Promise.reject(error);
   }
 );

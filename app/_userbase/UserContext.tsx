@@ -126,50 +126,33 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   const fetchUser = async () => {
     setIsLoading(true);
     try {
-      let token: string | null = null;
-
+      // Check for authentication
       if (Platform.OS !== 'web') {
-        // Native platforms rely on stored tokens
-        token = await AsyncStorage.getItem('access_token');
-        console.log('fetchUser: token found?', !!token, token ? token.substring(0, 20) + '...' : 'none');
-
+        const token = await AsyncStorage.getItem('access_token');
         if (!token) {
-          console.log('No access token found, user not authenticated');
           setUser(null);
           setIsAuthenticated(false);
           return;
         }
       } else {
-        // Web platform: check if auth cookies exist before making API call
-        console.log('fetchUser: running on web, checking for auth cookies');
-        const hasAuth = hasAuthCookies();
-        console.log('fetchUser: auth cookies present?', hasAuth);
-        
-        if (!hasAuth) {
-          console.log('No auth cookies found, user not authenticated');
+        if (!hasAuthCookies()) {
           setUser(null);
           setIsAuthenticated(false);
           return;
         }
-        
-        console.log('fetchUser: auth cookies found, proceeding with API call');
       }
 
-      console.log('fetchUser: calling apiFetchUser');
+      // Fetch user data
       const data = await apiFetchUser();
-      console.log('fetchUser: apiFetchUser response:', data);
       
-      // handle nested or direct response shapes
+      // Handle different response shapes
       let userData: User | null = null;
       if (data?.user?.user) userData = data.user.user;
       else if (data?.user?.id) userData = data.user;
       else if (data?.data?.user) userData = data.data.user;
       else if (data?.id) userData = data as User;
-      
-      console.log('fetchUser: processed userData:', userData);
 
       if (!userData) {
-        console.log('fetchUser: no user data returned, treating as unauthenticated');
         setUser(null);
         setIsAuthenticated(false);
         return;
@@ -178,18 +161,13 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       setUser(userData);
       setIsAuthenticated(true);
     } catch (e: any) {
-      console.error('UserContext fetchUser error', e);
-      console.error('Error response status:', e?.response?.status);
-      console.error('Error response data:', e?.response?.data);
-      // If 401, clear tokens and set user to null
+      // Clear auth on 401
       if (e?.response?.status === 401) {
-        console.log('401 error, clearing authentication');
         if (Platform.OS !== 'web') {
           await AsyncStorage.removeItem('access_token');
           await AsyncStorage.removeItem('mobile_access_token');
           await deleteRefreshToken();
         } else {
-          // On web, also clear cookies on 401
           clearAuthCookies();
         }
       }
