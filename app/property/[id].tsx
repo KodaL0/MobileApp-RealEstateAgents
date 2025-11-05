@@ -50,7 +50,7 @@ function normalizePropertyDetail(item: any) {
         ? raw
         : `https://api.propertpro.com${raw}`;
     })
-    .filter(uri => !!uri);
+    .filter((uri: string) => !!uri);
 
   // 2) forSale boolean
   let forSale = false;
