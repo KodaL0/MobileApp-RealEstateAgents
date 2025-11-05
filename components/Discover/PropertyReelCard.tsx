@@ -1,49 +1,93 @@
-import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  Image,
+  TouchableOpacity,
+  FlatList,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, MapPin, Bed, Bath, Maximize } from 'lucide-react-native';
-import { useState } from 'react';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PropertyReelCard({ property }: { property: any }) {
   const [isLiked, setIsLiked] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const images =
+    property.images?.map((img: any) =>
+      typeof img === 'string' ? img : img.image
+    ) || [];
 
   const formatPrice = (price: number) => {
     if (!price) return '—';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-    }).format(price);
+    return `€${price.toLocaleString('en-US')}`;
   };
 
-  const formatArea = (area: number) => {
-    if (!area) return '—';
-    return new Intl.NumberFormat('en-US').format(area);
+  const handleScroll = (event: any) => {
+    const index = Math.round(
+      event.nativeEvent.contentOffset.x / SCREEN_WIDTH
+    );
+    setCurrentIndex(index);
   };
 
-  // ✅ Adjust image field to match your backend (array of images)
-  const mainImage =
-    property.image_url ||
-    property.image ||
-    (property.images?.[0]?.image
-      ? property.images[0].image
-      : property.images?.[0]) ||
-    'https://via.placeholder.com/800x600?text=No+Image';
+  const getCountryFlag = (country: string) => {
+    switch (country) {
+      case 'Greece':
+        return '🇬🇷';
+      case 'Cyprus':
+        return '🇨🇾';
+      default:
+        return '🌍';
+    }
+  };
+
+  const getCountryColor = (country: string) => {
+    switch (country) {
+      case 'Greece':
+        return '#2563eb';
+      case 'Cyprus':
+        return '#ea580c';
+      default:
+        return '#4b5563';
+    }
+  };
+
+  const imageData =
+    images.length > 0
+      ? images
+      : ['https://via.placeholder.com/800x600?text=No+Image'];
 
   return (
     <View style={styles.container}>
-      <Image
-        source={{ uri: mainImage }}
-        style={styles.image}
-        resizeMode="cover"
+      {/* Image carousel */}
+      <FlatList
+        data={imageData}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        keyExtractor={(_, index) => index.toString()}
+        renderItem={({ item }) => (
+          <Image
+            source={{ uri: item }}
+            style={styles.image}
+            resizeMode="cover"
+          />
+        )}
       />
 
+      {/* Gradient overlay */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.9)']}
         style={styles.gradient}
       />
 
+      {/* Like button */}
       <TouchableOpacity
         style={styles.likeButton}
         onPress={() => setIsLiked(!isLiked)}
@@ -55,6 +99,49 @@ export default function PropertyReelCard({ property }: { property: any }) {
         />
       </TouchableOpacity>
 
+      {/* Country & status tags */}
+      <View style={styles.tagContainer}>
+        <View
+          style={[
+            styles.countryTag,
+            { backgroundColor: getCountryColor(property.country) },
+          ]}
+        >
+          <Text style={styles.countryText}>
+            {getCountryFlag(property.country)} {property.country}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.statusTag,
+            {
+              backgroundColor:
+                property.property_status === 'for_sale' ? '#22c55e' : '#3b82f6',
+            },
+          ]}
+        >
+          <Text style={styles.statusText}>
+            {property.property_status === 'for_sale' ? 'For Sale' : 'For Rent'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Carousel indicators */}
+      {imageData.length > 1 && (
+        <View style={styles.indicatorContainer}>
+          {imageData.map((_: string, index: number) => (
+            <View
+              key={index}
+              style={[
+                styles.indicator,
+                index === currentIndex && styles.activeIndicator,
+              ]}
+            />
+          ))}
+        </View>
+      )}
+
+      {/* Content */}
       <View style={styles.contentContainer}>
         <View style={styles.priceTag}>
           <Text style={styles.priceText}>{formatPrice(property.price)}</Text>
@@ -89,7 +176,7 @@ export default function PropertyReelCard({ property }: { property: any }) {
           <View style={styles.detailItem}>
             <Maximize size={18} color="#fff" />
             <Text style={styles.detailText}>
-              {formatArea(property.area || property.size)} sqft
+              {property.area ? `${property.area} sqft` : '—'}
             </Text>
           </View>
         </View>
@@ -119,43 +206,83 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   image: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   gradient: {
     position: 'absolute',
-    left: 0,
-    right: 0,
     bottom: 0,
-    height: '60%',
+    width: '100%',
+    height: '65%',
   },
   likeButton: {
     position: 'absolute',
-    top: 60,
+    top: 40, // ⬅️ lowered from 60 → 40 for better alignment
     right: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
   },
+  tagContainer: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    flexDirection: 'row',
+    gap: 8,
+    zIndex: 10,
+  },
+  countryTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  countryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  indicatorContainer: {
+    position: 'absolute',
+    bottom: 160,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  indicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  activeIndicator: {
+    backgroundColor: '#fff',
+    width: 16,
+  },
   contentContainer: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
     padding: 24,
-    paddingBottom: 40,
   },
   priceTag: {
-    alignSelf: 'flex-start',
     backgroundColor: '#0F3460',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    alignSelf: 'flex-start',
     marginBottom: 12,
   },
   priceText: {
@@ -165,10 +292,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#fff',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     marginBottom: 8,
-    lineHeight: 34,
+    lineHeight: 32,
   },
   locationRow: {
     flexDirection: 'row',
