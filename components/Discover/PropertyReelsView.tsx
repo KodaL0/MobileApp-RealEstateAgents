@@ -26,6 +26,8 @@ export default function PropertyReelsView() {
       setError(null);
       const response = await api.get('/properties/');
       const data = response.data || [];
+
+      // Show featured first if available
       const featured = data.filter((p: any) => p.is_featured);
       setProperties(featured.length ? featured : data);
     } catch (err) {
@@ -95,7 +97,9 @@ export default function PropertyReelsView() {
           offset: SCREEN_HEIGHT * index,
           index,
         })}
-        removeClippedSubviews
+        windowSize={3}              // ✅ keeps 1 before and 1 after rendered
+        initialNumToRender={2}      // ✅ renders at least 2 on load
+        maxToRenderPerBatch={2}     // ✅ limits render batches for perf
       />
 
       {/* Right-side Reel Progress Indicator */}
