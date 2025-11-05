@@ -179,19 +179,16 @@ export default function PropertyReelCard({ property }: { property: any }) {
 const styles = StyleSheet.create({
   container: {
     height: SCREEN_HEIGHT,
-    justifyContent: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#fff',
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginHorizontal: 12,
-    marginVertical: 10,
+    borderRadius: 0,
+    marginHorizontal: 0,
+    marginVertical: 0,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowColor: 'transparent',
+    elevation: 0,
   },
   tagsRow: {
     flexDirection: 'row',
@@ -216,7 +213,7 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 0.55,
   },
   image: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: SCREEN_HEIGHT * 0.55,
   },
   likeButton: {
