@@ -16,10 +16,16 @@ export default function PropertyReelCard({ property }: { property: any }) {
   const [isLiked, setIsLiked] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // ✅ reverted: no API_BASE_URL prepend, because backend gives full S3 URLs
+  // ✅ FIX: Handle both absolute and relative URLs
+  const BASE_URL = 'https://propertprodjango.onrender.com';
+
   const images =
     property.images && property.images.length > 0
-      ? property.images.map((img: any) => img.image || img)
+      ? property.images.map((img: any) => {
+          const uri = typeof img === 'string' ? img : img.image;
+          // If URI starts with http → keep it; else prepend backend URL
+          return uri?.startsWith('http') ? uri : `${BASE_URL}${uri}`;
+        })
       : [property.image_url || 'https://via.placeholder.com/800x600?text=No+Image'];
 
   const handleScroll = (event: any) => {
@@ -84,7 +90,13 @@ export default function PropertyReelCard({ property }: { property: any }) {
             scrollEventThrottle={16}
           >
             {images.map((uri: string, index: number) => (
-              <Image key={index} source={{ uri }} style={styles.image} resizeMode="cover" />
+              <View key={index} style={{ flex: 1, backgroundColor: '#000' }}>
+                <Image
+                  source={{ uri }}
+                  style={styles.image}
+                  resizeMode="cover"
+                />
+              </View>
             ))}
           </ScrollView>
 
