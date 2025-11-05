@@ -16,22 +16,11 @@ export default function PropertyReelCard({ property }: { property: any }) {
   const [isLiked, setIsLiked] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const API_BASE_URL = 'https://api.propertpro.com'; // ✅ backend domain
-
+  // ✅ reverted: no API_BASE_URL prepend, because backend gives full S3 URLs
   const images =
     property.images && property.images.length > 0
-      ? property.images.map((img: any) => {
-          const uri = img.image || img;
-          // ensure absolute URL
-          return uri?.startsWith('http') ? uri : `${API_BASE_URL}${uri}`;
-        })
-      : [
-          property.image_url
-            ? property.image_url.startsWith('http')
-              ? property.image_url
-              : `${API_BASE_URL}${property.image_url}`
-            : 'https://via.placeholder.com/800x600?text=No+Image',
-        ];
+      ? property.images.map((img: any) => img.image || img)
+      : [property.image_url || 'https://via.placeholder.com/800x600?text=No+Image'];
 
   const handleScroll = (event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
