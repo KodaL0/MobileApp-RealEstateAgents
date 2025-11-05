@@ -6,9 +6,10 @@ import {
   Dimensions,
   ActivityIndicator,
   Text,
+  StatusBar,
 } from 'react-native';
 import PropertyReelCard from './PropertyReelCard';
-import { api } from '@/config/api'; // your existing backend config
+import { api } from '@/config/api';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,14 +24,10 @@ export default function PropertyReelsView() {
     try {
       setLoading(true);
       setError(null);
-
       const response = await api.get('/properties/');
       const data = response.data || [];
-
-      // optional: only show featured ones if you want
       const featured = data.filter((p: any) => p.is_featured);
-
-      setProperties(featured);
+      setProperties(featured.length ? featured : data);
     } catch (err) {
       console.error('Error fetching properties:', err);
       setError('Failed to load properties. Please try again.');
@@ -43,7 +40,6 @@ export default function PropertyReelsView() {
     fetchProperties();
   }, [fetchProperties]);
 
-
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index || 0);
@@ -51,7 +47,7 @@ export default function PropertyReelsView() {
   }).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
+    itemVisiblePercentThreshold: 70,
   }).current;
 
   if (loading) {
@@ -81,16 +77,17 @@ export default function PropertyReelsView() {
 
   return (
     <View style={styles.container}>
+      <StatusBar hidden />
       <FlatList
         ref={flatListRef}
         data={properties}
         renderItem={({ item }) => <PropertyReelCard property={item} />}
-        keyExtractor={(item) => String(item.id)} // ✅ ensure it's a string
+        keyExtractor={(item) => String(item.id)}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        snapToInterval={SCREEN_HEIGHT}
         snapToAlignment="start"
         decelerationRate="fast"
+        snapToInterval={SCREEN_HEIGHT}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         getItemLayout={(data, index) => ({
@@ -98,8 +95,10 @@ export default function PropertyReelsView() {
           offset: SCREEN_HEIGHT * index,
           index,
         })}
+        removeClippedSubviews
       />
 
+      {/* Right-side Reel Progress Indicator */}
       <View style={styles.indicatorContainer}>
         {properties.map((_, index) => (
           <View
@@ -125,7 +124,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
-    padding: 20,
   },
   loadingText: {
     marginTop: 12,
@@ -146,6 +144,7 @@ const styles = StyleSheet.create({
     right: 16,
     top: '50%',
     transform: [{ translateY: -50 }],
+    alignItems: 'center',
     gap: 8,
   },
   indicator: {
