@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { Heart, MapPin, Square, ArrowUpCircle, Layers } from 'lucide-react-native';
+import { Heart, MapPin, Square, ArrowUpCircle, Layers, Share2, MessageCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -18,7 +19,6 @@ export default function PropertyReelCard({ property }: { property: any }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
 
-  // ✅ mimic web: clean + safe URL handling
   const getValidUrl = (uri?: string) => {
     if (!uri) return 'https://via.placeholder.com/800x600?text=No+Image';
     return uri.startsWith('http') ? uri : `${BASE_URL}${uri}`;
@@ -36,8 +36,7 @@ export default function PropertyReelCard({ property }: { property: any }) {
     setCurrentIndex(index);
   };
 
-  const handleError = (uri: string) => {
-    console.warn('❌ Image failed to load:', uri);
+  const handleError = () => {
     setImageError(true);
   };
 
@@ -61,133 +60,124 @@ export default function PropertyReelCard({ property }: { property: any }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        {/* TAGS */}
-        <View style={styles.tagsRow}>
-          <View style={[styles.tag, { backgroundColor: '#111827' }]}>
-            <Text style={styles.tagText}>
-              {property.property_type?.toUpperCase() || 'PROPERTY'}
-            </Text>
-          </View>
-          <View style={[styles.tag, { backgroundColor: getCountryColor(property.country) }]}>
-            <Text style={styles.tagText}>{property.country || 'Unknown'}</Text>
-          </View>
-          <View
-            style={[
-              styles.tag,
-              {
-                backgroundColor:
-                  property.property_status === 'for_sale' ? '#10b981' : '#3b82f6',
-              },
-            ]}
-          >
-            <Text style={styles.tagText}>
-              {property.property_status === 'for_sale' ? 'For Sale' : 'For Rent'}
-            </Text>
-          </View>
-        </View>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        style={styles.imageScroll}
+      >
+        {images.map((uri: string, index: number) => (
+          <Image
+            key={index}
+            source={{ uri: imageError ? 'https://via.placeholder.com/800x600?text=No+Image' : uri }}
+            style={styles.image}
+            resizeMode="cover"
+            onError={handleError}
+          />
+        ))}
+      </ScrollView>
 
-        {/* IMAGE CAROUSEL */}
-        <View style={styles.imageContainer}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          >
-            {images.map((uri: string, index: number) => (
-              <Image
-                key={index}
-                source={{ uri: imageError ? 'https://via.placeholder.com/800x600?text=No+Image' : uri }}
-                style={styles.image}
-                resizeMode="cover"
-                onError={() => handleError(uri)}
-              />
-            ))}
-          </ScrollView>
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
+        style={styles.gradient}
+      />
 
-          {/* Like Button */}
-          <TouchableOpacity
-            style={styles.likeButton}
-            onPress={() => setIsLiked(!isLiked)}
-          >
-            <Heart
-              size={26}
-              color={isLiked ? '#FF385C' : '#fff'}
-              fill={isLiked ? '#FF385C' : 'transparent'}
+      {images.length > 1 && (
+        <View style={styles.dotsContainer}>
+          {images.map((_: string, index: number) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                index === currentIndex && styles.activeDot,
+              ]}
             />
-          </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
-          {/* Dots */}
-          {images.length > 1 && (
-            <View style={styles.dotsContainer}>
-              {images.map((_: string, index: number) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.dot,
-                    index === currentIndex && styles.activeDot,
-                  ]}
-                />
-              ))}
-            </View>
-          )}
+      <View style={styles.tagsContainer}>
+        <View style={[styles.tag, { backgroundColor: '#111827' }]}>
+          <Text style={styles.tagText}>
+            {property.property_type?.toUpperCase() || 'PROPERTY'}
+          </Text>
+        </View>
+        <View style={[styles.tag, { backgroundColor: getCountryColor(property.country) }]}>
+          <Text style={styles.tagText}>{property.country || 'Unknown'}</Text>
+        </View>
+        <View
+          style={[
+            styles.tag,
+            {
+              backgroundColor:
+                property.property_status === 'for_sale' ? '#10b981' : '#3b82f6',
+            },
+          ]}
+        >
+          <Text style={styles.tagText}>
+            {property.property_status === 'for_sale' ? 'For Sale' : 'For Rent'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.sideActions}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => setIsLiked(!isLiked)}
+        >
+          <Heart
+            size={32}
+            color="#fff"
+            fill={isLiked ? '#FF385C' : 'transparent'}
+            strokeWidth={2}
+          />
+          <Text style={styles.actionText}>234</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton}>
+          <MessageCircle size={32} color="#fff" strokeWidth={2} />
+          <Text style={styles.actionText}>12</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton}>
+          <Share2 size={32} color="#fff" strokeWidth={2} />
+          <Text style={styles.actionText}>Share</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.bottomInfo}>
+        <Text style={styles.title} numberOfLines={2}>
+          {property.title || 'Untitled Property'}
+        </Text>
+
+        <View style={styles.locationRow}>
+          <MapPin size={16} color="#10b981" />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {property.location || 'Unknown Location'}
+          </Text>
         </View>
 
-        {/* DETAILS SECTION */}
-        <View style={styles.detailsContainer}>
-          <Text style={styles.title} numberOfLines={2}>
-            {property.title || 'Untitled Property'}
+        <View style={styles.priceRow}>
+          <Text style={styles.price}>{formatPrice(property.price)}</Text>
+          <Text style={styles.priceLabel}>
+            {property.property_status === 'for_sale' ? 'Purchase Price' : '/month'}
           </Text>
+        </View>
 
-          <View style={styles.locationRow}>
-            <MapPin size={16} color="#059669" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {property.location || 'Unknown Location'}
-            </Text>
+        <View style={styles.statsRow}>
+          <View style={styles.statPill}>
+            <Square size={14} color="#fff" />
+            <Text style={styles.statText}>{property.area ?? property.size ?? '—'} m²</Text>
           </View>
-
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>{formatPrice(property.price)}</Text>
-            {property.property_status === 'for_sale' && (
-              <Text style={styles.purchasePrice}>Purchase Price</Text>
-            )}
-            {property.property_status !== 'for_sale' && (
-              <Text style={styles.rentPrice}>Monthly Rent</Text>
-            )}
+          <View style={styles.statPill}>
+            <ArrowUpCircle size={14} color="#fff" />
+            <Text style={styles.statText}>Floor {property.floor_level ?? '—'}</Text>
           </View>
-
-          <View style={styles.statsBox}>
-            <View style={styles.statItem}>
-              <View style={[styles.iconBubble, { backgroundColor: '#ede9fe' }]}>
-                <Square size={18} color="#7c3aed" />
-              </View>
-              <Text style={styles.statValue}>
-                {property.area ?? property.size ?? '—'}
-              </Text>
-              <Text style={styles.statLabel}>sq m</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <View style={[styles.iconBubble, { backgroundColor: '#f0fdf4' }]}>
-                <ArrowUpCircle size={18} color="#059669" />
-              </View>
-              <Text style={styles.statValue}>
-                {property.floor_level ?? '—'}
-              </Text>
-              <Text style={styles.statLabel}>Floor</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <View style={[styles.iconBubble, { backgroundColor: '#eef2ff' }]}>
-                <Layers size={18} color="#4f46e5" />
-              </View>
-              <Text style={styles.statValue}>
-                {property.total_floors ?? '—'}
-              </Text>
-              <Text style={styles.statLabel}>Total Floors</Text>
-            </View>
+          <View style={styles.statPill}>
+            <Layers size={14} color="#fff" />
+            <Text style={styles.statText}>{property.total_floors ?? '—'} Floors</Text>
           </View>
         </View>
       </View>
@@ -196,60 +186,153 @@ export default function PropertyReelCard({ property }: { property: any }) {
 }
 
 const styles = StyleSheet.create({
-  container: { height: SCREEN_HEIGHT, backgroundColor: '#fff' },
-  card: { backgroundColor: '#fff', overflow: 'hidden' },
-  tagsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+  container: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#000',
+    position: 'relative',
   },
-  tag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  tagText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  imageContainer: { position: 'relative', width: '100%', height: SCREEN_HEIGHT * 0.55 },
-  image: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.55, backgroundColor: '#000' },
-  likeButton: {
+  imageScroll: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  image: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  gradient: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 25,
-    padding: 8,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.5,
+    pointerEvents: 'none',
   },
   dotsContainer: {
     position: 'absolute',
-    bottom: 10,
+    top: 60,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
-  activeDot: { backgroundColor: '#fff', width: 16 },
-  detailsContainer: { padding: 16 },
-  title: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  locationText: { marginLeft: 4, color: '#4b5563', fontSize: 14 },
-  priceContainer: { marginBottom: 16 },
-  price: { fontSize: 24, fontWeight: '700', color: '#111827' },
-  purchasePrice: { color: '#059669', fontSize: 14, fontWeight: '600', marginTop: 2 },
-  rentPrice: { color: '#3b82f6', fontSize: 14, fontWeight: '600', marginTop: 2 },
-  statsBox: {
+  activeDot: {
+    backgroundColor: '#fff',
+    width: 20,
+  },
+  tagsContainer: {
+    position: 'absolute',
+    top: 100,
+    left: 16,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    paddingVertical: 16,
+    gap: 8,
+    flexWrap: 'wrap',
   },
-  statItem: { alignItems: 'center' },
-  iconBubble: { padding: 8, borderRadius: 12, marginBottom: 4 },
-  statValue: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  statLabel: { fontSize: 12, color: '#6b7280' },
+  tag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  tagText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  sideActions: {
+    position: 'absolute',
+    right: 16,
+    bottom: 180,
+    gap: 24,
+    alignItems: 'center',
+  },
+  actionButton: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  bottomInfo: {
+    position: 'absolute',
+    bottom: 40,
+    left: 16,
+    right: 80,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationText: {
+    marginLeft: 6,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 12,
+    gap: 8,
+  },
+  price: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  priceLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#d1d5db',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  statText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });
