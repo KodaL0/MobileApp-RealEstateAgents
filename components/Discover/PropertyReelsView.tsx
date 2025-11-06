@@ -17,7 +17,6 @@ export default function PropertyReelsView() {
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
   const fetchProperties = useCallback(async () => {
@@ -41,16 +40,6 @@ export default function PropertyReelsView() {
   useEffect(() => {
     fetchProperties();
   }, [fetchProperties]);
-
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index || 0);
-    }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 70,
-  }).current;
 
   if (loading) {
     return (
@@ -90,30 +79,15 @@ export default function PropertyReelsView() {
         snapToAlignment="start"
         decelerationRate="fast"
         snapToInterval={SCREEN_HEIGHT}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
         getItemLayout={(data, index) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
           index,
         })}
-        windowSize={3}              // ✅ keeps 1 before and 1 after rendered
-        initialNumToRender={2}      // ✅ renders at least 2 on load
-        maxToRenderPerBatch={2}     // ✅ limits render batches for perf
+        windowSize={3}
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
       />
-
-      {/* Right-side Reel Progress Indicator */}
-      <View style={styles.indicatorContainer}>
-        {properties.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.indicator,
-              index === currentIndex && styles.activeIndicator,
-            ]}
-          />
-        ))}
-      </View>
     </View>
   );
 }
@@ -142,23 +116,5 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#666',
-  },
-  indicatorContainer: {
-    position: 'absolute',
-    right: 16,
-    top: '50%',
-    transform: [{ translateY: -50 }],
-    alignItems: 'center',
-    gap: 8,
-  },
-  indicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  activeIndicator: {
-    backgroundColor: '#fff',
-    height: 20,
   },
 });
