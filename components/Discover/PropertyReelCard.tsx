@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
   dotsContainer: {
     position: 'absolute',
-    top: 60,
+    top: 80,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     position: 'absolute',
-    top: 100,
+    top: 50,
     left: 16,
     flexDirection: 'row',
     gap: 8,
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   sideActions: {
     position: 'absolute',
     right: 16,
-    bottom: 180,
+    bottom: 230,
     gap: 24,
     alignItems: 'center',
   },
