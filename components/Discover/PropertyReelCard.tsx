@@ -8,13 +8,21 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { Heart, MapPin, Square, ArrowUpCircle, Layers, Share2, MessageCircle } from 'lucide-react-native';
+import {
+  Heart,
+  MapPin,
+  Square,
+  ArrowUpCircle,
+  Layers,
+  Share2,
+  MessageCircle,
+} from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
 
-export default function PropertyReelCard({ property }: { property: any }) {
+export default function PropertyReelCard({ property, onViewProperty }: { property: any; onViewProperty?: () => void }) {
   const [isLiked, setIsLiked] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
@@ -27,7 +35,9 @@ export default function PropertyReelCard({ property }: { property: any }) {
   const images =
     property.images && property.images.length > 0
       ? property.images
-          .map((img: any) => (typeof img === 'string' ? getValidUrl(img) : getValidUrl(img.image)))
+          .map((img: any) =>
+            typeof img === 'string' ? getValidUrl(img) : getValidUrl(img.image)
+          )
           .filter(Boolean)
       : [getValidUrl(property.image_url)];
 
@@ -36,9 +46,7 @@ export default function PropertyReelCard({ property }: { property: any }) {
     setCurrentIndex(index);
   };
 
-  const handleError = () => {
-    setImageError(true);
-  };
+  const handleError = () => setImageError(true);
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('en-US', {
@@ -60,6 +68,7 @@ export default function PropertyReelCard({ property }: { property: any }) {
 
   return (
     <View style={styles.container}>
+      {/* Horizontal image scroll */}
       <ScrollView
         horizontal
         pagingEnabled
@@ -71,7 +80,11 @@ export default function PropertyReelCard({ property }: { property: any }) {
         {images.map((uri: string, index: number) => (
           <Image
             key={index}
-            source={{ uri: imageError ? 'https://via.placeholder.com/800x600?text=No+Image' : uri }}
+            source={{
+              uri: imageError
+                ? 'https://via.placeholder.com/800x600?text=No+Image'
+                : uri,
+            }}
             style={styles.image}
             resizeMode="cover"
             onError={handleError}
@@ -79,11 +92,13 @@ export default function PropertyReelCard({ property }: { property: any }) {
         ))}
       </ScrollView>
 
+      {/* Bottom gradient */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
         style={styles.gradient}
       />
 
+      {/* Dots */}
       {images.length > 1 && (
         <View style={styles.dotsContainer}>
           {images.map((_: string, index: number) => (
@@ -98,13 +113,19 @@ export default function PropertyReelCard({ property }: { property: any }) {
         </View>
       )}
 
+      {/* Tags */}
       <View style={styles.tagsContainer}>
         <View style={[styles.tag, { backgroundColor: '#111827' }]}>
           <Text style={styles.tagText}>
             {property.property_type?.toUpperCase() || 'PROPERTY'}
           </Text>
         </View>
-        <View style={[styles.tag, { backgroundColor: getCountryColor(property.country) }]}>
+        <View
+          style={[
+            styles.tag,
+            { backgroundColor: getCountryColor(property.country) },
+          ]}
+        >
           <Text style={styles.tagText}>{property.country || 'Unknown'}</Text>
         </View>
         <View
@@ -112,7 +133,9 @@ export default function PropertyReelCard({ property }: { property: any }) {
             styles.tag,
             {
               backgroundColor:
-                property.property_status === 'for_sale' ? '#10b981' : '#3b82f6',
+                property.property_status === 'for_sale'
+                  ? '#10b981'
+                  : '#3b82f6',
             },
           ]}
         >
@@ -122,6 +145,7 @@ export default function PropertyReelCard({ property }: { property: any }) {
         </View>
       </View>
 
+      {/* Right side actions */}
       <View style={styles.sideActions}>
         <TouchableOpacity
           style={styles.actionButton}
@@ -147,6 +171,7 @@ export default function PropertyReelCard({ property }: { property: any }) {
         </TouchableOpacity>
       </View>
 
+      {/* Bottom property info */}
       <View style={styles.bottomInfo}>
         <Text style={styles.title} numberOfLines={2}>
           {property.title || 'Untitled Property'}
@@ -162,24 +187,41 @@ export default function PropertyReelCard({ property }: { property: any }) {
         <View style={styles.priceRow}>
           <Text style={styles.price}>{formatPrice(property.price)}</Text>
           <Text style={styles.priceLabel}>
-            {property.property_status === 'for_sale' ? 'Purchase Price' : '/month'}
+            {property.property_status === 'for_sale'
+              ? 'Purchase Price'
+              : '/month'}
           </Text>
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statPill}>
             <Square size={14} color="#fff" />
-            <Text style={styles.statText}>{property.area ?? property.size ?? '—'} m²</Text>
+            <Text style={styles.statText}>
+              {property.area ?? property.size ?? '—'} m²
+            </Text>
           </View>
           <View style={styles.statPill}>
             <ArrowUpCircle size={14} color="#fff" />
-            <Text style={styles.statText}>Floor {property.floor_level ?? '—'}</Text>
+            <Text style={styles.statText}>
+              Floor {property.floor_level ?? '—'}
+            </Text>
           </View>
           <View style={styles.statPill}>
             <Layers size={14} color="#fff" />
-            <Text style={styles.statText}>{property.total_floors ?? '—'} Floors</Text>
+            <Text style={styles.statText}>
+              {property.total_floors ?? '—'} Floors
+            </Text>
           </View>
         </View>
+
+        {/* View Property Button */}
+        <TouchableOpacity
+          style={styles.viewButton}
+          onPress={onViewProperty}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.viewButtonText}>View Property</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -210,7 +252,7 @@ const styles = StyleSheet.create({
   },
   dotsContainer: {
     position: 'absolute',
-    top: 80,
+    top: SCREEN_HEIGHT * 0.08,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -229,7 +271,7 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     position: 'absolute',
-    top: 50,
+    top: SCREEN_HEIGHT * 0.03,
     left: 16,
     flexDirection: 'row',
     gap: 8,
@@ -249,7 +291,7 @@ const styles = StyleSheet.create({
   sideActions: {
     position: 'absolute',
     right: 16,
-    bottom: 230,
+    bottom: SCREEN_HEIGHT * 0.33,
     gap: 24,
     alignItems: 'center',
   },
@@ -267,7 +309,7 @@ const styles = StyleSheet.create({
   },
   bottomInfo: {
     position: 'absolute',
-    bottom: 40,
+    bottom: SCREEN_HEIGHT * 0.05,
     left: 16,
     right: 80,
   },
@@ -301,7 +343,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   price: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: '#fff',
     textShadowColor: 'rgba(0,0,0,0.8)',
@@ -312,14 +354,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#d1d5db',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   statsRow: {
     flexDirection: 'row',
     gap: 8,
     flexWrap: 'wrap',
+    marginBottom: 12,
   },
   statPill: {
     flexDirection: 'row',
@@ -334,5 +374,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  viewButton: {
+    backgroundColor: '#10b981',
+    paddingVertical: 10,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  viewButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+    textTransform: 'uppercase',
   },
 });
