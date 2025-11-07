@@ -165,12 +165,12 @@ export default function PropertyReelCard({
           </View>
         </View>
 
-        {/* Chat button (top-left floating) */}
+        {/* Chat button (top-right floating) */}
         <TouchableOpacity style={styles.chatButton}>
           <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
         </TouchableOpacity>
 
-        {/* Right side actions */}
+        {/* Right side actions (centered vertically) */}
         <View style={styles.sideActions}>
           {/* Like */}
           <TouchableOpacity
@@ -192,7 +192,7 @@ export default function PropertyReelCard({
             <Text style={styles.actionText}>Agent</Text>
           </TouchableOpacity>
 
-          {/* View Property (smaller) */}
+          {/* View Property (small button) */}
           <TouchableOpacity
             style={styles.viewPropertyButton}
             onPress={onViewProperty}
@@ -323,10 +323,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  /* Chat button (top-right floating) */
+  chatButton: {
+    position: 'absolute',
+    right: 16,
+    top: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 25,
+    padding: 6,
+    zIndex: 10,
+  },
+  /* Right-side actions (centered vertically) */
   sideActions: {
     position: 'absolute',
     right: 16,
-    bottom: SCREEN_HEIGHT * 0.25,
+    bottom: SCREEN_HEIGHT * 0.35, // moved up for better centering
     gap: 22,
     alignItems: 'center',
   },
@@ -350,14 +361,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-  },
-  chatButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 25,
-    padding: 6,
   },
   bottomInfo: {
     position: 'absolute',
