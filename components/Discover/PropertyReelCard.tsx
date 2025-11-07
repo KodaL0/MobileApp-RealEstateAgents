@@ -15,7 +15,7 @@ import {
   Square,
   ArrowUpCircle,
   Layers,
-  Share2,
+  UserCircle,
   MessageCircle,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,6 +34,7 @@ export default function PropertyReelCard({
   const [isLiked, setIsLiked] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const getValidUrl = (uri?: string) => {
     if (!uri) return 'https://via.placeholder.com/800x600?text=No+Image';
@@ -100,7 +101,7 @@ export default function PropertyReelCard({
                 resizeMode="cover"
               />
 
-              {/* Main clear image */}
+              {/* Main image */}
               <Image
                 source={{
                   uri: imageError
@@ -124,7 +125,7 @@ export default function PropertyReelCard({
           ))}
         </ScrollView>
 
-        {/* Gradient overlay for better text contrast */}
+        {/* Gradient overlay */}
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
           style={styles.gradient}
@@ -164,8 +165,14 @@ export default function PropertyReelCard({
           </View>
         </View>
 
+        {/* Chat button (top-left floating) */}
+        <TouchableOpacity style={styles.chatButton}>
+          <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
+        </TouchableOpacity>
+
         {/* Right side actions */}
         <View style={styles.sideActions}>
+          {/* Like */}
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => setIsLiked(!isLiked)}
@@ -179,14 +186,19 @@ export default function PropertyReelCard({
             <Text style={styles.actionText}>234</Text>
           </TouchableOpacity>
 
+          {/* Profile */}
           <TouchableOpacity style={styles.actionButton}>
-            <MessageCircle size={32} color="#fff" strokeWidth={2} />
-            <Text style={styles.actionText}>12</Text>
+            <UserCircle size={32} color="#fff" strokeWidth={2} />
+            <Text style={styles.actionText}>Agent</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <Share2 size={32} color="#fff" strokeWidth={2} />
-            <Text style={styles.actionText}>Share</Text>
+          {/* View Property (smaller) */}
+          <TouchableOpacity
+            style={styles.viewPropertyButton}
+            onPress={onViewProperty}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewPropertyText}>View</Text>
           </TouchableOpacity>
         </View>
 
@@ -196,50 +208,52 @@ export default function PropertyReelCard({
             {property.title || 'Untitled Property'}
           </Text>
 
-          <View style={styles.locationRow}>
-            <MapPin size={16} color="#10b981" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {property.location || 'Unknown Location'}
+          {showMore && (
+            <>
+              <View style={styles.locationRow}>
+                <MapPin size={16} color="#10b981" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {property.location || 'Unknown Location'}
+                </Text>
+              </View>
+
+              <View style={styles.priceRow}>
+                <Text style={styles.price}>{formatPrice(property.price)}</Text>
+                <Text style={styles.priceLabel}>
+                  {property.property_status === 'for_sale'
+                    ? 'Purchase Price'
+                    : '/month'}
+                </Text>
+              </View>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statPill}>
+                  <Square size={14} color="#fff" />
+                  <Text style={styles.statText}>
+                    {property.area ?? property.size ?? '—'} m²
+                  </Text>
+                </View>
+                <View style={styles.statPill}>
+                  <ArrowUpCircle size={14} color="#fff" />
+                  <Text style={styles.statText}>
+                    Floor {property.floor_level ?? '—'}
+                  </Text>
+                </View>
+                <View style={styles.statPill}>
+                  <Layers size={14} color="#fff" />
+                  <Text style={styles.statText}>
+                    {property.total_floors ?? '—'} Floors
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* Toggle "Show more" */}
+          <TouchableOpacity onPress={() => setShowMore(!showMore)}>
+            <Text style={styles.showMoreText}>
+              {showMore ? 'Show less' : 'Show more'}
             </Text>
-          </View>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatPrice(property.price)}</Text>
-            <Text style={styles.priceLabel}>
-              {property.property_status === 'for_sale'
-                ? 'Purchase Price'
-                : '/month'}
-            </Text>
-          </View>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statPill}>
-              <Square size={14} color="#fff" />
-              <Text style={styles.statText}>
-                {property.area ?? property.size ?? '—'} m²
-              </Text>
-            </View>
-            <View style={styles.statPill}>
-              <ArrowUpCircle size={14} color="#fff" />
-              <Text style={styles.statText}>
-                Floor {property.floor_level ?? '—'}
-              </Text>
-            </View>
-            <View style={styles.statPill}>
-              <Layers size={14} color="#fff" />
-              <Text style={styles.statText}>
-                {property.total_floors ?? '—'} Floors
-              </Text>
-            </View>
-          </View>
-
-          {/* View Property Button */}
-          <TouchableOpacity
-            style={styles.viewButton}
-            onPress={onViewProperty}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.viewButtonText}>View Property</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -268,9 +282,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   image: {
-    width: SCREEN_WIDTH * 0.98, // slightly smaller for safer fit
-    height: SCREEN_HEIGHT * 0.85, // adjusted to prevent cutoffs
-    resizeMode: 'contain',
+    width: SCREEN_WIDTH * 0.98,
+    height: SCREEN_HEIGHT * 0.85,
   },
   gradient: {
     position: 'absolute',
@@ -278,7 +291,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.45,
-    pointerEvents: 'none',
   },
   photoCounter: {
     position: 'absolute',
@@ -314,8 +326,8 @@ const styles = StyleSheet.create({
   sideActions: {
     position: 'absolute',
     right: 16,
-    bottom: SCREEN_HEIGHT * 0.25, // moved higher for visibility
-    gap: 24,
+    bottom: SCREEN_HEIGHT * 0.25,
+    gap: 22,
     alignItems: 'center',
   },
   actionButton: {
@@ -327,11 +339,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  viewPropertyButton: {
+    backgroundColor: '#10b981',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginTop: 4,
+  },
+  viewPropertyText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chatButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 25,
+    padding: 6,
+  },
   bottomInfo: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.12, // ensures it's above nav bar
+    bottom: SCREEN_HEIGHT * 0.12,
     left: 16,
-    right: 80,
+    right: 100,
   },
   title: {
     fontSize: 18,
@@ -385,17 +417,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  viewButton: {
-    backgroundColor: '#10b981',
-    paddingVertical: 12,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  viewButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-    textTransform: 'uppercase',
+  showMoreText: {
+    color: '#10b981',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });
