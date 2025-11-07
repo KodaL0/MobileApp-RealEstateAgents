@@ -20,17 +20,17 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
 
 export default function PropertyReelCard({
   property,
-  onViewProperty,
 }: {
   property: any;
-  onViewProperty?: () => void;
 }) {
+  const navigation = useNavigation();
   const [isLiked, setIsLiked] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
@@ -72,6 +72,12 @@ export default function PropertyReelCard({
         return '#f97316';
       default:
         return '#6b7280';
+    }
+  };
+
+  const handleViewProperty = () => {
+    if (property?.id) {
+      navigation.navigate('PropertyDetails', { id: property.id });
     }
   };
 
@@ -195,7 +201,7 @@ export default function PropertyReelCard({
           {/* View Property */}
           <TouchableOpacity
             style={styles.viewPropertyButton}
-            onPress={onViewProperty}
+            onPress={handleViewProperty}
             activeOpacity={0.8}
           >
             <Text style={styles.viewPropertyText}>View</Text>
@@ -262,10 +268,7 @@ export default function PropertyReelCard({
 }
 
 const styles = StyleSheet.create({
-  safeContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
+  safeContainer: { flex: 1, backgroundColor: '#000' },
   container: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
@@ -318,13 +321,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
-  tagText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
-  /* Right-side actions (chat above others) */
+  tagText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   sideActions: {
     position: 'absolute',
     right: 16,
@@ -337,20 +334,9 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     padding: 6,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
-  actionButton: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  actionText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  actionButton: { alignItems: 'center', gap: 4 },
+  actionText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   viewPropertyButton: {
     backgroundColor: '#10b981',
     borderRadius: 20,
@@ -358,49 +344,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 4,
   },
-  viewPropertyText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  viewPropertyText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   bottomInfo: {
     position: 'absolute',
     bottom: SCREEN_HEIGHT * 0.12,
     left: 16,
     right: 100,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-  },
+  title: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 8 },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
   },
-  locationText: {
-    marginLeft: 6,
-    color: '#fff',
-    fontSize: 14,
-  },
+  locationText: { marginLeft: 6, color: '#fff', fontSize: 14 },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     marginBottom: 12,
     gap: 8,
   },
-  price: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  priceLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#d1d5db',
-  },
+  price: { fontSize: 26, fontWeight: '800', color: '#fff' },
+  priceLabel: { fontSize: 13, fontWeight: '600', color: '#d1d5db' },
   statsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -416,11 +381,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 6,
   },
-  statText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  statText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   showMoreText: {
     color: '#10b981',
     fontSize: 13,
