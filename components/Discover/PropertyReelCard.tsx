@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from 'react-native';
 import {
   Heart,
@@ -18,6 +19,7 @@ import {
   MessageCircle,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -73,179 +75,186 @@ export default function PropertyReelCard({
   };
 
   return (
-    <View style={styles.container}>
-      {/* Horizontal image scroll with blurred background */}
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        style={styles.imageScroll}
-      >
-        {images.map((uri: string, index: number) => (
-          <View key={index} style={styles.imageWrapper}>
-            {/* Blurred background */}
-            <Image
-              source={{
-                uri: imageError
-                  ? 'https://via.placeholder.com/800x600?text=No+Image'
-                  : uri,
-              }}
-              style={StyleSheet.absoluteFillObject}
-              blurRadius={25}
-              resizeMode="cover"
+    <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
+      <View style={styles.container}>
+        {/* Horizontal image scroll with blurred background */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.imageScroll}
+        >
+          {images.map((uri: string, index: number) => (
+            <View key={index} style={styles.imageWrapper}>
+              {/* Blurred background */}
+              <Image
+                source={{
+                  uri: imageError
+                    ? 'https://via.placeholder.com/800x600?text=No+Image'
+                    : uri,
+                }}
+                style={StyleSheet.absoluteFillObject}
+                blurRadius={25}
+                resizeMode="cover"
+              />
+
+              {/* Main clear image */}
+              <Image
+                source={{
+                  uri: imageError
+                    ? 'https://via.placeholder.com/800x600?text=No+Image'
+                    : uri,
+                }}
+                style={styles.image}
+                resizeMode="contain"
+                onError={handleError}
+              />
+
+              {/* Photo counter */}
+              {images.length > 1 && (
+                <View style={styles.photoCounter}>
+                  <Text style={styles.photoCounterText}>
+                    {index + 1}/{images.length}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Gradient overlay for better text contrast */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
+          style={styles.gradient}
+        />
+
+        {/* Tags */}
+        <View style={styles.tagsContainer}>
+          <View style={[styles.tag, { backgroundColor: '#111827' }]}>
+            <Text style={styles.tagText}>
+              {property.property_type?.toUpperCase() || 'PROPERTY'}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.tag,
+              { backgroundColor: getCountryColor(property.country) },
+            ]}
+          >
+            <Text style={styles.tagText}>{property.country || 'Unknown'}</Text>
+          </View>
+          <View
+            style={[
+              styles.tag,
+              {
+                backgroundColor:
+                  property.property_status === 'for_sale'
+                    ? '#10b981'
+                    : '#3b82f6',
+              },
+            ]}
+          >
+            <Text style={styles.tagText}>
+              {property.property_status === 'for_sale'
+                ? 'For Sale'
+                : 'For Rent'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Right side actions */}
+        <View style={styles.sideActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setIsLiked(!isLiked)}
+          >
+            <Heart
+              size={32}
+              color="#fff"
+              fill={isLiked ? '#FF385C' : 'transparent'}
+              strokeWidth={2}
             />
+            <Text style={styles.actionText}>234</Text>
+          </TouchableOpacity>
 
-            {/* Main clear image */}
-            <Image
-              source={{
-                uri: imageError
-                  ? 'https://via.placeholder.com/800x600?text=No+Image'
-                  : uri,
-              }}
-              style={styles.image}
-              resizeMode="contain"
-              onError={handleError}
-            />
+          <TouchableOpacity style={styles.actionButton}>
+            <MessageCircle size={32} color="#fff" strokeWidth={2} />
+            <Text style={styles.actionText}>12</Text>
+          </TouchableOpacity>
 
-            {/* Photo index counter */}
-            {images.length > 1 && (
-              <View style={styles.photoCounter}>
-                <Text style={styles.photoCounterText}>
-                  {index + 1}/{images.length}
-                </Text>
-              </View>
-            )}
-          </View>
-        ))}
-      </ScrollView>
+          <TouchableOpacity style={styles.actionButton}>
+            <Share2 size={32} color="#fff" strokeWidth={2} />
+            <Text style={styles.actionText}>Share</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Gradient overlay for better text contrast */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
-        style={styles.gradient}
-      />
-
-      {/* Tags (type, country, status) */}
-      <View style={styles.tagsContainer}>
-        <View style={[styles.tag, { backgroundColor: '#111827' }]}>
-          <Text style={styles.tagText}>
-            {property.property_type?.toUpperCase() || 'PROPERTY'}
+        {/* Bottom Info */}
+        <View style={styles.bottomInfo}>
+          <Text style={styles.title} numberOfLines={2}>
+            {property.title || 'Untitled Property'}
           </Text>
-        </View>
-        <View
-          style={[
-            styles.tag,
-            { backgroundColor: getCountryColor(property.country) },
-          ]}
-        >
-          <Text style={styles.tagText}>{property.country || 'Unknown'}</Text>
-        </View>
-        <View
-          style={[
-            styles.tag,
-            {
-              backgroundColor:
-                property.property_status === 'for_sale'
-                  ? '#10b981'
-                  : '#3b82f6',
-            },
-          ]}
-        >
-          <Text style={styles.tagText}>
-            {property.property_status === 'for_sale' ? 'For Sale' : 'For Rent'}
-          </Text>
-        </View>
-      </View>
 
-      {/* Right-side action buttons */}
-      <View style={styles.sideActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => setIsLiked(!isLiked)}
-        >
-          <Heart
-            size={32}
-            color="#fff"
-            fill={isLiked ? '#FF385C' : 'transparent'}
-            strokeWidth={2}
-          />
-          <Text style={styles.actionText}>234</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <MessageCircle size={32} color="#fff" strokeWidth={2} />
-          <Text style={styles.actionText}>12</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Share2 size={32} color="#fff" strokeWidth={2} />
-          <Text style={styles.actionText}>Share</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom info section */}
-      <View style={styles.bottomInfo}>
-        <Text style={styles.title} numberOfLines={2}>
-          {property.title || 'Untitled Property'}
-        </Text>
-
-        <View style={styles.locationRow}>
-          <MapPin size={16} color="#10b981" />
-          <Text style={styles.locationText} numberOfLines={1}>
-            {property.location || 'Unknown Location'}
-          </Text>
-        </View>
-
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>{formatPrice(property.price)}</Text>
-          <Text style={styles.priceLabel}>
-            {property.property_status === 'for_sale'
-              ? 'Purchase Price'
-              : '/month'}
-          </Text>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statPill}>
-            <Square size={14} color="#fff" />
-            <Text style={styles.statText}>
-              {property.area ?? property.size ?? '—'} m²
+          <View style={styles.locationRow}>
+            <MapPin size={16} color="#10b981" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {property.location || 'Unknown Location'}
             </Text>
           </View>
-          <View style={styles.statPill}>
-            <ArrowUpCircle size={14} color="#fff" />
-            <Text style={styles.statText}>
-              Floor {property.floor_level ?? '—'}
-            </Text>
-          </View>
-          <View style={styles.statPill}>
-            <Layers size={14} color="#fff" />
-            <Text style={styles.statText}>
-              {property.total_floors ?? '—'} Floors
-            </Text>
-          </View>
-        </View>
 
-        {/* View Property Button */}
-        <TouchableOpacity
-          style={styles.viewButton}
-          onPress={onViewProperty}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.viewButtonText}>View Property</Text>
-        </TouchableOpacity>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(property.price)}</Text>
+            <Text style={styles.priceLabel}>
+              {property.property_status === 'for_sale'
+                ? 'Purchase Price'
+                : '/month'}
+            </Text>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statPill}>
+              <Square size={14} color="#fff" />
+              <Text style={styles.statText}>
+                {property.area ?? property.size ?? '—'} m²
+              </Text>
+            </View>
+            <View style={styles.statPill}>
+              <ArrowUpCircle size={14} color="#fff" />
+              <Text style={styles.statText}>
+                Floor {property.floor_level ?? '—'}
+              </Text>
+            </View>
+            <View style={styles.statPill}>
+              <Layers size={14} color="#fff" />
+              <Text style={styles.statText}>
+                {property.total_floors ?? '—'} Floors
+              </Text>
+            </View>
+          </View>
+
+          {/* View Property Button */}
+          <TouchableOpacity
+            style={styles.viewButton}
+            onPress={onViewProperty}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewButtonText}>View Property</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
   container: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: '#000',
     position: 'relative',
   },
   imageScroll: {
@@ -255,20 +264,20 @@ const styles = StyleSheet.create({
   imageWrapper: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
   },
   image: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
+    width: SCREEN_WIDTH * 0.98, // slightly smaller for safer fit
+    height: SCREEN_HEIGHT * 0.85, // adjusted to prevent cutoffs
+    resizeMode: 'contain',
   },
   gradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.5,
+    height: SCREEN_HEIGHT * 0.45,
     pointerEvents: 'none',
   },
   photoCounter: {
@@ -287,11 +296,10 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.03,
+    top: Platform.OS === 'ios' ? 40 : 20,
     left: 16,
     flexDirection: 'row',
     gap: 8,
-    flexWrap: 'wrap',
   },
   tag: {
     paddingHorizontal: 12,
@@ -302,12 +310,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
   },
   sideActions: {
     position: 'absolute',
     right: 16,
-    bottom: SCREEN_HEIGHT * 0.33,
+    bottom: SCREEN_HEIGHT * 0.25, // moved higher for visibility
     gap: 24,
     alignItems: 'center',
   },
@@ -319,13 +326,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   bottomInfo: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.05,
+    bottom: SCREEN_HEIGHT * 0.12, // ensures it's above nav bar
     left: 16,
     right: 80,
   },
@@ -334,23 +338,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     marginBottom: 8,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   locationText: {
     marginLeft: 6,
     color: '#fff',
     fontSize: 14,
-    fontWeight: '500',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   priceRow: {
     flexDirection: 'row',
@@ -390,15 +387,15 @@ const styles = StyleSheet.create({
   },
   viewButton: {
     backgroundColor: '#10b981',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 25,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
   },
   viewButtonText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 15,
     textTransform: 'uppercase',
   },
 });
