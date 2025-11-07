@@ -10,36 +10,109 @@ import {
 } from 'react-native';
 import PropertyReelCard from './PropertyReelCard';
 import { api } from '@/config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function PropertyReelsView() {
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextPage, setNextPage] = useState<number | null>(2);
+  const [hasMore, setHasMore] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
-  const fetchProperties = useCallback(async () => {
+  const checkAuth = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const response = await api.get('/properties/');
-      const data = response.data || [];
-
-      // Show featured first if available
-      const featured = data.filter((p: any) => p.is_featured);
-      setProperties(featured.length ? featured : data);
-    } catch (err) {
-      console.error('Error fetching properties:', err);
-      setError('Failed to load properties. Please try again.');
-    } finally {
-      setLoading(false);
+      const token = await AsyncStorage.getItem('access_token');
+      return !!token;
+    } catch {
+      return false;
     }
   }, []);
 
+  const fetchFeed = useCallback(async (page: number = 1) => {
+    try {
+      if (page === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      setError(null);
+
+      const response = await api.feed.list({ page, page_size: 10 });
+      const newProperties = response.results || [];
+
+      if (page === 1) {
+        setProperties(newProperties);
+      } else {
+        setProperties(prev => [...prev, ...newProperties]);
+      }
+
+      // Update pagination state
+      if (response.next) {
+        // Extract page number from next URL or increment
+        const nextPageNum = page + 1;
+        setNextPage(nextPageNum);
+        setHasMore(true);
+      } else {
+        setNextPage(null);
+        setHasMore(false);
+      }
+    } catch (err: any) {
+      console.error('Error fetching feed:', err);
+      
+      // If 401 (unauthorized), fallback to generic properties
+      if (err.response?.status === 401) {
+        try {
+          const response = await api.get('/properties/');
+          const data = response.data || [];
+          const featured = data.filter((p: any) => p.is_featured);
+          setProperties(featured.length ? featured : data);
+          setError(null);
+        } catch (fallbackErr) {
+          setError('Failed to load properties. Please try again.');
+        }
+      } else {
+        setError('Failed to load feed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore && nextPage) {
+      fetchFeed(nextPage);
+    }
+  }, [loadingMore, hasMore, nextPage, fetchFeed]);
+
   useEffect(() => {
-    fetchProperties();
-  }, [fetchProperties]);
+    const initializeFeed = async () => {
+      const isAuthenticated = await checkAuth();
+      if (isAuthenticated) {
+        fetchFeed(1);
+      } else {
+        // Fallback to generic properties for unauthenticated users
+        try {
+          setLoading(true);
+          const response = await api.get('/properties/');
+          const data = response.data || [];
+          const featured = data.filter((p: any) => p.is_featured);
+          setProperties(featured.length ? featured : data);
+        } catch (err) {
+          console.error('Error fetching properties:', err);
+          setError('Failed to load properties. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeFeed();
+  }, [checkAuth, fetchFeed]);
 
   if (loading) {
     return (
@@ -72,7 +145,7 @@ export default function PropertyReelsView() {
       <FlatList
         ref={flatListRef}
         data={properties}
-        renderItem={({ item }) => <PropertyReelCard property={item} />}
+        renderItem={({ item }) => <PropertyReelCard property={item} source="feed" />}
         keyExtractor={(item) => String(item.id)}
         pagingEnabled
         showsVerticalScrollIndicator={false}
@@ -87,6 +160,16 @@ export default function PropertyReelsView() {
         windowSize={3}
         initialNumToRender={2}
         maxToRenderPerBatch={2}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" color="#0F3460" />
+              <Text style={styles.loadingMoreText}>Loading more...</Text>
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -115,6 +198,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
+    color: '#666',
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
     color: '#666',
   },
 });

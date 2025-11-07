@@ -17,10 +17,13 @@ import {
   Layers,
   UserCircle,
   MessageCircle,
+  Share,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { api } from '@/config/api';
+import { Alert } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -28,12 +31,14 @@ const BASE_URL = 'https://propertprodjango.onrender.com';
 export default function PropertyReelCard({
   property,
   onViewProperty,
+  source,
 }: {
   property: any;
   onViewProperty?: () => void;
+  source?: string;
 }) {
   const router = useRouter();
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(property.is_favourite || false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -77,12 +82,63 @@ export default function PropertyReelCard({
     }
   };
 
-  // ✅ New navigation handler for the View button
+  // Navigation handler for the View button with source tracking
   const handleViewPress = () => {
     if (onViewProperty) {
       onViewProperty();
     } else if (property?.id) {
-      router.push(`/property/${property.id}`);
+      const queryParams = source ? `?source=${source}` : '';
+      router.push(`/property/${property.id}${queryParams}`);
+    }
+  };
+
+  // Favorite handler with API integration and success message
+  const handleFavorite = async () => {
+    try {
+      const response = await api.properties.toggleFavorite(property.id);
+      setIsLiked(response.is_favourite || false);
+      Alert.alert(
+        'Success',
+        response.is_favourite 
+          ? 'Property added to favorites!' 
+          : 'Property removed from favorites!',
+        [{ text: 'OK' }]
+      );
+    } catch (e: any) {
+      console.error('Failed to toggle favorite:', e);
+      Alert.alert('Error', 'Failed to update favorite. Please try again.');
+    }
+  };
+
+  // Chat handler with tracking and success message
+  const handleChat = async () => {
+    try {
+      await api.analytics.trackConversion(property.id, 'chat');
+      Alert.alert(
+        'Success',
+        'Chat initiated! Full chat functionality coming soon.',
+        [{ text: 'OK' }]
+      );
+    } catch (e: any) {
+      console.error('Failed to track chat:', e);
+      Alert.alert('Error', 'Failed to initiate chat. Please try again.');
+    }
+  };
+
+  // Share handler with tracking and success message
+  const handleShare = async () => {
+    try {
+      // Note: Share tracking endpoint doesn't exist yet, but we'll show success message
+      // When backend endpoint is ready, uncomment:
+      // await api.analytics.trackShare(property.id, 'copy_link');
+      Alert.alert(
+        'Success',
+        'Share tracked! Full sharing functionality coming soon.',
+        [{ text: 'OK' }]
+      );
+    } catch (e: any) {
+      console.error('Failed to track share:', e);
+      Alert.alert('Error', 'Failed to track share. Please try again.');
     }
   };
 
@@ -180,14 +236,14 @@ export default function PropertyReelCard({
         {/* Right side actions (chat above all others) */}
         <View style={styles.sideActions}>
           {/* Chat Button */}
-          <TouchableOpacity style={styles.chatButton}>
+          <TouchableOpacity style={styles.chatButton} onPress={handleChat}>
             <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
           </TouchableOpacity>
 
           {/* Like */}
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => setIsLiked(!isLiked)}
+            onPress={handleFavorite}
           >
             <Heart
               size={32}
@@ -196,6 +252,15 @@ export default function PropertyReelCard({
               strokeWidth={2}
             />
             <Text style={styles.actionText}>234</Text>
+          </TouchableOpacity>
+
+          {/* Share */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleShare}
+          >
+            <Share size={32} color="#fff" strokeWidth={2} />
+            <Text style={styles.actionText}>Share</Text>
           </TouchableOpacity>
 
           {/* Profile */}

@@ -242,9 +242,10 @@ export const api = {
 
     /**
      * Get property by ID
+     * Optionally accepts config with params (e.g., { params: { source: 'feed' } })
      */
-    getById: (id: number | string) =>
-      apiGet(`properties/${id}`).then(res => res.data),
+    getById: (id: number | string, config?: AxiosRequestConfig) =>
+      apiGet(`properties/${id}`, config).then(res => res.data),
 
     /**
      * Create new property: expects FormData if uploading images; else JSON.
@@ -369,6 +370,40 @@ export const api = {
       apiFormPost('properties/api_admin/create-property', fd).then(res => res.data),
     getUserProps: () =>
       apiGet('properties/api_admin/properties').then(res => res.data),
+  },
+
+  // Feed endpoints (personalized property feed)
+  feed: {
+    /**
+     * Get personalized property feed
+     * Returns paginated feed with match_score and slot_type
+     * Requires authentication
+     */
+    list: (params?: { page?: number; page_size?: number }) =>
+      apiGet<{ count: number; next: string | null; previous: string | null; results: any[] }>(
+        'feed/properties',
+        { params }
+      ).then(res => {
+        const d = res.data;
+        return {
+          results: Array.isArray(d.results) ? d.results : [],
+          count: d.count || 0,
+          next: d.next,
+          previous: d.previous,
+        };
+      }),
+  },
+
+  // Analytics endpoints
+  analytics: {
+    /**
+     * Track contact conversion (phone/email/chat clicks)
+     */
+    trackConversion: (propertyId: number | string, contactMethod: 'phone' | 'email' | 'chat' | 'whatsapp') =>
+      apiPost('analytics/track-conversion', { 
+        property_id: propertyId, 
+        contact_method: contactMethod 
+      }).then(res => res.data),
   },
 };
 

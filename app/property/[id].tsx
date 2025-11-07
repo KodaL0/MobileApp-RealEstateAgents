@@ -11,6 +11,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Linking,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -238,7 +239,7 @@ function formatOrdinal(n: string | number): string {
 }
 
 export default function PropertyDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, source } = useLocalSearchParams();
   const router = useRouter();
 
   const [property, setProperty] = useState<any>(null);
@@ -253,7 +254,9 @@ export default function PropertyDetailScreen() {
       setLoading(true);
       setError(null);
       try {
-        const rawResp = await api.properties.getById(Number(id));
+        // Pass source parameter if present (for feed click tracking)
+        const params = source ? { params: { source } } : undefined;
+        const rawResp = await api.properties.getById(Number(id), params);
         const rawData = rawResp?.data ?? rawResp;
         if (!isMounted) return;
         const normalized = normalizePropertyDetail(rawData);
@@ -273,7 +276,7 @@ export default function PropertyDetailScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, source]);
 
   if (loading) {
     return (
@@ -332,6 +335,76 @@ export default function PropertyDetailScreen() {
     ? rawCurrent
     : `https://api.propertpro.com${rawCurrent}`;
 
+  // Contact tracking handlers
+  const handlePhoneClick = async () => {
+    if (property?.id) {
+      try {
+        await api.analytics.trackConversion(property.id, 'phone');
+      } catch (e) {
+        console.error('Failed to track phone click:', e);
+      }
+    }
+    Linking.openURL(`tel:${contactPhone}`);
+  };
+
+  const handleEmailClick = async () => {
+    if (property?.id) {
+      try {
+        await api.analytics.trackConversion(property.id, 'email');
+      } catch (e) {
+        console.error('Failed to track email click:', e);
+      }
+    }
+    Linking.openURL(`mailto:${contactEmail}`);
+  };
+
+  const handleAgentPhoneClick = async () => {
+    if (property?.id && agent?.phone) {
+      try {
+        await api.analytics.trackConversion(property.id, 'phone');
+      } catch (e) {
+        console.error('Failed to track agent phone click:', e);
+      }
+    }
+    if (agent?.phone) {
+      Linking.openURL(`tel:${agent.phone}`);
+    }
+  };
+
+  const handleAgentEmailClick = async () => {
+    if (property?.id && agent?.email) {
+      try {
+        await api.analytics.trackConversion(property.id, 'email');
+      } catch (e) {
+        console.error('Failed to track agent email click:', e);
+      }
+    }
+    if (agent?.email) {
+      Linking.openURL(`mailto:${agent.email}`);
+    }
+  };
+
+  const handleChatClick = async () => {
+    if (property?.id) {
+      try {
+        await api.analytics.trackConversion(property.id, 'chat');
+      } catch (e) {
+        console.error('Failed to track chat click:', e);
+      }
+    }
+    // Navigate to chat screen (placeholder)
+    // router.push(`/chat/${owner?.id || property.owner_id}`);
+  };
+
+  // Share handler (placeholder until backend endpoint ready)
+  const handleShare = () => {
+    Alert.alert(
+      'Share',
+      'Share functionality coming in a future update.',
+      [{ text: 'OK' }]
+    );
+  };
+
   const goPrev = (e: any) => {
     e.stopPropagation?.();
     if (imgCount > 0) {
@@ -380,7 +453,15 @@ export default function PropertyDetailScreen() {
               <View style={styles.headerButtons}>
                 <TouchableOpacity
                   style={styles.iconButton}
-                  onPress={() => setIsFavourite(prev => !prev)}
+                  onPress={async () => {
+                    try {
+                      const response = await api.properties.toggleFavorite(property.id);
+                      setIsFavourite(response.is_favourite || false);
+                    } catch (e) {
+                      console.error('Failed to toggle favorite:', e);
+                      Alert.alert('Error', 'Failed to update favorite. Please try again.');
+                    }
+                  }}
                 >
                   <Heart
                     size={24}
@@ -388,7 +469,7 @@ export default function PropertyDetailScreen() {
                     fill={isFavourite ? '#FF6B6B' : 'transparent'}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
+                <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
                   <Share size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
@@ -699,7 +780,7 @@ export default function PropertyDetailScreen() {
           {contactPhone ? (
             <TouchableOpacity
               style={styles.contactRow}
-              onPress={() => Linking.openURL(`tel:${contactPhone}`)}
+              onPress={handlePhoneClick}
             >
               <Phone size={16} color="#0F3460" />
               <Text style={styles.contactText}>
@@ -710,7 +791,7 @@ export default function PropertyDetailScreen() {
           {contactEmail ? (
             <TouchableOpacity
               style={styles.contactRow}
-              onPress={() => Linking.openURL(`mailto:${contactEmail}`)}
+              onPress={handleEmailClick}
             >
               <Mail size={16} color="#0F3460" />
               <Text style={styles.contactText}>
@@ -765,11 +846,7 @@ export default function PropertyDetailScreen() {
                     styles.agentButton,
                     styles.messageButton,
                   ]}
-                  onPress={() => {
-                    if (agent.email) {
-                      Linking.openURL(`mailto:${agent.email}`);
-                    }
-                  }}
+                  onPress={handleChatClick}
                 >
                   <MessageSquare
                     size={20}
@@ -784,11 +861,7 @@ export default function PropertyDetailScreen() {
                     styles.agentButton,
                     styles.callButton,
                   ]}
-                  onPress={() => {
-                    if (agent.phone) {
-                      Linking.openURL(`tel:${agent.phone}`);
-                    }
-                  }}
+                  onPress={handleAgentPhoneClick}
                 >
                   <Phone size={20} color="#fff" />
                   <Text style={styles.agentButtonText}>
