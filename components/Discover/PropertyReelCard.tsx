@@ -165,13 +165,13 @@ export default function PropertyReelCard({
           </View>
         </View>
 
-        {/* Chat button (top-right floating) */}
-        <TouchableOpacity style={styles.chatButton}>
-          <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
-        </TouchableOpacity>
-
-        {/* Right side actions (centered vertically) */}
+        {/* Right side actions (chat above all others) */}
         <View style={styles.sideActions}>
+          {/* Chat Button */}
+          <TouchableOpacity style={styles.chatButton}>
+            <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
+          </TouchableOpacity>
+
           {/* Like */}
           <TouchableOpacity
             style={styles.actionButton}
@@ -192,7 +192,7 @@ export default function PropertyReelCard({
             <Text style={styles.actionText}>Agent</Text>
           </TouchableOpacity>
 
-          {/* View Property (small button) */}
+          {/* View Property */}
           <TouchableOpacity
             style={styles.viewPropertyButton}
             onPress={onViewProperty}
@@ -323,23 +323,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  /* Chat button (top-right floating) */
-  chatButton: {
-    position: 'absolute',
-    right: 16,
-    top: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 25,
-    padding: 6,
-    zIndex: 10,
-  },
-  /* Right-side actions (centered vertically) */
+
+  /* Right-side actions (chat above others) */
   sideActions: {
     position: 'absolute',
     right: 16,
-    bottom: SCREEN_HEIGHT * 0.35, // moved up for better centering
-    gap: 22,
+    bottom: SCREEN_HEIGHT * 0.35,
     alignItems: 'center',
+    gap: 22,
+  },
+  chatButton: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 25,
+    padding: 6,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   actionButton: {
     alignItems: 'center',
