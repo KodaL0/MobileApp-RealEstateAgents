@@ -20,7 +20,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native'; // ✅ added
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -32,7 +32,7 @@ export default function PropertyReelCard({
   property: any;
   onViewProperty?: () => void;
 }) {
-  const navigation = useNavigation(); // ✅ added
+  const router = useRouter();
   const [isLiked, setIsLiked] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
@@ -82,10 +82,10 @@ export default function PropertyReelCard({
     if (onViewProperty) {
       onViewProperty();
     } else if (property?.id) {
-      // @ts-ignore
-      navigation.navigate('PropertyDetails', { id: property.id });
+      router.push(`/property/${property.id}`);
     }
   };
+
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
