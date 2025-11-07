@@ -22,7 +22,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
 
-export default function PropertyReelCard({ property, onViewProperty }: { property: any; onViewProperty?: () => void }) {
+export default function PropertyReelCard({
+  property,
+  onViewProperty,
+}: {
+  property: any;
+  onViewProperty?: () => void;
+}) {
   const [isLiked, setIsLiked] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
@@ -68,7 +74,7 @@ export default function PropertyReelCard({ property, onViewProperty }: { propert
 
   return (
     <View style={styles.container}>
-      {/* Horizontal image scroll */}
+      {/* Horizontal image scroll with blurred background */}
       <ScrollView
         horizontal
         pagingEnabled
@@ -78,42 +84,50 @@ export default function PropertyReelCard({ property, onViewProperty }: { propert
         style={styles.imageScroll}
       >
         {images.map((uri: string, index: number) => (
-          <Image
-            key={index}
-            source={{
-              uri: imageError
-                ? 'https://via.placeholder.com/800x600?text=No+Image'
-                : uri,
-            }}
-            style={styles.image}
-            resizeMode="cover"
-            onError={handleError}
-          />
+          <View key={index} style={styles.imageWrapper}>
+            {/* Blurred background */}
+            <Image
+              source={{
+                uri: imageError
+                  ? 'https://via.placeholder.com/800x600?text=No+Image'
+                  : uri,
+              }}
+              style={StyleSheet.absoluteFillObject}
+              blurRadius={25}
+              resizeMode="cover"
+            />
+
+            {/* Main clear image */}
+            <Image
+              source={{
+                uri: imageError
+                  ? 'https://via.placeholder.com/800x600?text=No+Image'
+                  : uri,
+              }}
+              style={styles.image}
+              resizeMode="contain"
+              onError={handleError}
+            />
+
+            {/* Photo index counter */}
+            {images.length > 1 && (
+              <View style={styles.photoCounter}>
+                <Text style={styles.photoCounterText}>
+                  {index + 1}/{images.length}
+                </Text>
+              </View>
+            )}
+          </View>
         ))}
       </ScrollView>
 
-      {/* Bottom gradient */}
+      {/* Gradient overlay for better text contrast */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
+        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
         style={styles.gradient}
       />
 
-      {/* Dots */}
-      {images.length > 1 && (
-        <View style={styles.dotsContainer}>
-          {images.map((_: string, index: number) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                index === currentIndex && styles.activeDot,
-              ]}
-            />
-          ))}
-        </View>
-      )}
-
-      {/* Tags */}
+      {/* Tags (type, country, status) */}
       <View style={styles.tagsContainer}>
         <View style={[styles.tag, { backgroundColor: '#111827' }]}>
           <Text style={styles.tagText}>
@@ -145,7 +159,7 @@ export default function PropertyReelCard({ property, onViewProperty }: { propert
         </View>
       </View>
 
-      {/* Right side actions */}
+      {/* Right-side action buttons */}
       <View style={styles.sideActions}>
         <TouchableOpacity
           style={styles.actionButton}
@@ -171,7 +185,7 @@ export default function PropertyReelCard({ property, onViewProperty }: { propert
         </TouchableOpacity>
       </View>
 
-      {/* Bottom property info */}
+      {/* Bottom info section */}
       <View style={styles.bottomInfo}>
         <Text style={styles.title} numberOfLines={2}>
           {property.title || 'Untitled Property'}
@@ -238,6 +252,13 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
   },
+  imageWrapper: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   image: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
@@ -250,24 +271,19 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 0.5,
     pointerEvents: 'none',
   },
-  dotsContainer: {
+  photoCounter: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.08,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  activeDot: {
-    backgroundColor: '#fff',
-    width: 20,
+  photoCounterText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   tagsContainer: {
     position: 'absolute',
@@ -346,9 +362,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   priceLabel: {
     fontSize: 13,
