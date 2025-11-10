@@ -25,12 +25,23 @@ export default function PropertyReelsView() {
   const flatListRef = useRef<FlatList>(null);
   const { isAuthenticated, isLoading: authLoading } = useUser();
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
-  const lastVisibleIndex = useRef(0);
-  const [prefetchingAhead, setPrefetchingAhead] = useState(false);
+  const isFetchingRef = useRef(false);
+  const propertiesRef = useRef<any[]>([]);
+  const nextPageRef = useRef<number | null>(2);
+  const hasMoreRef = useRef(true);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    propertiesRef.current = properties;
+    nextPageRef.current = nextPage;
+    hasMoreRef.current = hasMore;
+  }, [properties, nextPage, hasMore]);
 
   const fetchFeed = useCallback(
-    async (page: number = 1, options: { append?: boolean } = {}) => {
-      const append = options.append ?? page !== 1;
+    async (page: number = 1, append: boolean = false) => {
+      // Prevent duplicate fetches
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
 
       try {
         if (page === 1) {
@@ -43,12 +54,9 @@ export default function PropertyReelsView() {
         const response = await api.feed.list({ page, page_size: 10 });
         const newProperties = response.results || [];
 
-        if (newProperties.length) {
+        if (newProperties.length > 0) {
           if (append) {
-            setProperties(prev => {
-              const merged = [...prev, ...newProperties];
-              return merged.length > 60 ? merged.slice(merged.length - 60) : merged;
-            });
+            setProperties(prev => [...prev, ...newProperties]);
           } else {
             setProperties(newProperties);
           }
@@ -58,12 +66,10 @@ export default function PropertyReelsView() {
 
         // Update pagination state
         if (response.next) {
-          // Extract page number from next URL or increment
-          const nextPageNum = page + 1;
-          setNextPage(nextPageNum);
+          setNextPage(page + 1);
           setHasMore(true);
-        } else if (newProperties.length) {
-          // recycle from first page
+        } else if (newProperties.length > 0) {
+          // Loop back to page 1 for infinite scroll
           setNextPage(1);
           setHasMore(true);
         } else {
@@ -77,51 +83,46 @@ export default function PropertyReelsView() {
         } else {
           setError('Failed to load feed. Please try again.');
         }
-        setProperties([]);
+        if (!append) {
+          setProperties([]);
+        }
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        isFetchingRef.current = false;
       }
     },
     []
   );
 
-  const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore && nextPage && isAuthenticated) {
-      fetchFeed(nextPage, { append: true });
-    }
-  }, [loadingMore, hasMore, nextPage, fetchFeed, isAuthenticated]);
-
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
-      if (!viewableItems.length) return;
-      const index = viewableItems[0].index ?? 0;
-      lastVisibleIndex.current = index;
+      if (!viewableItems.length || !isAuthenticated) return;
 
-      const total = properties.length;
+      const index = viewableItems[0].index ?? 0;
+      const total = propertiesRef.current.length;
+      const currentNextPage = nextPageRef.current;
+      const currentHasMore = hasMoreRef.current;
+
+      // Prefetch when user is within 3 items of the end
       if (
-        isAuthenticated &&
-        hasMore &&
-        !loadingMore &&
-        !prefetchingAhead &&
+        currentHasMore &&
+        !isFetchingRef.current &&
         total >= 10 &&
         index >= total - 3 &&
-        nextPage
+        currentNextPage
       ) {
-        setPrefetchingAhead(true);
-        fetchFeed(nextPage, { append: true }).finally(() => setPrefetchingAhead(false));
+        fetchFeed(currentNextPage, true);
       }
     },
-    [fetchFeed, hasMore, isAuthenticated, loadingMore, nextPage, prefetchingAhead, properties.length]
+    [isAuthenticated, fetchFeed]
   );
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
+    if (authLoading) return;
 
     if (isAuthenticated) {
-      fetchFeed(1);
+      fetchFeed(1, false);
     } else {
       setLoading(false);
       setLoadingMore(false);
@@ -164,7 +165,7 @@ export default function PropertyReelsView() {
         ref={flatListRef}
         data={properties}
         renderItem={({ item }) => <PropertyReelCard property={item} source="feed" />}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={(item, index) => `property-${item?.id ?? index}`}
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToAlignment="start"
@@ -180,8 +181,7 @@ export default function PropertyReelsView() {
         windowSize={3}
         initialNumToRender={2}
         maxToRenderPerBatch={2}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
+        removeClippedSubviews={true}
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footerLoader}>
