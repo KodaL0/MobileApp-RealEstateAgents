@@ -1,0 +1,633 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import {
+  ArrowLeft,
+  MapPin,
+  Phone,
+  Globe,
+  Mail,
+  Home,
+  Users,
+  Star,
+  Share2,
+  MessageCircle,
+} from 'lucide-react-native';
+
+import { api } from '@/config/api';
+import { useChat } from '@/app/features/chat/context/ChatContext';
+import { useUser } from '@/app/_userbase/UserContext';
+import type { PublicProfileData, Property } from '@/app/features/chat/types';
+
+export default function AgentProfileScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ username?: string }>();
+  const username = useMemo(() => params.username?.toString() ?? '', [params.username]);
+
+  const { getOrCreateDmThread } = useChat();
+  const { isAuthenticated } = useUser();
+
+  const [profile, setProfile] = useState<PublicProfileData | null>(null);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProfile = useCallback(async () => {
+    if (!username) {
+      setError('Agent username missing.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const data = await api.auth.getPublicProfile(username);
+      setProfile(data);
+      setProperties(Array.isArray(data?.published_properties) ? data.published_properties : []);
+      setError(null);
+    } catch (err: any) {
+      console.error('Failed to load agent profile:', err);
+      setError('Unable to load agent profile at this time.');
+    } finally {
+      setLoading(false);
+    }
+  }, [username]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchProfile();
+    setRefreshing(false);
+  }, [fetchProfile]);
+
+  const handlePropertyPress = (property: Property) => {
+    router.push(`/property/${property.id}`);
+  };
+
+  const handleOpenLink = (url?: string | null) => {
+    if (!url) return;
+    const normalized = url.startsWith('http') ? url : `https://${url}`;
+    Linking.openURL(normalized).catch(err => console.warn('Failed to open url', err));
+  };
+
+  const handleCall = (phone?: string | null) => {
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`).catch(err => console.warn('Failed to start call', err));
+  };
+
+  const handleEmail = (email?: string | null) => {
+    if (!email) return;
+    Linking.openURL(`mailto:${email}`).catch(err => console.warn('Failed to open mail client', err));
+  };
+
+  const handleMessageAgent = async () => {
+    if (!profile) return;
+
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to message this agent.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => router.push('/(tabs)/profile') },
+      ]);
+      return;
+    }
+
+    try {
+      const threadId = await getOrCreateDmThread(profile.id);
+      router.push(`/chat/${threadId}`);
+    } catch (err) {
+      console.error('Failed to open chat thread:', err);
+      Alert.alert('Error', 'Could not open chat. Please try again later.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color="#0F3460" />
+          <Text style={styles.loadingText}>Loading agent...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+        <View style={styles.centerContent}>
+          <Text style={styles.errorText}>{error || 'Agent not found.'}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchProfile}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const initial = profile.name?.charAt(0)?.toUpperCase() ?? profile.username.charAt(0).toUpperCase();
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
+
+      <View style={styles.hero}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={22} color="#fff" />
+        </TouchableOpacity>
+        <View style={styles.heroContent}>
+          {profile.avatar ? (
+            <Image source={{ uri: profile.avatar }} style={styles.heroAvatar} />
+          ) : (
+            <View style={styles.heroFallbackAvatar}>
+              <Text style={styles.heroFallbackInitial}>{initial}</Text>
+            </View>
+          )}
+          <View style={styles.heroTextBlock}>
+            <Text style={styles.heroName}>{profile.name || profile.username}</Text>
+            <Text style={styles.heroSubtitle}>{profile.office || 'Licensed Agent'}</Text>
+            <View style={styles.heroMetaRow}>
+              <MapPin size={14} color="#fff" />
+              <Text style={styles.heroMetaText}>
+                {profile.location || 'Location not provided'}
+              </Text>
+            </View>
+            <Text style={styles.heroMetaHint}>
+              Member since{' '}
+              {new Date(profile.date_joined).toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric',
+              })}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.heroActions}>
+          <TouchableOpacity style={styles.heroActionPrimary} onPress={handleMessageAgent}>
+            <MessageCircle size={18} color="#fff" />
+                <Text style={styles.heroActionPrimaryText}>Message</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.heroActionSecondary}
+            onPress={() => Alert.alert('Share', 'Sharing coming soon!')}
+          >
+            <Share2 size={18} color="#0F3460" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0F3460" />
+        }
+      >
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <Home size={20} color="#0F3460" />
+            <Text style={styles.statValue}>
+              {profile.properties_count ?? properties.length}
+            </Text>
+            <Text style={styles.statLabel}>Listings</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Users size={20} color="#0F3460" />
+            <Text style={styles.statValue}>{profile.connections_count ?? 0}</Text>
+            <Text style={styles.statLabel}>Connections</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Star size={20} color="#0F3460" />
+            <Text style={styles.statValue}>
+              {profile.mutual_connections_count ?? 0}
+            </Text>
+            <Text style={styles.statLabel}>Mutual</Text>
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionBody}>
+            {profile.bio?.trim() ||
+              'This agent has not added a bio yet. Explore their listings or contact them directly for more information.'}
+          </Text>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <View style={styles.contactGrid}>
+            <TouchableOpacity
+              style={styles.contactButton}
+              onPress={() => handleCall(profile.phone)}
+              disabled={!profile.phone}
+            >
+              <Phone size={18} color="#0F3460" />
+              <Text style={styles.contactButtonLabel}>
+                {profile.phone || 'Phone unavailable'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.contactButton} onPress={() => handleEmail(profile.email)}>
+              <Mail size={18} color="#0F3460" />
+              <Text style={styles.contactButtonLabel}>{profile.email}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.contactButton}
+              onPress={() => handleOpenLink(profile.website)}
+              disabled={!profile.website}
+            >
+              <Globe size={18} color="#0F3460" />
+              <Text style={styles.contactButtonLabel}>
+                {profile.website || 'Website unavailable'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Published Listings</Text>
+            <Text style={styles.sectionHint}>{properties.length} active</Text>
+          </View>
+
+          {properties.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No listings yet</Text>
+              <Text style={styles.emptySubtitle}>
+                This agent has not published any properties yet. Check back soon!
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.propertyList}>
+              {properties.map(property => {
+                const image =
+                  property.images?.[0]?.image ??
+                  property.image ??
+                  'https://via.placeholder.com/300x200?text=Property';
+                const price = Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'EUR',
+                  minimumFractionDigits: 0,
+                }).format(property.price || 0);
+
+                return (
+                  <TouchableOpacity
+                    key={property.id}
+                    style={styles.propertyCard}
+                    onPress={() => handlePropertyPress(property)}
+                  >
+                    <Image source={{ uri: image }} style={styles.propertyImage} />
+                    <View style={styles.propertyOverlay}>
+                      <View style={styles.propertyBadgeRow}>
+                        <View style={styles.propertyBadge}>
+                          <Text style={styles.propertyBadgeText}>
+                            {property.property_type || 'Listing'}
+                          </Text>
+                        </View>
+                        <View style={styles.propertyBadge}>
+                          <Text style={styles.propertyBadgeText}>
+                            {property.property_status === 'for_sale' ? 'For Sale' : 'For Rent'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.propertyTitle}>{property.title}</Text>
+                      <Text style={styles.propertyPrice}>{price}</Text>
+                      <View style={styles.propertyMetaRow}>
+                        <MapPin size={14} color="#E5E7EB" />
+                        <Text style={styles.propertyMetaText} numberOfLines={1}>
+                          {property.location ||
+                            [property.city, property.country].filter(Boolean).join(', ') ||
+                            'Location not provided'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  hero: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    backgroundColor: '#0F172A',
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  heroContent: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+  },
+  heroAvatar: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  heroFallbackAvatar: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#1D4ED8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroFallbackInitial: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#EFF6FF',
+  },
+  heroTextBlock: {
+    flex: 1,
+    gap: 6,
+  },
+  heroName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.75)',
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  heroMetaText: {
+    color: '#F9FAFB',
+    fontSize: 13,
+  },
+  heroMetaHint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  heroActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  heroActionPrimary: {
+    flex: 1,
+    backgroundColor: '#10B981',
+    borderRadius: 999,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  heroActionPrimaryText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  heroActionSecondary: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scroll: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  scrollContent: {
+    padding: 20,
+    gap: 16,
+    paddingBottom: 40,
+  },
+  statsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: '#E5E7EB',
+    height: '100%',
+  },
+  sectionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 20,
+    gap: 12,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  sectionHint: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionBody: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#4B5563',
+  },
+  contactGrid: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  contactButton: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  contactButtonLabel: {
+    fontSize: 14,
+    color: '#1F2937',
+    flex: 1,
+  },
+  propertyList: {
+    gap: 14,
+  },
+  propertyCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#111827',
+    minHeight: 180,
+  },
+  propertyImage: {
+    width: '100%',
+    height: 180,
+  },
+  propertyOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+  },
+  propertyBadgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  propertyBadge: {
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  propertyBadgeText: {
+    color: '#E0E7FF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  propertyTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  propertyPrice: {
+    color: '#F9FAFB',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  propertyMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  propertyMetaText: {
+    color: '#E5E7EB',
+    fontSize: 13,
+    flex: 1,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 16,
+    gap: 6,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  centerContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#F3F4F6',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: '#0F3460',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+

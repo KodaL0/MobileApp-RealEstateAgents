@@ -59,10 +59,37 @@ export default function PropertyReelCard({
   const [isChatLoading, setIsChatLoading] = useState(false);
   const { getOrCreateThread, threads } = useChat();
   const { isAuthenticated, user } = useUser();
+  const owner = property?.owner ?? {};
+  const ownerIdValue =
+    owner?.id ??
+    property?.owner_id ??
+    property?.ownerId ??
+    null;
+  const ownerId =
+    ownerIdValue !== null && ownerIdValue !== undefined
+      ? Number(ownerIdValue)
+      : NaN;
+  const ownerUsername: string | null =
+    owner?.username ??
+    property?.owner_username ??
+    property?.ownerUsername ??
+    null;
 
   const getValidUrl = (uri?: string) => {
     if (!uri) return 'https://via.placeholder.com/800x600?text=No+Image';
     return uri.startsWith('http') ? uri : `${BASE_URL}${uri}`;
+  };
+
+  const handleAgentProfilePress = () => {
+    if (!ownerUsername) {
+      Alert.alert('Unavailable', 'Agent profile is currently unavailable.');
+      return;
+    }
+
+    router.push({
+      pathname: '/agent/[username]',
+      params: { username: ownerUsername },
+    } as never);
   };
 
   const images =
@@ -139,12 +166,6 @@ export default function PropertyReelCard({
     }
 
     const propertyId = property?.id ? Number(property.id) : null;
-    const ownerIdRaw =
-      property?.owner?.id ??
-      property?.owner_id ??
-      property?.ownerId;
-    const ownerId = ownerIdRaw !== undefined ? Number(ownerIdRaw) : NaN;
-
     if (!ownerId || Number.isNaN(ownerId)) {
       Alert.alert('Unavailable', 'Could not identify the agent for this property.');
       return;
@@ -354,7 +375,7 @@ export default function PropertyReelCard({
           </TouchableOpacity>
 
           {/* Profile */}
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleAgentProfilePress}>
             <UserCircle size={32} color="#fff" strokeWidth={2} />
             <Text style={styles.actionText}>Agent</Text>
           </TouchableOpacity>
