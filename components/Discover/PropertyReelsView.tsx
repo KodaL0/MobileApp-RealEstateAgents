@@ -12,6 +12,7 @@ import PropertyReelCard from './PropertyReelCard';
 import { api } from '@/config/api';
 import { useUser } from '@/app/_userbase/UserContext';
 import type { ViewToken } from 'react-native';
+import type { ViewToken } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,8 +28,14 @@ export default function PropertyReelsView() {
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
   const lastVisibleIndex = useRef(0);
   const [prefetchingAhead, setPrefetchingAhead] = useState(false);
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
+  const lastVisibleIndex = useRef(0);
+  const [prefetchingAhead, setPrefetchingAhead] = useState(false);
 
-  const fetchFeed = useCallback(async (page: number = 1) => {
+  const fetchFeed = useCallback(
+    async (page: number = 1, options: { append?: boolean } = {}) => {
+      const append = options.append ?? page !== 1;
+
     try {
       if (page === 1) {
         setLoading(true);
@@ -40,10 +47,17 @@ export default function PropertyReelsView() {
       const response = await api.feed.list({ page, page_size: 10 });
       const newProperties = response.results || [];
 
-      if (page === 1) {
-        setProperties(newProperties);
-      } else {
-        setProperties(prev => [...prev, ...newProperties]);
+      if (newProperties.length) {
+        if (append) {
+          setProperties(prev => {
+            const merged = [...prev, ...newProperties];
+            return merged.length > 60 ? merged.slice(merged.length - 60) : merged;
+          });
+        } else {
+          setProperties(newProperties);
+        }
+      } else if (!append && page === 1) {
+        setProperties([]);
       }
 
       // Update pagination state
@@ -51,6 +65,10 @@ export default function PropertyReelsView() {
         // Extract page number from next URL or increment
         const nextPageNum = page + 1;
         setNextPage(nextPageNum);
+        setHasMore(true);
+      } else if (newProperties.length) {
+        // recycle from first page
+        setNextPage(1);
         setHasMore(true);
       } else {
         setNextPage(null);
@@ -68,13 +86,38 @@ export default function PropertyReelsView() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+    },
+    []
+  );
 
   const loadMore = useCallback(() => {
     if (!loadingMore && hasMore && nextPage && isAuthenticated) {
-      fetchFeed(nextPage);
+      fetchFeed(nextPage, { append: true });
     }
   }, [loadingMore, hasMore, nextPage, fetchFeed, isAuthenticated]);
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
+      if (!viewableItems.length) return;
+      const index = viewableItems[0].index ?? 0;
+      lastVisibleIndex.current = index;
+
+      const total = properties.length;
+      if (
+        isAuthenticated &&
+        hasMore &&
+        !loadingMore &&
+        !prefetchingAhead &&
+        total >= 10 &&
+        index >= total - 3 &&
+        nextPage
+      ) {
+        setPrefetchingAhead(true);
+        fetchFeed(nextPage, { append: true }).finally(() => setPrefetchingAhead(false));
+      }
+    },
+    [fetchFeed, hasMore, isAuthenticated, loadingMore, nextPage, prefetchingAhead, properties.length]
+  );
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
@@ -95,7 +138,7 @@ export default function PropertyReelsView() {
         nextPage
       ) {
         setPrefetchingAhead(true);
-        fetchFeed(nextPage).finally(() => setPrefetchingAhead(false));
+        fetchFeed(nextPage, { append: true }).finally(() => setPrefetchingAhead(false));
       }
     },
     [fetchFeed, hasMore, isAuthenticated, loadingMore, nextPage, properties.length, prefetchingAhead]
