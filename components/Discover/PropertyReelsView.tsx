@@ -11,6 +11,7 @@ import {
 import PropertyReelCard from './PropertyReelCard';
 import { api } from '@/config/api';
 import { useUser } from '@/app/_userbase/UserContext';
+import type { ViewToken } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,6 +24,9 @@ export default function PropertyReelsView() {
   const [hasMore, setHasMore] = useState(true);
   const flatListRef = useRef<FlatList>(null);
   const { isAuthenticated, isLoading: authLoading } = useUser();
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
+  const lastVisibleIndex = useRef(0);
+  const [prefetchingAhead, setPrefetchingAhead] = useState(false);
 
   const fetchFeed = useCallback(async (page: number = 1) => {
     try {
@@ -71,6 +75,31 @@ export default function PropertyReelsView() {
       fetchFeed(nextPage);
     }
   }, [loadingMore, hasMore, nextPage, fetchFeed, isAuthenticated]);
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
+      if (!viewableItems.length) {
+        return;
+      }
+      const index = viewableItems[0].index ?? 0;
+      lastVisibleIndex.current = index;
+
+      const total = properties.length;
+      if (
+        isAuthenticated &&
+        hasMore &&
+        !loadingMore &&
+        !prefetchingAhead &&
+        total >= 10 &&
+        index >= total - 3 &&
+        nextPage
+      ) {
+        setPrefetchingAhead(true);
+        fetchFeed(nextPage).finally(() => setPrefetchingAhead(false));
+      }
+    },
+    [fetchFeed, hasMore, isAuthenticated, loadingMore, nextPage, properties.length, prefetchingAhead]
+  );
 
   useEffect(() => {
     if (authLoading) {
@@ -127,6 +156,8 @@ export default function PropertyReelsView() {
         snapToAlignment="start"
         decelerationRate="fast"
         snapToInterval={SCREEN_HEIGHT}
+        viewabilityConfig={viewabilityConfig.current}
+        onViewableItemsChanged={onViewableItemsChanged}
         getItemLayout={(data, index) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
