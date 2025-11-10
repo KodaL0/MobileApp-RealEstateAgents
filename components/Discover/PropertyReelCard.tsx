@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Heart,
@@ -24,6 +25,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { api } from '@/config/api';
 import { Alert } from 'react-native';
+import { useChat } from '@/app/features/chat/context/ChatContext';
+import { useUser } from '@/app/_userbase/UserContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -39,9 +42,23 @@ export default function PropertyReelCard({
 }) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(property.is_favourite || false);
+  const [favoriteCount, setFavoriteCount] = useState<number>(() => {
+    const count =
+      typeof property?.favorites_count === 'number'
+        ? property.favorites_count
+        : typeof property?.favourites_count === 'number'
+        ? property.favourites_count
+        : typeof property?.favorite_count === 'number'
+        ? property.favorite_count
+        : 0;
+    return count ?? 0;
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const { getOrCreateThread, threads } = useChat();
+  const { isAuthenticated, user } = useUser();
 
   const getValidUrl = (uri?: string) => {
     if (!uri) return 'https://via.placeholder.com/800x600?text=No+Image';
@@ -97,6 +114,9 @@ export default function PropertyReelCard({
     try {
       const response = await api.properties.toggleFavorite(property.id);
       setIsLiked(response.is_favourite || false);
+      setFavoriteCount(prev =>
+        response.is_favourite ? prev + 1 : Math.max(0, prev - 1)
+      );
       Alert.alert(
         'Success',
         response.is_favourite 
@@ -110,18 +130,80 @@ export default function PropertyReelCard({
     }
   };
 
-  // Chat handler with tracking and success message
+  // Chat handler: open or create thread then navigate to chat
   const handleChat = async () => {
-    try {
-      await api.analytics.trackConversion(property.id, 'chat');
-      Alert.alert(
-        'Success',
-        'Chat initiated! Full chat functionality coming soon.',
-        [{ text: 'OK' }]
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to start a chat with the agent.');
+      router.push('/(tabs)/profile');
+      return;
+    }
+
+    const propertyId = property?.id ? Number(property.id) : null;
+    const ownerIdRaw =
+      property?.owner?.id ??
+      property?.owner_id ??
+      property?.ownerId;
+    const ownerId = ownerIdRaw !== undefined ? Number(ownerIdRaw) : NaN;
+
+    if (!ownerId || Number.isNaN(ownerId)) {
+      Alert.alert('Unavailable', 'Could not identify the agent for this property.');
+      return;
+    }
+
+    // If a thread already exists, navigate directly without creating another
+    let existingThreadId: string | null = null;
+    if (propertyId) {
+      const existing = threads.find(
+        thread => thread.property != null && Number(thread.property) === propertyId
       );
+      if (existing) {
+        existingThreadId = existing.id;
+      }
+    }
+
+    if (!existingThreadId) {
+      const userId = user?.id ?? null;
+      const dmThread = threads.find(
+        thread =>
+          thread.property === null &&
+          userId !== null &&
+          ((thread.user1 === ownerId && thread.user2 === userId) ||
+            (thread.user2 === ownerId && thread.user1 === userId))
+      );
+      if (dmThread) {
+        existingThreadId = dmThread.id;
+      }
+    }
+
+    if (existingThreadId) {
+      if (propertyId) {
+        api.analytics.trackConversion(propertyId, 'chat').catch(err =>
+          console.warn('Failed to track chat conversion:', err)
+        );
+      }
+      router.push(`/chat/${existingThreadId}`);
+      return;
+    }
+
+    if (isChatLoading) return;
+
+    try {
+      setIsChatLoading(true);
+      const threadId = await getOrCreateThread(ownerId, propertyId, property?.title);
+
+      // Track conversion for analytics (non-blocking)
+      if (propertyId) {
+        api.analytics.trackConversion(propertyId, 'chat').catch(err =>
+          console.warn('Failed to track chat conversion:', err)
+        );
+      }
+
+      router.push(`/chat/${threadId}`);
     } catch (e: any) {
-      console.error('Failed to track chat:', e);
-      Alert.alert('Error', 'Failed to initiate chat. Please try again.');
+      console.error('Failed to initiate chat:', e);
+      Alert.alert('Error', 'Failed to open chat. Please try again.');
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -236,8 +318,16 @@ export default function PropertyReelCard({
         {/* Right side actions (chat above all others) */}
         <View style={styles.sideActions}>
           {/* Chat Button */}
-          <TouchableOpacity style={styles.chatButton} onPress={handleChat}>
-            <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
+          <TouchableOpacity
+            style={[styles.chatButton, isChatLoading && styles.chatButtonDisabled]}
+            onPress={handleChat}
+            disabled={isChatLoading}
+          >
+            {isChatLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
+            )}
           </TouchableOpacity>
 
           {/* Like */}
@@ -251,7 +341,7 @@ export default function PropertyReelCard({
               fill={isLiked ? '#FF385C' : 'transparent'}
               strokeWidth={2}
             />
-            <Text style={styles.actionText}>234</Text>
+            <Text style={styles.actionText}>{favoriteCount}</Text>
           </TouchableOpacity>
 
           {/* Share */}
@@ -416,6 +506,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+  },
+  chatButtonDisabled: {
+    opacity: 0.6,
   },
   actionButton: {
     alignItems: 'center',
