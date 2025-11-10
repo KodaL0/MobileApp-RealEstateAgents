@@ -135,13 +135,11 @@ export const UserProvider = ({ children }: UserProviderProps) => {
           return;
         }
       } else {
-        // On web, HttpOnly cookies aren't visible in document.cookie
-        // If forceCheck is true (e.g., after login), skip the cookie check
-        // and attempt to fetch user - cookies will be sent automatically if present
+        // On web, HttpOnly cookies aren't visible in document.cookie.
+        // Even if we can't detect cookies client-side, attempt to fetch the user.
+        // The request will succeed if auth cookies exist and return 401 otherwise.
         if (!forceCheck && !hasAuthCookies()) {
-          setUser(null);
-          setIsAuthenticated(false);
-          return;
+          console.debug('UserContext: Auth cookies not detectable, attempting fetch anyway.');
         }
       }
 
