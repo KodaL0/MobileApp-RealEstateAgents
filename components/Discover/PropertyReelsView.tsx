@@ -62,21 +62,12 @@ export default function PropertyReelsView() {
       }
     } catch (err: any) {
       console.error('Error fetching feed:', err);
-      
-      // If 401 (unauthorized), fallback to generic properties
       if (err.response?.status === 401) {
-        try {
-          const response = await api.get('/properties/');
-          const data = response.data || [];
-          const featured = data.filter((p: any) => p.is_featured);
-          setProperties(featured.length ? featured : data);
-          setError(null);
-        } catch (fallbackErr) {
-          setError('Failed to load properties. Please try again.');
-        }
+        setError('Please log in to view your property feed.');
       } else {
         setError('Failed to load feed. Please try again.');
       }
+      setProperties([]);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -95,19 +86,9 @@ export default function PropertyReelsView() {
       if (isAuthenticated) {
         fetchFeed(1);
       } else {
-        // Fallback to generic properties for unauthenticated users
-        try {
-          setLoading(true);
-          const response = await api.get('/properties/');
-          const data = response.data || [];
-          const featured = data.filter((p: any) => p.is_featured);
-          setProperties(featured.length ? featured : data);
-        } catch (err) {
-          console.error('Error fetching properties:', err);
-          setError('Failed to load properties. Please try again.');
-        } finally {
-          setLoading(false);
-        }
+        setLoading(false);
+        setError('Please log in to view your property feed.');
+        setProperties([]);
       }
     };
 
