@@ -142,7 +142,8 @@ export default function AgentProfileScreen() {
     );
   }
 
-  const initial = profile.name?.charAt(0)?.toUpperCase() ?? profile.username.charAt(0).toUpperCase();
+  const displayName = (profile.name && profile.name.trim()) || profile.username || 'Agent';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -161,7 +162,7 @@ export default function AgentProfileScreen() {
             </View>
           )}
           <View style={styles.heroTextBlock}>
-            <Text style={styles.heroName}>{profile.name || profile.username}</Text>
+            <Text style={styles.heroName}>{displayName}</Text>
             <Text style={styles.heroSubtitle}>{profile.office || 'Licensed Agent'}</Text>
             <View style={styles.heroMetaRow}>
               <MapPin size={14} color="#fff" />
