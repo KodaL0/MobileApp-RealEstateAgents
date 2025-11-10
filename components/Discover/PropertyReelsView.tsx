@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import PropertyReelCard from './PropertyReelCard';
 import { api } from '@/config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUser } from '@/app/_userbase/UserContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -22,15 +22,7 @@ export default function PropertyReelsView() {
   const [nextPage, setNextPage] = useState<number | null>(2);
   const [hasMore, setHasMore] = useState(true);
   const flatListRef = useRef<FlatList>(null);
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('access_token');
-      return !!token;
-    } catch {
-      return false;
-    }
-  }, []);
+  const { isAuthenticated, isLoading: authLoading } = useUser();
 
   const fetchFeed = useCallback(async (page: number = 1) => {
     try {
@@ -75,25 +67,27 @@ export default function PropertyReelsView() {
   }, []);
 
   const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore && nextPage) {
+    if (!loadingMore && hasMore && nextPage && isAuthenticated) {
       fetchFeed(nextPage);
     }
-  }, [loadingMore, hasMore, nextPage, fetchFeed]);
+  }, [loadingMore, hasMore, nextPage, fetchFeed, isAuthenticated]);
 
   useEffect(() => {
-    const initializeFeed = async () => {
-      const isAuthenticated = await checkAuth();
-      if (isAuthenticated) {
-        fetchFeed(1);
-      } else {
-        setLoading(false);
-        setError('Please log in to view your property feed.');
-        setProperties([]);
-      }
-    };
+    if (authLoading) {
+      return;
+    }
 
-    initializeFeed();
-  }, [checkAuth, fetchFeed]);
+    if (isAuthenticated) {
+      fetchFeed(1);
+    } else {
+      setLoading(false);
+      setLoadingMore(false);
+      setError('Please log in to view your property feed.');
+      setProperties([]);
+      setHasMore(false);
+      setNextPage(null);
+    }
+  }, [authLoading, isAuthenticated, fetchFeed]);
 
   if (loading) {
     return (
