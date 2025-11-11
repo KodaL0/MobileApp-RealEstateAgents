@@ -29,6 +29,7 @@ export default function PropertyReelsView() {
   const propertiesRef = useRef<any[]>([]);
   const nextPageRef = useRef<number | null>(2);
   const hasMoreRef = useRef(true);
+  const cycleRef = useRef(0);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -39,12 +40,11 @@ export default function PropertyReelsView() {
 
   const fetchFeed = useCallback(
     async (page: number = 1, append: boolean = false) => {
-      // Prevent duplicate fetches
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
 
       try {
-        if (page === 1) {
+        if (!append) {
           setLoading(true);
         } else {
           setLoadingMore(true);
@@ -55,10 +55,26 @@ export default function PropertyReelsView() {
         const newProperties = response.results || [];
 
         if (newProperties.length > 0) {
+          let cycle = cycleRef.current;
+
+          if (!append) {
+            cycleRef.current = 0;
+            cycle = 0;
+          } else if (page === 1 && !response.next) {
+            cycleRef.current += 1;
+            cycle = cycleRef.current;
+          }
+
+          const decorated = newProperties.map((item: any, idx: number) => ({
+            ...item,
+            __cycle: cycle,
+            __listKey: `cycle-${cycle}-property-${item?.id ?? idx}`,
+          }));
+
           if (append) {
-            setProperties(prev => [...prev, ...newProperties]);
+            setProperties(prev => [...prev, ...decorated]);
           } else {
-            setProperties(newProperties);
+            setProperties(decorated);
           }
         } else if (!append && page === 1) {
           setProperties([]);
@@ -104,7 +120,6 @@ export default function PropertyReelsView() {
       const currentNextPage = nextPageRef.current;
       const currentHasMore = hasMoreRef.current;
 
-      // Prefetch when user is within 3 items of the end
       if (
         currentHasMore &&
         !isFetchingRef.current &&
@@ -165,7 +180,7 @@ export default function PropertyReelsView() {
         ref={flatListRef}
         data={properties}
         renderItem={({ item }) => <PropertyReelCard property={item} source="feed" />}
-        keyExtractor={(item, index) => `property-${item?.id ?? index}`}
+        keyExtractor={(item, index) => item?.__listKey ?? `property-${item?.id ?? index}-${index}`}
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToAlignment="start"
