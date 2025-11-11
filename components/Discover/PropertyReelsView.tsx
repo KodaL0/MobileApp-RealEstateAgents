@@ -44,6 +44,9 @@ export default function PropertyReelsView() {
       isFetchingRef.current = true;
 
       try {
+        console.log(
+          `[Feed] requesting page ${page} (append=${append}) | isAuthenticated=${isAuthenticated}`
+        );
         if (!append) {
           setLoading(true);
         } else {
@@ -76,8 +79,12 @@ export default function PropertyReelsView() {
           } else {
             setProperties(decorated);
           }
+          console.log(
+            `[Feed] loaded ${decorated.length} items for page ${page} (append=${append}) | cycle=${cycle}`
+          );
         } else if (!append && page === 1) {
           setProperties([]);
+          console.log('[Feed] initial load returned 0 items');
         }
 
         // Update pagination state
@@ -108,7 +115,7 @@ export default function PropertyReelsView() {
         isFetchingRef.current = false;
       }
     },
-    []
+    [isAuthenticated]
   );
 
   const onViewableItemsChanged = useCallback(
@@ -129,6 +136,12 @@ export default function PropertyReelsView() {
       ) {
         fetchFeed(currentNextPage, true);
       }
+
+      const currentItem = propertiesRef.current[index];
+      const itemId = currentItem?.id ?? 'unknown';
+      console.log(
+        `[Feed] user viewing index ${index} of ${total} | propertyId=${itemId} | cycle=${currentItem?.__cycle ?? 'n/a'}`
+      );
     },
     [isAuthenticated, fetchFeed]
   );
