@@ -11,7 +11,7 @@ import React, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, WS_BASE_URL } from '@/config/api';
 import { useUser } from '../../../_userbase/UserContext';
-import { Thread, Message } from '../types';
+import { Thread, Message } from '../../types';
 
 interface ChatContextValue {
   threads: Thread[];

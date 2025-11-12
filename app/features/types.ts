@@ -6,14 +6,14 @@ export interface PropertyImage {
 }
 
 export interface Owner {
-  id: string;
+  id: number | string;
   email: string;
   name?: string;
   username?: string;
 }
 
 export interface Property {
-  id: string;
+  id: number | string;
   title: string;
   description: string;
   price: number;
@@ -41,6 +41,7 @@ export interface Property {
   created_at: string;
   updated_at: string;
   images: PropertyImage[];
+  image?: string;
   // Structured location fields
   country?: string;
   region?: string;
@@ -55,6 +56,11 @@ export interface Property {
   view_count?: number;
   is_featured?: boolean;
   url?: string;
+}
+
+export interface FeedProperty extends Property {
+  match_score?: number | null;
+  slot_type?: 'personalized' | 'explore' | string | null;
 }
 
 // Utility function to normalize a single property object from API
@@ -114,6 +120,7 @@ export interface PublicProfileData {
   office?: string;
   avatar?: string;
   website?: string;
+  email?: string;
   phone?: string;
   // Property and connection data
   properties_count: number;
@@ -121,6 +128,11 @@ export interface PublicProfileData {
   connections_count: number;
   connection_status: 'connected' | 'pending_sent' | 'pending_received' | 'rejected' | 'none' | 'self';
   mutual_connections_count: number;
+}
+
+export interface PublicProfileResponse {
+  status: number;
+  profile: PublicProfileData;
 }
 
 // Chat system types

@@ -12,11 +12,14 @@ import PropertyReelCard from './PropertyReelCard';
 import { api } from '@/config/api';
 import { useUser } from '@/app/_userbase/UserContext';
 import type { ViewToken } from 'react-native';
+import type { FeedProperty } from '@/app/features/types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+type FeedListItem = FeedProperty & { __cycle?: number; __listKey?: string };
+
 export default function PropertyReelsView() {
-  const [properties, setProperties] = useState<any[]>([]);
+  const [properties, setProperties] = useState<FeedListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +29,7 @@ export default function PropertyReelsView() {
   const { isAuthenticated, isLoading: authLoading } = useUser();
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
   const isFetchingRef = useRef(false);
-  const propertiesRef = useRef<any[]>([]);
+  const propertiesRef = useRef<FeedListItem[]>([]);
   const nextPageRef = useRef<number | null>(2);
   const hasMoreRef = useRef(true);
   const cycleRef = useRef(0);

@@ -30,7 +30,7 @@ import { api } from '@/config/api';
 import { Alert } from 'react-native';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
-import { Property } from '@/app/features/chat/types';
+import type { FeedProperty } from '@/app/features/types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -40,7 +40,7 @@ export default function PropertyReelCard({
   onViewProperty,
   source,
 }: {
-  property: Property;
+  property: FeedProperty;
   onViewProperty?: () => void;
   source?: string;
 }) {

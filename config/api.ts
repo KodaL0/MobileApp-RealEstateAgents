@@ -3,6 +3,8 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import type { FeedProperty, PublicProfileData, PublicProfileResponse } from '@/app/features/types';
+import { normalizePropertyData } from '@/app/features/types';
 
 /**
  * Mobile API client for PropertPro backend.
@@ -191,8 +193,23 @@ export const api = {
     /**
      * Get public profile by username (if applicable).
      */
-    getPublicProfile: (username: string) =>
-      apiGet(`users/profiles/${username}`).then(res => res.data),
+    getPublicProfile: async (username: string): Promise<PublicProfileData> => {
+      const response = await apiGet<PublicProfileResponse>(`users/profiles/${username}`);
+      const profile = response.data?.profile;
+
+      if (!profile) {
+        throw new Error('Public profile response missing profile payload');
+      }
+
+      const publishedProperties = Array.isArray(profile.published_properties)
+        ? profile.published_properties.map(property => normalizePropertyData(property))
+        : [];
+
+      return {
+        ...profile,
+        published_properties: publishedProperties,
+      };
+    },
 
     /**
      * Email verification: verify email with token from email link
@@ -379,19 +396,38 @@ export const api = {
      * Returns paginated feed with match_score and slot_type
      * Requires authentication
      */
-    list: (params?: { page?: number; page_size?: number }) =>
-      apiGet<{ count: number; next: string | null; previous: string | null; results: any[] }>(
-        'feed/properties',
-        { params }
-      ).then(res => {
-        const d = res.data;
+    list: async (params?: { page?: number; page_size?: number }) => {
+      const response = await apiGet<{
+        count?: number;
+        next?: string | null;
+        previous?: string | null;
+        results?: FeedProperty[];
+      }>('feed/properties', { params });
+
+      const payload = response.data;
+
+      const rawResults: any[] = Array.isArray((payload as any)?.results)
+        ? (payload as any).results
+        : Array.isArray(payload)
+        ? (payload as any)
+        : [];
+
+      const results: FeedProperty[] = rawResults.map(item => {
+        const normalized = normalizePropertyData(item);
         return {
-          results: Array.isArray(d.results) ? d.results : [],
-          count: d.count || 0,
-          next: d.next,
-          previous: d.previous,
+          ...normalized,
+          match_score: typeof item?.match_score === 'number' ? item.match_score : null,
+          slot_type: item?.slot_type ?? null,
         };
-      }),
+      });
+
+      return {
+        results,
+        count: typeof payload?.count === 'number' ? payload.count : results.length,
+        next: payload?.next ?? null,
+        previous: payload?.previous ?? null,
+      };
+    },
   },
 
   // Analytics endpoints

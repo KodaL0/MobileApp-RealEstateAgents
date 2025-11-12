@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useChat } from '../../features/chat/context/ChatContext';
 import { useUser } from '../../_userbase/UserContext';
 import { Home, Clock, User } from 'lucide-react-native';
-import type { Thread } from '../../features/chat/types';
+import type { Thread } from '../../features/types';
 
 export default function ThreadList() {
   const router = useRouter();

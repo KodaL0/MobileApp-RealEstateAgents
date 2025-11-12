@@ -30,7 +30,7 @@ import {
 import { api } from '@/config/api';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
-import type { PublicProfileData, Property } from '@/app/features/chat/types';
+import type { PublicProfileData, Property } from '@/app/features/types';
 
 export default function AgentProfileScreen() {
   const router = useRouter();

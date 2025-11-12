@@ -14,7 +14,7 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import type { Message } from '../../features/chat/types';
+import type { Message } from '../../features/types';
 import { useChat } from '../../features/chat/context/ChatContext';
 import { useUser } from '../../_userbase/UserContext';
 import { useRequireAuth } from '../../_userbase/hooks/useRequireAuth';
