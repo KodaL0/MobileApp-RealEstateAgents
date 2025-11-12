@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Users, UserCircle } from 'lucide-react-native';
 
 import { api } from '@/config/api';
+import { useSmartBack } from '@/hooks/useSmartBack';
 import type { PublicProfileData } from '@/app/features/types';
 
 type ConnectionUser = {
@@ -31,6 +32,7 @@ export default function AgentConnectionsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ agentId?: string }>();
   const username = useMemo(() => params.agentId?.toString() ?? '', [params.agentId]);
+  const handleBack = useSmartBack();
 
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
   const [connections, setConnections] = useState<ConnectionUser[]>([]);
@@ -126,7 +128,7 @@ export default function AgentConnectionsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <ArrowLeft size={22} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>

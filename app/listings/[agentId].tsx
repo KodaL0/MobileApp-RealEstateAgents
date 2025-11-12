@@ -16,12 +16,14 @@ import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, MapPin } from 'lucide-react-native';
 
 import { api } from '@/config/api';
+import { useSmartBack } from '@/hooks/useSmartBack';
 import type { Property } from '@/app/features/types';
 
 export default function AgentListingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ agentId?: string }>();
   const username = useMemo(() => params.agentId?.toString() ?? '', [params.agentId]);
+  const handleBack = useSmartBack();
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -109,7 +111,7 @@ export default function AgentListingsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <ArrowLeft size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>

@@ -29,6 +29,7 @@ import {
 import { api } from '@/config/api';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
+import { useSmartBack } from '@/hooks/useSmartBack';
 import type { PublicProfileData } from '@/app/features/types';
 
 export default function AgentProfileScreen() {
@@ -42,6 +43,7 @@ export default function AgentProfileScreen() {
 
   const { getOrCreateDmThread } = useChat();
   const { isAuthenticated } = useUser();
+  const handleBack = useSmartBack();
 
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -147,7 +149,7 @@ export default function AgentProfileScreen() {
       <StatusBar style="light" />
 
       <View style={styles.hero}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <ArrowLeft size={22} color="#fff" />
         </TouchableOpacity>
         <View style={styles.heroContent}>
