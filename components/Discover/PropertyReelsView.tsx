@@ -130,8 +130,8 @@ export default function PropertyReelsView() {
       if (
         currentHasMore &&
         !isFetchingRef.current &&
-        total >= 10 &&
-        index >= total - 3 &&
+        total >= 5 &&
+        index >= total - 2 &&
         currentNextPage
       ) {
         fetchFeed(currentNextPage, true);
