@@ -20,39 +20,55 @@ const getShadow = () =>
   });
 
 export default function TabLayout() {
+  const tabBarStyle = IS_SMALL_SCREEN 
+    ? [styles.tabBar, styles.tabBarSmall, getShadow()]
+    : [styles.tabBar, getShadow()];
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#0F3460',
         tabBarInactiveTintColor: '#666',
-        tabBarStyle: [styles.tabBar, getShadow()],
+        tabBarStyle: tabBarStyle,
         tabBarLabelStyle: styles.label,
         tabBarShowLabel: !IS_SMALL_SCREEN,
       }}
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+        options={{ 
+          title: IS_SMALL_SCREEN ? '' : 'Home', 
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> 
+        }}
       />
       <Tabs.Screen
         name="search"
-        options={{ title: 'Search', tabBarIcon: ({ color, size }) => <Search color={color} size={size} /> }}
+        options={{ 
+          title: IS_SMALL_SCREEN ? '' : 'Search', 
+          tabBarIcon: ({ color, size }) => <Search color={color} size={size} /> 
+        }}
       />
       <Tabs.Screen
         name="map"
-        options={{ title: 'Map', tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} /> }}
+        options={{ 
+          title: IS_SMALL_SCREEN ? '' : 'Map', 
+          tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} /> 
+        }}
       />
       <Tabs.Screen
         name="chat"
         options={{
-          title: 'Chat',
+          title: IS_SMALL_SCREEN ? '' : 'Chat',
           tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <User color={color} size={size} /> }}
+        options={{ 
+          title: IS_SMALL_SCREEN ? '' : 'Profile', 
+          tabBarIcon: ({ color, size }) => <User color={color} size={size} /> 
+        }}
       />
     </Tabs>
   );
@@ -65,6 +81,11 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderTopWidth: 1,
     borderTopColor: '#eee',
+  },
+  tabBarSmall: {
+    height: 50,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   label: {
     fontFamily: 'Poppins-Medium',
