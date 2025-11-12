@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   bottomInfo: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.135,
+    bottom: SCREEN_HEIGHT * 0.07,
     left: 16,
     right: 100,
   },
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   locationText: {
     marginLeft: 6,
