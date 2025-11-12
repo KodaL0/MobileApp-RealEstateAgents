@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   photoCounter: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 50 : 30,
-    right: 20,
+    right: SCREEN_WIDTH * 0.15,
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   tagsContainer: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 50 : 30,
-    left: 16,
+    left: SCREEN_WIDTH * 0.15,
     flexDirection: 'row',
     gap: 8,
   },
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   bottomInfo: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.12,
+    bottom: SCREEN_HEIGHT * 0.06,
     left: 16,
     right: 100,
   },
