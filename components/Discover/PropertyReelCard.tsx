@@ -121,6 +121,21 @@ export default function PropertyReelCard({
     }
   };
 
+  const parseNumericValue = (value: number | string | null | undefined): number | null => {
+    if (value === null || value === undefined) return null;
+    const numeric = typeof value === 'string' ? parseFloat(value) : value;
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+
+  const bedroomsValue = parseNumericValue(property.bedrooms);
+  const bathroomsValue = parseNumericValue(property.bathrooms);
+  const areaValue = parseNumericValue(property.area);
+
+  const formatBathrooms = (value: number | null) => {
+    if (value === null) return null;
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  };
+
   // Navigation handler for the View button with source tracking
   const handleViewPress = () => {
     if (onViewProperty) {
@@ -492,31 +507,23 @@ export default function PropertyReelCard({
 
           {/* Beds/Baths/Area in one line */}
           <View style={styles.statsRow}>
-            {property.bedrooms !== null && property.bedrooms !== undefined && (
+            {bedroomsValue !== null && (
               <View style={styles.statPill}>
                 <Bed size={14} color="#fff" />
-                <Text style={styles.statText}>
-                  {property.bedrooms}
-                </Text>
+                <Text style={styles.statText}>{bedroomsValue.toString()}</Text>
               </View>
             )}
-            {property.bathrooms !== null && property.bathrooms !== undefined && (
+            {formatBathrooms(bathroomsValue) && (
               <View style={styles.statPill}>
                 <Bath size={14} color="#fff" />
-                <Text style={styles.statText}>
-                  {property.bathrooms % 1 === 0 
-                    ? property.bathrooms.toString() 
-                    : property.bathrooms.toFixed(1)}
-                </Text>
+                <Text style={styles.statText}>{formatBathrooms(bathroomsValue)}</Text>
               </View>
             )}
-            {property.area !== null && property.area !== undefined && (
+            {areaValue !== null && (
               <View style={styles.statPill}>
                 <Square size={14} color="#fff" />
                 <Text style={styles.statText}>
-                  {typeof property.area === 'number' 
-                    ? property.area.toLocaleString() 
-                    : property.area} m²
+                  {areaValue.toLocaleString()} m²
                 </Text>
               </View>
             )}
