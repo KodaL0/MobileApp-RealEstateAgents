@@ -1,8 +1,11 @@
 // File: app/(tabs)/_layout.tsx
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, Dimensions } from 'react-native';
 import { Home, Search, MapPin, MessageSquare, User } from 'lucide-react-native';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const IS_SMALL_SCREEN = SCREEN_WIDTH < 375 || SCREEN_HEIGHT < 667;
 
 const getShadow = () =>
   Platform.select({
@@ -25,6 +28,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#666',
         tabBarStyle: [styles.tabBar, getShadow()],
         tabBarLabelStyle: styles.label,
+        tabBarShowLabel: !IS_SMALL_SCREEN,
       }}
     >
       <Tabs.Screen
