@@ -33,8 +33,12 @@ import type { PublicProfileData } from '@/app/features/types';
 
 export default function AgentProfileScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ username?: string }>();
-  const username = useMemo(() => params.username?.toString() ?? '', [params.username]);
+  const params = useLocalSearchParams<{ username?: string | string[] }>();
+  const username = useMemo(() => {
+    const param = params.username;
+    if (!param) return '';
+    return Array.isArray(param) ? param[0] : param;
+  }, [params.username]);
 
   const { getOrCreateDmThread } = useChat();
   const { isAuthenticated } = useUser();

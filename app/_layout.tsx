@@ -200,6 +200,9 @@ function InnerApp() {
         <ChatProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="agent/[username]" />
+            <Stack.Screen name="listings/[agentId]" />
+            <Stack.Screen name="connections/[agentId]" />
             <Stack.Screen name="+not-found" options={{ title: 'Not Found' }} />
           </Stack>
         </ChatProvider>
