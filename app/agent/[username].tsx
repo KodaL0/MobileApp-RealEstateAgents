@@ -22,7 +22,6 @@ import {
   Mail,
   Home,
   Users,
-  Star,
   Share2,
   MessageCircle,
 } from 'lucide-react-native';
@@ -30,7 +29,7 @@ import {
 import { api } from '@/config/api';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
-import type { PublicProfileData, Property } from '@/app/features/types';
+import type { PublicProfileData } from '@/app/features/types';
 
 export default function AgentProfileScreen() {
   const router = useRouter();
@@ -41,7 +40,6 @@ export default function AgentProfileScreen() {
   const { isAuthenticated } = useUser();
 
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
-  const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +54,6 @@ export default function AgentProfileScreen() {
     try {
       const data = await api.auth.getPublicProfile(username);
       setProfile(data);
-      setProperties(Array.isArray(data?.published_properties) ? data.published_properties : []);
       setError(null);
     } catch (err: any) {
       console.error('Failed to load agent profile:', err);
@@ -75,10 +72,6 @@ export default function AgentProfileScreen() {
     await fetchProfile();
     setRefreshing(false);
   }, [fetchProfile]);
-
-  const handlePropertyPress = (property: Property) => {
-    router.push(`/property/${property.id}`);
-  };
 
   const handleOpenLink = (url?: string | null) => {
     if (!url) return;
@@ -200,28 +193,37 @@ export default function AgentProfileScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0F3460" />
         }
       >
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
+        {/* Compact Action Buttons */}
+        <View style={styles.actionButtonsRow}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push({
+              pathname: '/listings/[agentId]',
+              params: { agentId: profile.username },
+            } as never)}
+          >
             <Home size={20} color="#0F3460" />
-            <Text style={styles.statValue}>
-              {profile.properties_count ?? properties.length}
-            </Text>
-            <Text style={styles.statLabel}>Listings</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
+            <View style={styles.actionButtonContent}>
+              <Text style={styles.actionButtonValue}>
+                {profile.properties_count ?? 0}
+              </Text>
+              <Text style={styles.actionButtonLabel}>Listings</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push({
+              pathname: '/connections/[agentId]',
+              params: { agentId: profile.username },
+            } as never)}
+          >
             <Users size={20} color="#0F3460" />
-            <Text style={styles.statValue}>{profile.connections_count ?? 0}</Text>
-            <Text style={styles.statLabel}>Connections</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Star size={20} color="#0F3460" />
-            <Text style={styles.statValue}>
-              {profile.mutual_connections_count ?? 0}
-            </Text>
-            <Text style={styles.statLabel}>Mutual</Text>
-          </View>
+            <View style={styles.actionButtonContent}>
+              <Text style={styles.actionButtonValue}>{profile.connections_count ?? 0}</Text>
+              <Text style={styles.actionButtonLabel}>Connections</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.sectionCard}>
@@ -260,70 +262,6 @@ export default function AgentProfileScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Published Listings</Text>
-            <Text style={styles.sectionHint}>{properties.length} active</Text>
-          </View>
-
-          {properties.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No listings yet</Text>
-              <Text style={styles.emptySubtitle}>
-                This agent has not published any properties yet. Check back soon!
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.propertyList}>
-              {properties.map(property => {
-                const image =
-                  property.images?.[0]?.image ??
-                  property.image ??
-                  'https://via.placeholder.com/300x200?text=Property';
-                const price = Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'EUR',
-                  minimumFractionDigits: 0,
-                }).format(property.price || 0);
-
-                return (
-                  <TouchableOpacity
-                    key={property.id}
-                    style={styles.propertyCard}
-                    onPress={() => handlePropertyPress(property)}
-                  >
-                    <Image source={{ uri: image }} style={styles.propertyImage} />
-                    <View style={styles.propertyOverlay}>
-                      <View style={styles.propertyBadgeRow}>
-                        <View style={styles.propertyBadge}>
-                          <Text style={styles.propertyBadgeText}>
-                            {property.property_type || 'Listing'}
-                          </Text>
-                        </View>
-                        <View style={styles.propertyBadge}>
-                          <Text style={styles.propertyBadgeText}>
-                            {property.property_status === 'for_sale' ? 'For Sale' : 'For Rent'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.propertyTitle}>{property.title}</Text>
-                      <Text style={styles.propertyPrice}>{price}</Text>
-                      <View style={styles.propertyMetaRow}>
-                        <MapPin size={14} color="#E5E7EB" />
-                        <Text style={styles.propertyMetaText} numberOfLines={1}>
-                          {property.location ||
-                            [property.city, property.country].filter(Boolean).join(', ') ||
-                            'Location not provided'}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -438,46 +376,45 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    gap: 16,
+    gap: 12,
     paddingBottom: 40,
   },
-  statsCard: {
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 18,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
     shadowColor: '#0F172A',
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  statItem: {
+  actionButtonContent: {
     flex: 1,
-    alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
-  statValue: {
-    fontSize: 18,
+  actionButtonValue: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#0F172A',
   },
-  statLabel: {
-    fontSize: 12,
+  actionButtonLabel: {
+    fontSize: 13,
     color: '#6B7280',
-  },
-  statDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: '#E5E7EB',
-    height: '100%',
+    fontWeight: '500',
   },
   sectionCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
-    padding: 20,
-    gap: 12,
+    padding: 16,
+    gap: 10,
     shadowColor: '#0F172A',
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -505,14 +442,14 @@ const styles = StyleSheet.create({
   },
   contactGrid: {
     flexDirection: 'column',
-    gap: 12,
+    gap: 10,
   },
   contactButton: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -522,84 +459,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1F2937',
     flex: 1,
-  },
-  propertyList: {
-    gap: 14,
-  },
-  propertyCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#111827',
-    minHeight: 180,
-  },
-  propertyImage: {
-    width: '100%',
-    height: 180,
-  },
-  propertyOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: 16,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
-  },
-  propertyBadgeRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  propertyBadge: {
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  propertyBadgeText: {
-    color: '#E0E7FF',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  propertyTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  propertyPrice: {
-    color: '#F9FAFB',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  propertyMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  propertyMetaText: {
-    color: '#E5E7EB',
-    fontSize: 13,
-    flex: 1,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 16,
-    gap: 6,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
   },
   centerContent: {
     flex: 1,
