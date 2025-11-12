@@ -392,14 +392,6 @@ export default function PropertyReelCard({
             {property.title || 'Untitled Property'}
           </Text>
 
-          {/* Location */}
-          <View style={styles.locationRow}>
-            <MapPin size={16} color="#10b981" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {property.location || 'Unknown Location'}
-            </Text>
-          </View>
-
           {/* Price */}
           <View style={styles.priceRow}>
             <Text style={styles.price}>{formatPrice(property.price)}</Text>
@@ -407,6 +399,14 @@ export default function PropertyReelCard({
               {property.property_status === 'for_sale'
                 ? 'Purchase Price'
                 : '/month'}
+            </Text>
+          </View>
+
+          {/* Location */}
+          <View style={styles.locationRow}>
+            <MapPin size={16} color="#10b981" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {property.location || 'Unknown Location'}
             </Text>
           </View>
 
@@ -480,8 +480,8 @@ const styles = StyleSheet.create({
   },
   photoCounter: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
-    right: SCREEN_WIDTH * 0.15,
+    top: SCREEN_HEIGHT * 0.07,
+    right: 20,
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -494,8 +494,8 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
-    left: SCREEN_WIDTH * 0.15,
+    top: SCREEN_HEIGHT * 0.07,
+    left: 16,
     flexDirection: 'row',
     gap: 8,
   },
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   bottomInfo: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.06,
+    bottom: SCREEN_HEIGHT * 0.15,
     left: 16,
     right: 100,
   },
@@ -560,18 +560,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#d1d5db',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   locationText: {
     marginLeft: 6,
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 12,
+    marginBottom: 8,
     gap: 8,
   },
   price: {
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginTop: 4,
   },
   statPill: {
     flexDirection: 'row',
