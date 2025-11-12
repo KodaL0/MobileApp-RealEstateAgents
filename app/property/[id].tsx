@@ -27,7 +27,10 @@ import {
   Calendar,
   Layers,
 } from 'lucide-react-native';
-import SimilarProperties from '@/components/property/SimilarProperties';
+import PropertyDocuments from '@/components/property/PropertyDocuments';
+import PropertyMapView from '@/components/property/PropertyMapView';
+import ChatButton from '@/components/property/ChatButton';
+import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../../config/api'; // adjust path if needed
 
 const { width } = Dimensions.get('window');
@@ -180,6 +183,9 @@ function normalizePropertyDetail(item: any) {
       ? Number(item.longitude)
       : null;
 
+  // 17) Documents
+  const documents = Array.isArray(item.documents) ? item.documents : [];
+
   return {
     id,
     images,
@@ -213,6 +219,7 @@ function normalizePropertyDetail(item: any) {
     isFavourite,
     latitude,
     longitude,
+    documents,
   };
 }
 
@@ -244,7 +251,7 @@ export default function PropertyDetailScreen() {
 
   const [property, setProperty] = useState<any>(null);
   const [isFavourite, setIsFavourite] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -264,7 +271,7 @@ export default function PropertyDetailScreen() {
         if (rawData.is_favourite !== undefined) {
           setIsFavourite(Boolean(rawData.is_favourite));
         }
-        setSelectedImage(0);
+        setCurrentImageIndex(0);
       } catch (e) {
         console.error('Error fetching property detail:', e);
         if (isMounted) setError('Failed to load property details.');
@@ -326,14 +333,10 @@ export default function PropertyDetailScreen() {
     isPublished,
     latitude,
     longitude,
+    documents,
   } = property;
 
-  // Image slideshow logic
   const imgCount = images.length;
-  const rawCurrent = images[selectedImage] || '';
-  const imageUri = rawCurrent.startsWith('http')
-    ? rawCurrent
-    : `https://api.propertpro.com${rawCurrent}`;
 
   // Contact tracking handlers
   const handlePhoneClick = async () => {
@@ -405,17 +408,9 @@ export default function PropertyDetailScreen() {
     );
   };
 
-  const goPrev = (e: any) => {
-    e.stopPropagation?.();
-    if (imgCount > 0) {
-      setSelectedImage(i => (i - 1 + imgCount) % imgCount);
-    }
-  };
-  const goNext = (e: any) => {
-    e.stopPropagation?.();
-    if (imgCount > 0) {
-      setSelectedImage(i => (i + 1) % imgCount);
-    }
+  const handleImageScroll = (event: any) => {
+    const index = Math.round(event.nativeEvent.contentOffset.x / width);
+    setCurrentImageIndex(index);
   };
 
   return (
@@ -434,107 +429,89 @@ export default function PropertyDetailScreen() {
           </View>
         )}
 
-        {/* Main image & overlays */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.mainImage}
-            resizeMode="cover"
-            onError={e => console.error('Image load failed:', imageUri)}
-          />
-          <View style={styles.imageOverlay}>
-            <View style={styles.header}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => router.back()}
-              >
-                <ArrowLeft size={24} color="#fff" />
-              </TouchableOpacity>
-              <View style={styles.headerButtons}>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={async () => {
-                    try {
-                      const response = await api.properties.toggleFavorite(property.id);
-                      setIsFavourite(response.is_favourite || false);
-                    } catch (e) {
-                      console.error('Failed to toggle favorite:', e);
-                      Alert.alert('Error', 'Failed to update favorite. Please try again.');
-                    }
-                  }}
-                >
-                  <Heart
-                    size={24}
-                    color="#fff"
-                    fill={isFavourite ? '#FF6B6B' : 'transparent'}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-                  <Share size={24} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {imgCount > 1 && (
-              <View style={styles.imageCountBadge}>
-                <Text style={styles.imageCountText}>
-                  {selectedImage + 1}/{imgCount}
-                </Text>
-              </View>
-            )}
-
-            {imgCount > 1 && (
-              <>
-                <TouchableOpacity
-                  style={styles.arrowLeft}
-                  onPress={goPrev}
-                  activeOpacity={0.7}
-                >
-                  <ArrowLeft size={24} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.arrowRight}
-                  onPress={goNext}
-                  activeOpacity={0.7}
-                >
-                  <ArrowRight size={24} color="#fff" />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* Thumbnails */}
-        {imgCount > 1 && (
+        {/* Reel-style Image Gallery */}
+        <View style={styles.imageGalleryContainer}>
           <ScrollView
             horizontal
+            pagingEnabled
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.thumbnailContainer}
+            onScroll={handleImageScroll}
+            scrollEventThrottle={16}
+            style={styles.imageScroll}
           >
-            {images.map((imgRaw: string, index: number) => {
-              const uri = imgRaw.startsWith('http')
-                ? imgRaw
-                : `https://api.propertpro.com${imgRaw}`;
-              const isSelected = index === selectedImage;
-              return (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => setSelectedImage(index)}
-                  style={[
-                    styles.thumbnail,
-                    isSelected && styles.thumbnailSelected,
-                  ]}
-                >
-                  <Image
-                    source={{ uri }}
-                    style={styles.thumbnailImage}
-                    resizeMode="cover"
-                  />
-                </TouchableOpacity>
-              );
-            })}
+            {images.length > 0 ? (
+              images.map((uri: string, index: number) => {
+                const imageUri = uri.startsWith('http')
+                  ? uri
+                  : `https://api.propertpro.com${uri}`;
+                return (
+                  <View key={index} style={styles.imageWrapper}>
+                    {/* Blurred background */}
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={StyleSheet.absoluteFillObject}
+                      blurRadius={25}
+                      resizeMode="cover"
+                    />
+                    {/* Main image */}
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.reelImage}
+                      resizeMode="contain"
+                    />
+                    {/* Photo counter */}
+                    {imgCount > 1 && (
+                      <View style={styles.photoCounter}>
+                        <Text style={styles.photoCounterText}>
+                          {index + 1}/{imgCount}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.imageWrapper}>
+                <View style={styles.noImagePlaceholder}>
+                  <Text style={styles.noImageText}>No images available</Text>
+                </View>
+              </View>
+            )}
           </ScrollView>
-        )}
+
+          {/* Header overlay */}
+          <View style={styles.imageHeader}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <ArrowLeft size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={async () => {
+                  try {
+                    const response = await api.properties.toggleFavorite(property.id);
+                    setIsFavourite(response.is_favourite || false);
+                  } catch (e) {
+                    console.error('Failed to toggle favorite:', e);
+                    Alert.alert('Error', 'Failed to update favorite. Please try again.');
+                  }
+                }}
+              >
+                <Heart
+                  size={24}
+                  color="#fff"
+                  fill={isFavourite ? '#FF6B6B' : 'transparent'}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+                <Share size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
         {/* Content */}
         <View style={styles.contentContainer}>
@@ -574,58 +551,69 @@ export default function PropertyDetailScreen() {
             <Text style={styles.locationText}>{location}</Text>
           </View>
 
-          {/* --- MOVED: Property Details before Description --- */}
+          {/* Property Details - Improved UI */}
           <View style={styles.separator} />
           <Text style={styles.sectionTitle}>Property Details</Text>
 
-          <View style={styles.detailRow}>
-            <Calendar size={16} color="#666" />
-            <Text style={styles.detailText}>
-              Year Built: {yearBuilt || 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Layers size={16} color="#666" />
-            <Text style={styles.detailText}>
-              Floor Level:{' '}
-              {floorLevel ? formatOrdinal(floorLevel) : 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Total Floors:</Text>
-            <Text style={styles.detailText}>
-              {totalFloors || 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <MapPin size={16} color="#666" />
-            <Text style={styles.detailText}>
-              Lot Size: {lotSize ? `${lotSize} m²` : 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Parking Spaces:</Text>
-            <Text style={styles.detailText}>
-              {parkingSpaces != null ? parkingSpaces : 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Energy Rating:</Text>
-            <Text style={styles.detailText}>
-              {energyRating || 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Construction:</Text>
-            <Text style={styles.detailText}>
-              {constructionMaterial || 'N/A'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Calendar size={16} color="#666" />
-            <Text style={styles.detailText}>
-              Available From: {availableFrom || 'N/A'}
-            </Text>
+          <View style={styles.detailsGrid}>
+            {yearBuilt && (
+              <View style={styles.detailCard}>
+                <Calendar size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Year Built</Text>
+                <Text style={styles.detailCardValue}>{yearBuilt}</Text>
+              </View>
+            )}
+            {floorLevel && (
+              <View style={styles.detailCard}>
+                <Layers size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Floor Level</Text>
+                <Text style={styles.detailCardValue}>{formatOrdinal(floorLevel)}</Text>
+              </View>
+            )}
+            {totalFloors && (
+              <View style={styles.detailCard}>
+                <Layers size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Total Floors</Text>
+                <Text style={styles.detailCardValue}>{totalFloors}</Text>
+              </View>
+            )}
+            {lotSize && (
+              <View style={styles.detailCard}>
+                <MapPin size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Lot Size</Text>
+                <Text style={styles.detailCardValue}>{lotSize} m²</Text>
+              </View>
+            )}
+            {parkingSpaces != null && parkingSpaces > 0 && (
+              <View style={styles.detailCard}>
+                <MapPin size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Parking</Text>
+                <Text style={styles.detailCardValue}>{parkingSpaces}</Text>
+              </View>
+            )}
+            {energyRating && (
+              <View style={styles.detailCard}>
+                <Calendar size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Energy Rating</Text>
+                <Text style={styles.detailCardValue}>{energyRating}</Text>
+              </View>
+            )}
+            {constructionMaterial && (
+              <View style={styles.detailCard}>
+                <Layers size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Construction</Text>
+                <Text style={styles.detailCardValue} numberOfLines={2}>
+                  {constructionMaterial}
+                </Text>
+              </View>
+            )}
+            {availableFrom && (
+              <View style={styles.detailCard}>
+                <Calendar size={20} color="#0F3460" />
+                <Text style={styles.detailCardLabel}>Available From</Text>
+                <Text style={styles.detailCardValue}>{availableFrom}</Text>
+              </View>
+            )}
           </View>
 
           {/* Description */}
@@ -757,16 +745,25 @@ export default function PropertyDetailScreen() {
             </>
           )}
 
-          {/* Location Map Placeholder or actual map if you integrate */}
+          {/* Property Documents */}
+          {documents && documents.length > 0 && (
+            <>
+              <View style={styles.separator} />
+              <PropertyDocuments documents={documents} />
+            </>
+          )}
+
+          {/* Location Map */}
           {(latitude != null && longitude != null) && (
             <>
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Location</Text>
-              <View style={styles.mapPlaceholder}>
-                <Text style={styles.mapPlaceholderText}>
-                  Map: {latitude}, {longitude}
-                </Text>
-              </View>
+              <PropertyMapView
+                latitude={latitude}
+                longitude={longitude}
+                title={title}
+                location={location}
+              />
               <View style={styles.detailRow}>
                 <MapPin size={16} color="#666" />
                 <Text style={styles.detailText}>{location}</Text>
@@ -805,6 +802,16 @@ export default function PropertyDetailScreen() {
             </Text>
           )}
 
+          {/* Chat Button */}
+          {owner && (
+            <View style={styles.chatButtonContainer}>
+              <ChatButton
+                sellerId={owner.id}
+                propertyId={property.id}
+                title={title}
+              />
+            </View>
+          )}
 
           {/* Agent Info */}
           {agent && (
@@ -872,11 +879,6 @@ export default function PropertyDetailScreen() {
             </>
           )}
 
-          {/* SimilarProperties */}
-          <View style={styles.separator} />
-          <SimilarProperties
-            currentPropertyId={property.id}
-          />
         </View>
       </ScrollView>
 
@@ -896,24 +898,11 @@ export default function PropertyDetailScreen() {
           </Text>
         </View>
         {owner && (
-          <TouchableOpacity
-            style={styles.scheduleButton}
-            onPress={() => {
-              router.push({
-                pathname: '/chat',
-                params: {
-                  ownerId: String(owner.id),
-                  propertyId: String(property.id),
-                  title: title,
-                },
-              });
-            }}
-          >
-            <MessageSquare size={16} color="#fff" />
-            <Text style={styles.scheduleButtonText}>
-              Message Owner
-            </Text>
-          </TouchableOpacity>
+          <ChatButton
+            sellerId={owner.id}
+            propertyId={property.id}
+            title={title}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -947,25 +936,62 @@ const styles = StyleSheet.create({
     color: '#856404',
     fontFamily: 'Poppins-Regular',
   },
-  imageContainer: {
+  imageGalleryContainer: {
     width: '100%',
-    height: width * 0.6,
+    height: width * 0.75,
     position: 'relative',
-    backgroundColor: '#EEE',
+    backgroundColor: '#000',
   },
-  mainImage: {
+  imageScroll: {
+    flex: 1,
+  },
+  imageWrapper: {
+    width: width,
+    height: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reelImage: {
     width: '100%',
     height: '100%',
   },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+  photoCounter: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  header: {
+  photoCounterText: {
+    color: '#fff',
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
+  },
+  noImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EEE',
+  },
+  noImageText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: '#666',
+  },
+  imageHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    zIndex: 10,
   },
   backButton: {
     width: 40,
@@ -1001,41 +1027,37 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     fontSize: 12,
   },
-  arrowLeft: {
-    position: 'absolute',
-    top: '45%',
-    left: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 20,
-    padding: 6,
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
   },
-  arrowRight: {
-    position: 'absolute',
-    top: '45%',
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 20,
-    padding: 6,
+  detailCard: {
+    width: '47%',
+    margin: 6,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  thumbnailContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+  detailCardLabel: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
+    color: '#666',
+    marginTop: 8,
+    marginBottom: 4,
   },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    overflow: 'hidden',
+  detailCardValue: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: '#0F3460',
+    textAlign: 'center',
   },
-  thumbnailSelected: {
-    borderColor: '#0F3460',
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
+  chatButtonContainer: {
+    marginTop: 16,
+    marginBottom: 8,
   },
   contentContainer: {
     padding: 16,
@@ -1154,20 +1176,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  mapPlaceholder: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#EEE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  mapPlaceholderText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#666',
-  },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1272,20 +1280,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     fontSize: 12,
     color: '#666',
-  },
-  scheduleButton: {
-    backgroundColor: '#0F3460',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scheduleButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#fff',
-    marginLeft: 8,
   },
 });
