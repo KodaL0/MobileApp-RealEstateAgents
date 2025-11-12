@@ -35,6 +35,7 @@ export default function ChatThreadPage() {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
+  const hasFetchedRef = useRef<string | null>(null);
 
   // Find the thread object
   const thread = threads.find(t => t.id === threadId);
@@ -54,10 +55,17 @@ export default function ChatThreadPage() {
 
   // Fetch initial messages if not present
   useEffect(() => {
+    if (!threadId) return;
+    
+    // Skip if already fetched for this threadId or if messages exist
+    if (hasFetchedRef.current === threadId || messages[threadId]?.length) {
+      return;
+    }
+    
     let isMounted = true;
+    hasFetchedRef.current = threadId;
+    
     const loadInitial = async () => {
-      if (!threadId) return;
-      if (messages[threadId]?.length) return; // already have
       try {
         const res = await apiClient.get<{ results: Message[] }>(`chat/${threadId}/messages/?limit=30`);
         if (!isMounted) return;
@@ -65,13 +73,25 @@ export default function ChatThreadPage() {
         setMessages(prev => ({ ...prev, [threadId]: fetched }));
       } catch (e) {
         console.warn('Failed to load messages', e);
+        // Reset flag on error so we can retry
+        if (isMounted) {
+          hasFetchedRef.current = null;
+        }
       }
     };
+    
     loadInitial();
+    
     return () => {
       isMounted = false;
+      // Reset fetch flag when threadId changes (cleanup)
+      if (hasFetchedRef.current === threadId) {
+        hasFetchedRef.current = null;
+      }
     };
-  }, [threadId, messages, setMessages]);
+    // Only depend on threadId - messages check is inside the effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
 
   // Figure out who we're sending *to* -- if last message was from me, flip
   const getRecipientId = (): number => {
