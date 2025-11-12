@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import {
   Heart,
@@ -51,6 +52,10 @@ export default function PropertyReelCard({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+  const lastTap = useRef<number>(0);
   const { getOrCreateThread, threads } = useChat();
   const { isAuthenticated, user } = useUser();
   const owner = property?.owner ?? {};
@@ -124,6 +129,54 @@ export default function PropertyReelCard({
       const queryParams = source ? `?source=${source}` : '';
       router.push(`/property/${property.id}${queryParams}`);
     }
+  };
+
+  // Handle title press to navigate to property page
+  const handleTitlePress = () => {
+    handleViewPress();
+  };
+
+  // Double tap handler for favorite animation
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+
+    if (lastTap.current && now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // Double tap detected
+      if (!isLiked) {
+        handleFavorite();
+      }
+      triggerHeartAnimation();
+    } else {
+      lastTap.current = now;
+    }
+  };
+
+  // Heart animation trigger
+  const triggerHeartAnimation = () => {
+    setShowHeartAnimation(true);
+    heartScale.setValue(0);
+    heartOpacity.setValue(1);
+
+    Animated.parallel([
+      Animated.spring(heartScale, {
+        toValue: 1.2,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.delay(200),
+        Animated.timing(heartOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
+      setShowHeartAnimation(false);
+      heartScale.setValue(0);
+    });
   };
 
   // Favorite handler with API integration and success message
@@ -286,6 +339,29 @@ export default function PropertyReelCard({
           ))}
         </ScrollView>
 
+        {/* Double tap overlay for favorite */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={handleDoubleTap}
+          style={styles.doubleTapOverlay}
+        />
+
+        {/* Heart animation overlay */}
+        {showHeartAnimation && (
+          <Animated.View
+            style={[
+              styles.heartAnimation,
+              {
+                opacity: heartOpacity,
+                transform: [{ scale: heartScale }],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Heart size={80} color="#FF385C" fill="#FF385C" />
+          </Animated.View>
+        )}
+
         {/* Gradient overlay */}
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
@@ -382,15 +458,19 @@ export default function PropertyReelCard({
 
         {/* Bottom Info - Always visible */}
         <View style={styles.bottomInfo}>
-          {/* Agent Name */}
+          {/* Agent Name - Clickable */}
           {agentName && (
-            <Text style={styles.agentName}>{agentName}</Text>
+            <TouchableOpacity onPress={handleAgentProfilePress} activeOpacity={0.7}>
+              <Text style={styles.agentName}>{agentName}</Text>
+            </TouchableOpacity>
           )}
 
-          {/* Full Title */}
-          <Text style={styles.title}>
-            {property.title || 'Untitled Property'}
-          </Text>
+          {/* Full Title - Clickable */}
+          <TouchableOpacity onPress={handleTitlePress} activeOpacity={0.7}>
+            <Text style={styles.title}>
+              {property.title || 'Untitled Property'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Price */}
           <View style={styles.priceRow}>
@@ -461,6 +541,24 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
   },
+  doubleTapOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+  },
+  heartAnimation: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -40,
+    marginTop: -40,
+    zIndex: 1000,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   imageWrapper: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
@@ -515,6 +613,7 @@ const styles = StyleSheet.create({
     bottom: SCREEN_HEIGHT * 0.22,
     alignItems: 'center',
     gap: 22,
+    zIndex: 10,
   },
   chatButton: {
     backgroundColor: 'rgba(0,0,0,0.55)',
@@ -555,6 +654,7 @@ const styles = StyleSheet.create({
     bottom: SCREEN_HEIGHT * 0.07,
     left: 16,
     right: 100,
+    zIndex: 10,
   },
   agentName: {
     fontSize: 14,
