@@ -8,6 +8,7 @@ import {
   Text,
   StatusBar,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import PropertyReelCard from './PropertyReelCard';
 import { api } from '@/config/api';
 import { useUser } from '@/app/_userbase/UserContext';
@@ -33,6 +34,8 @@ export default function PropertyReelsView() {
   const nextPageRef = useRef<number | null>(2);
   const hasMoreRef = useRef(true);
   const cycleRef = useRef(0);
+  const hasInitializedRef = useRef(false);
+  const scrollOffsetRef = useRef<number>(0);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -147,12 +150,21 @@ export default function PropertyReelsView() {
     [isAuthenticated, fetchFeed]
   );
 
+  // Initial fetch - only on mount and auth state change
   useEffect(() => {
     if (authLoading) return;
 
     if (isAuthenticated) {
-      fetchFeed(1, false);
+      // Only fetch if we haven't initialized yet
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        fetchFeed(1, false);
+      }
     } else {
+      // Reset only if auth state changes to unauthenticated
+      if (hasInitializedRef.current) {
+        hasInitializedRef.current = false;
+      }
       setLoading(false);
       setLoadingMore(false);
       setError('Please log in to view your property feed.');
@@ -160,7 +172,21 @@ export default function PropertyReelsView() {
       setHasMore(false);
       setNextPage(null);
     }
-  }, [authLoading, isAuthenticated, fetchFeed]);
+    // Only depend on auth state, not fetchFeed to prevent refetch on navigation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated]);
+
+  // Handle screen focus - don't refetch, just ensure we have data
+  useFocusEffect(
+    useCallback(() => {
+      // When screen comes into focus, don't refetch if we already have data
+      // This prevents refetching when navigating back from agent profile
+      if (isAuthenticated && !authLoading && properties.length === 0 && !loading && !hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        fetchFeed(1, false);
+      }
+    }, [isAuthenticated, authLoading, properties.length, loading, fetchFeed])
+  );
 
   if (loading) {
     return (
@@ -202,6 +228,10 @@ export default function PropertyReelsView() {
         snapToInterval={SCREEN_HEIGHT}
         viewabilityConfig={viewabilityConfig.current}
         onViewableItemsChanged={onViewableItemsChanged}
+        onScroll={(event) => {
+          scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
         getItemLayout={(data, index) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
@@ -211,6 +241,9 @@ export default function PropertyReelsView() {
         initialNumToRender={2}
         maxToRenderPerBatch={2}
         removeClippedSubviews={true}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+        }}
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footerLoader}>
