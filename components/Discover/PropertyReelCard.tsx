@@ -56,6 +56,8 @@ export default function PropertyReelCard({
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
   const lastTap = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const touchStartX = useRef<number>(0);
   const { getOrCreateThread, threads } = useChat();
   const { isAuthenticated, user } = useUser();
   const owner = property?.owner ?? {};
@@ -151,8 +153,29 @@ export default function PropertyReelCard({
     handleViewPress();
   };
 
-  // Double tap handler for favorite animation
-  const handleDoubleTap = () => {
+  // Handle touch start to detect taps vs swipes
+  const handleTouchStart = (event: any) => {
+    const touch = event.nativeEvent.touches[0];
+    if (touch) {
+      touchStartY.current = touch.pageY;
+      touchStartX.current = touch.pageX;
+    }
+  };
+
+  // Handle touch end to detect taps vs swipes
+  const handleTouchEnd = (event: any) => {
+    const touch = event.nativeEvent.changedTouches?.[0];
+    if (!touch) return;
+
+    const deltaY = Math.abs(touch.pageY - touchStartY.current);
+    const deltaX = Math.abs(touch.pageX - touchStartX.current);
+    
+    // If significant movement (>15px), it's a swipe - don't handle as tap
+    if (deltaY > 15 || deltaX > 15) {
+      return;
+    }
+
+    // It's a tap, check for double tap
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
 
@@ -306,7 +329,13 @@ export default function PropertyReelCard({
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
-      <View style={styles.container}>
+      <View 
+        style={styles.container}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onStartShouldSetResponder={() => false}
+        onMoveShouldSetResponder={() => false}
+      >
         {/* Horizontal image scroll with blurred background */}
         <ScrollView
           horizontal
@@ -353,13 +382,6 @@ export default function PropertyReelCard({
             </View>
           ))}
         </ScrollView>
-
-        {/* Double tap overlay for favorite */}
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={handleDoubleTap}
-          style={styles.doubleTapOverlay}
-        />
 
         {/* Heart animation overlay */}
         {showHeartAnimation && (
