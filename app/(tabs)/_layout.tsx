@@ -5,7 +5,7 @@ import { StyleSheet, Platform, Dimensions } from 'react-native';
 import { Home, Search, MapPin, MessageSquare, User } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const IS_SMALL_SCREEN = SCREEN_WIDTH < 375 || SCREEN_HEIGHT < 667;
+const IS_SMALL_SCREEN = SCREEN_WIDTH < 450 || SCREEN_HEIGHT < 900;
 
 const getShadow = () =>
   Platform.select({
