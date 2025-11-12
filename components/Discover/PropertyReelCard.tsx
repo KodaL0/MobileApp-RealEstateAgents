@@ -19,6 +19,8 @@ import {
   UserCircle,
   MessageCircle,
   Share,
+  Bed,
+  Bath,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +29,7 @@ import { api } from '@/config/api';
 import { Alert } from 'react-native';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
+import { Property } from '@/app/features/chat/types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -36,44 +39,31 @@ export default function PropertyReelCard({
   onViewProperty,
   source,
 }: {
-  property: any;
+  property: Property;
   onViewProperty?: () => void;
   source?: string;
 }) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(property.is_favourite || false);
   const [favoriteCount, setFavoriteCount] = useState<number>(() => {
-    const count =
-      typeof property?.favorites_count === 'number'
-        ? property.favorites_count
-        : typeof property?.favourites_count === 'number'
-        ? property.favourites_count
-        : typeof property?.favorite_count === 'number'
-        ? property.favorite_count
-        : 0;
-    return count ?? 0;
+    return property?.favorites_count ?? 0;
   });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
-  const [showMore, setShowMore] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const { getOrCreateThread, threads } = useChat();
   const { isAuthenticated, user } = useUser();
   const owner = property?.owner ?? {};
-  const ownerIdValue =
-    owner?.id ??
-    property?.owner_id ??
-    property?.ownerId ??
-    null;
+  const ownerIdValue = owner?.id ?? null;
   const ownerId =
     ownerIdValue !== null && ownerIdValue !== undefined
       ? Number(ownerIdValue)
       : NaN;
+  // Agent name: prefer name, fallback to username
+  const agentName: string | null =
+    owner?.name ?? owner?.username ?? null;
   const ownerUsername: string | null =
-    owner?.username ??
-    property?.owner_username ??
-    property?.ownerUsername ??
-    null;
+    owner?.username ?? null;
 
   const getValidUrl = (uri?: string) => {
     if (!uri) return 'https://via.placeholder.com/800x600?text=No+Image';
@@ -99,7 +89,7 @@ export default function PropertyReelCard({
             typeof img === 'string' ? getValidUrl(img) : getValidUrl(img.image)
           )
           .filter(Boolean)
-      : [getValidUrl(property.image_url)];
+      : [getValidUrl()];
 
   const handleScroll = (event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
@@ -302,7 +292,7 @@ export default function PropertyReelCard({
           style={styles.gradient}
         />
 
-        {/* Tags */}
+        {/* Tags - aligned with photo counter */}
         <View style={styles.tagsContainer}>
           <View style={[styles.tag, { backgroundColor: '#111827' }]}>
             <Text style={styles.tagText}>
@@ -312,7 +302,7 @@ export default function PropertyReelCard({
           <View
             style={[
               styles.tag,
-              { backgroundColor: getCountryColor(property.country) },
+              { backgroundColor: getCountryColor(property.country || '') },
             ]}
           >
             <Text style={styles.tagText}>{property.country || 'Unknown'}</Text>
@@ -336,7 +326,7 @@ export default function PropertyReelCard({
           </View>
         </View>
 
-        {/* Right side actions (chat above all others) */}
+        {/* Right side actions - moved lower */}
         <View style={styles.sideActions}>
           {/* Chat Button */}
           <TouchableOpacity
@@ -390,59 +380,67 @@ export default function PropertyReelCard({
           </TouchableOpacity>
         </View>
 
-        {/* Bottom Info */}
+        {/* Bottom Info - Always visible */}
         <View style={styles.bottomInfo}>
-          <Text style={styles.title} numberOfLines={2}>
+          {/* Agent Name */}
+          {agentName && (
+            <Text style={styles.agentName}>{agentName}</Text>
+          )}
+
+          {/* Full Title */}
+          <Text style={styles.title}>
             {property.title || 'Untitled Property'}
           </Text>
 
-          {showMore && (
-            <>
-              <View style={styles.locationRow}>
-                <MapPin size={16} color="#10b981" />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {property.location || 'Unknown Location'}
-                </Text>
-              </View>
-
-              <View style={styles.priceRow}>
-                <Text style={styles.price}>{formatPrice(property.price)}</Text>
-                <Text style={styles.priceLabel}>
-                  {property.property_status === 'for_sale'
-                    ? 'Purchase Price'
-                    : '/month'}
-                </Text>
-              </View>
-
-              <View style={styles.statsRow}>
-                <View style={styles.statPill}>
-                  <Square size={14} color="#fff" />
-                  <Text style={styles.statText}>
-                    {property.area ?? property.size ?? '—'} m²
-                  </Text>
-                </View>
-                <View style={styles.statPill}>
-                  <ArrowUpCircle size={14} color="#fff" />
-                  <Text style={styles.statText}>
-                    Floor {property.floor_level ?? '—'}
-                  </Text>
-                </View>
-                <View style={styles.statPill}>
-                  <Layers size={14} color="#fff" />
-                  <Text style={styles.statText}>
-                    {property.total_floors ?? '—'} Floors
-                  </Text>
-                </View>
-              </View>
-            </>
-          )}
-
-          {/* Toggle "Show more" */}
-          <TouchableOpacity onPress={() => setShowMore(!showMore)}>
-            <Text style={styles.showMoreText}>
-              {showMore ? 'Show less' : 'Show more'}
+          {/* Location */}
+          <View style={styles.locationRow}>
+            <MapPin size={16} color="#10b981" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {property.location || 'Unknown Location'}
             </Text>
-          </TouchableOpacity>
+          </View>
+
+          {/* Price */}
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(property.price)}</Text>
+            <Text style={styles.priceLabel}>
+              {property.property_status === 'for_sale'
+                ? 'Purchase Price'
+                : '/month'}
+            </Text>
+          </View>
+
+          {/* Beds/Baths/Area in one line */}
+          <View style={styles.statsRow}>
+            {property.bedrooms !== null && property.bedrooms !== undefined && (
+              <View style={styles.statPill}>
+                <Bed size={14} color="#fff" />
+                <Text style={styles.statText}>
+                  {property.bedrooms}
+                </Text>
+              </View>
+            )}
+            {property.bathrooms !== null && property.bathrooms !== undefined && (
+              <View style={styles.statPill}>
+                <Bath size={14} color="#fff" />
+                <Text style={styles.statText}>
+                  {property.bathrooms % 1 === 0 
+                    ? property.bathrooms.toString() 
+                    : property.bathrooms.toFixed(1)}
+                </Text>
+              </View>
+            )}
+            {property.area !== null && property.area !== undefined && (
+              <View style={styles.statPill}>
+                <Square size={14} color="#fff" />
+                <Text style={styles.statText}>
+                  {typeof property.area === 'number' 
+                    ? property.area.toLocaleString() 
+                    : property.area} m²
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -482,7 +480,7 @@ const styles = StyleSheet.create({
   },
   photoCounter: {
     position: 'absolute',
-    top: 50,
+    top: Platform.OS === 'ios' ? 50 : 30,
     right: 20,
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
@@ -496,7 +494,7 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 40 : 20,
+    top: Platform.OS === 'ios' ? 50 : 30,
     left: 16,
     flexDirection: 'row',
     gap: 8,
@@ -514,7 +512,7 @@ const styles = StyleSheet.create({
   sideActions: {
     position: 'absolute',
     right: 16,
-    bottom: SCREEN_HEIGHT * 0.35,
+    bottom: SCREEN_HEIGHT * 0.22,
     alignItems: 'center',
     gap: 22,
   },
@@ -558,11 +556,17 @@ const styles = StyleSheet.create({
     left: 16,
     right: 100,
   },
+  agentName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#d1d5db',
+    marginBottom: 4,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   locationRow: {
     flexDirection: 'row',
@@ -609,11 +613,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-  },
-  showMoreText: {
-    color: '#10b981',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 4,
   },
 });

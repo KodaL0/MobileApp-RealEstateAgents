@@ -8,7 +8,8 @@ export interface PropertyImage {
 export interface Owner {
   id: string;
   email: string;
-  // add additional owner fields if needed
+  name?: string;
+  username?: string;
 }
 
 export interface Property {
@@ -18,17 +19,17 @@ export interface Property {
   price: number;
   location: string;
   property_type: string;
-  bedrooms: number;
-  bathrooms: number;
-  area: number;
-  year_built: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  area: number | null;
+  year_built: number | null;
   parking_spaces: number;
-  lot_size?: number;
+  lot_size?: number | null;
   property_status: string;
   energy_rating?: string;
   construction_material?: string;
-  floor_level?: number;
-  total_floors?: number;
+  floor_level?: number | null;
+  total_floors?: number | null;
   available_from?: string;
   contact_phone: string;
   contact_email: string;
@@ -40,22 +41,38 @@ export interface Property {
   created_at: string;
   updated_at: string;
   images: PropertyImage[];
+  // Structured location fields
+  country?: string;
+  region?: string;
+  city?: string;
+  postal_code?: string;
+  street?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  // Computed fields from backend
+  is_favourite?: boolean;
+  favorites_count?: number;
+  view_count?: number;
+  is_featured?: boolean;
+  url?: string;
 }
 
 // Utility function to normalize a single property object from API
 export const normalizePropertyData = (property: any): Property => ({
   ...property,
   price:         typeof property.price === 'string'   ? parseFloat(property.price)     : property.price,
-  area:          typeof property.area === 'string'    ? parseFloat(property.area)      : property.area,
-  bedrooms:      typeof property.bedrooms === 'string'? parseInt(property.bedrooms,10) : property.bedrooms,
-  bathrooms:     typeof property.bathrooms === 'string'? parseInt(property.bathrooms,10): property.bathrooms,
-  year_built:    typeof property.year_built === 'string'? parseInt(property.year_built,10): property.year_built,
+  area:          typeof property.area === 'string'    ? parseFloat(property.area)      : (property.area ?? null),
+  bedrooms:      typeof property.bedrooms === 'string'? parseInt(property.bedrooms,10) : (property.bedrooms ?? null),
+  bathrooms:     typeof property.bathrooms === 'string'? parseFloat(property.bathrooms) : (property.bathrooms ?? null),
+  year_built:    typeof property.year_built === 'string'? parseInt(property.year_built,10): (property.year_built ?? null),
   parking_spaces:typeof property.parking_spaces === 'string'
                     ? parseInt(property.parking_spaces,10)
                     : property.parking_spaces,
-  lot_size:      typeof property.lot_size === 'string'  ? parseFloat(property.lot_size)  : property.lot_size,
-  floor_level:   typeof property.floor_level === 'string'? parseInt(property.floor_level,10)  : property.floor_level,
-  total_floors:  typeof property.total_floors === 'string'? parseInt(property.total_floors,10) : property.total_floors,
+  lot_size:      typeof property.lot_size === 'string'  ? parseFloat(property.lot_size)  : (property.lot_size ?? null),
+  floor_level:   typeof property.floor_level === 'string'? parseInt(property.floor_level,10)  : (property.floor_level ?? null),
+  total_floors:  typeof property.total_floors === 'string'? parseInt(property.total_floors,10) : (property.total_floors ?? null),
+  latitude:      typeof property.latitude === 'string' ? parseFloat(property.latitude) : (property.latitude ?? null),
+  longitude:     typeof property.longitude === 'string' ? parseFloat(property.longitude) : (property.longitude ?? null),
 });
 
 // Interface for your listing form data
