@@ -31,6 +31,7 @@ import PropertyDocuments from '@/components/property/PropertyDocuments';
 import PropertyMapView from '@/components/property/PropertyMapView';
 import ChatButton from '@/components/property/ChatButton';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useUser } from '@/app/_userbase/UserContext';
 import { api } from '../../config/api'; // adjust path if needed
 
 const { width } = Dimensions.get('window');
@@ -248,6 +249,7 @@ function formatOrdinal(n: string | number): string {
 export default function PropertyDetailScreen() {
   const { id, source } = useLocalSearchParams();
   const router = useRouter();
+  const { user } = useUser();
 
   const [property, setProperty] = useState<any>(null);
   const [isFavourite, setIsFavourite] = useState(false);
@@ -763,6 +765,7 @@ export default function PropertyDetailScreen() {
                 longitude={longitude}
                 title={title}
                 location={location}
+                email={user?.email}
               />
               <View style={styles.detailRow}>
                 <MapPin size={16} color="#666" />
