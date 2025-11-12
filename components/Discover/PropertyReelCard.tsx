@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   bottomInfo: {
     position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.15,
+    bottom: SCREEN_HEIGHT * 0.135,
     left: 16,
     right: 100,
   },
