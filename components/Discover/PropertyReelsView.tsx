@@ -54,7 +54,7 @@ export default function PropertyReelsView() {
         }
         setError(null);
 
-        const response = await api.feed.list({ page, page_size: 10 });
+        const response = await api.feed.list({ page });
         const newProperties = response.results || [];
 
         if (newProperties.length > 0) {
@@ -139,9 +139,7 @@ export default function PropertyReelsView() {
 
       const currentItem = propertiesRef.current[index];
       const itemId = currentItem?.id ?? 'unknown';
-      console.log(
-        `[Feed] user viewing index ${index} of ${total} | propertyId=${itemId} | cycle=${currentItem?.__cycle ?? 'n/a'}`
-      );
+      console.log(`[Feed] user viewing index ${index} of ${total} | propertyId=${itemId}`);
     },
     [isAuthenticated, fetchFeed]
   );
