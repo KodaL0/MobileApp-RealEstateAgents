@@ -48,16 +48,14 @@ export default function AgentConnectionsScreen() {
     }
 
     try {
-      // Get profile to get connection counts
-      const profileData = await api.auth.getPublicProfile(username);
+      const [profileData, connectionsData, mutualData] = await Promise.all([
+        api.auth.getPublicProfile(username),
+        api.connections.getAgentConnections(username),
+        api.connections.getAgentConnections(username, 'mutual'),
+      ]);
       setProfile(profileData);
-
-      // TODO: Fetch actual connections list when API endpoint is available
-      // For now, we'll show empty state with counts
-      // const connectionsData = await api.connections.getAgentConnections(username);
-      // setConnections(connectionsData.connections || []);
-      // setMutualConnections(connectionsData.mutual || []);
-
+      setConnections(connectionsData.connections || []);
+      setMutualConnections(mutualData.connections || []);
       setError(null);
     } catch (err: any) {
       console.error('Failed to load connections:', err);

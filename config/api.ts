@@ -242,6 +242,12 @@ export const api = {
       apiGet('users/password-reset/validate', { params: { token } }),
   },
 
+  connections: {
+    getAgentConnections: (username: string, view?: 'mutual') =>
+      apiGet(`users/profiles/${username}/connections`, view === 'mutual' ? { params: { view: 'mutual' } } : undefined)
+        .then(res => res.data),
+  },
+
   // Property-related endpoints
   properties: {
     /**
