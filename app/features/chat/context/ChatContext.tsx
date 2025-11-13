@@ -17,6 +17,7 @@ interface ChatContextValue {
   threads: Thread[];
   messages: Record<string, Message[]>;
   setMessages: React.Dispatch<React.SetStateAction<Record<string, Message[]>>>;
+  refreshThreads: () => Promise<void>;
   getOrCreateThread: (
     sellerId: number,
     propertyId: number | null,
@@ -61,6 +62,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const [userStatuses, setUserStatuses] = useState<
     Record<number, 'online' | 'offline'>
   >({});
+
+  const fetchThreads = useCallback(async () => {
+    const response = await apiClient.get<Thread[]>('chat/');
+    setThreads(response.data);
+  }, []);
 
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<number | null>(null);
@@ -284,7 +290,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     // Only fetch threads and open socket if user is authenticated
     if (user) {
       // initial fetch + open socket
-      apiClient.get<Thread[]>('chat/').then((r) => setThreads(r.data));
+      fetchThreads();
       openSocket();
     }
 
@@ -293,7 +299,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
       ws.current?.close();
     };
-  }, [user, openSocket]);
+  }, [user, openSocket, fetchThreads]);
 
   const getOrCreateThread = useCallback(
     async (sellerId: number, propertyId: number | null, title?: string) => {
@@ -537,6 +543,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         threads,
         messages,
         setMessages,
+        refreshThreads: fetchThreads,
         getOrCreateThread,
         getOrCreateDmThread,
         sendMessage,

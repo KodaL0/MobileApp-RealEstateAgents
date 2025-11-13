@@ -21,7 +21,7 @@ import { setLastChatRoute } from '../../features/chat/navigationState';
 export default function ThreadList() {
   const router = useRouter();
   const params = useLocalSearchParams<{ ownerId?: string; propertyId?: string; title?: string }>();
-  const { threads, messages, getOrCreateThread } = useChat();
+  const { threads, messages, getOrCreateThread, refreshThreads } = useChat();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'property' | 'dm'>('dm');
@@ -92,10 +92,11 @@ export default function ThreadList() {
 
   useFocusEffect(
     React.useCallback(() => {
+      refreshThreads().catch(err => console.warn('Failed to refresh threads', err));
       if (pathname) {
         setLastChatRoute(pathname);
       }
-    }, [pathname])
+    }, [pathname, refreshThreads])
   );
 
   const formatTime = (timestamp: string) => {
@@ -169,6 +170,11 @@ export default function ThreadList() {
           const unread = (messages[thread.id] || []).filter(
             m => !m.read_at && m.sender !== user?.id
           ).length;
+          const previewPrefix = last
+            ? last.sender === user?.id
+              ? 'You: '
+              : `${thread.other_username || 'Agent'}: `
+            : '';
 
           return (
             <TouchableOpacity
@@ -206,7 +212,7 @@ export default function ThreadList() {
                   {thread.property_title || thread.other_username}
                 </Text>
                 <Text style={styles.itemSubtitle} numberOfLines={1}>
-                  {last?.content || 'Start the conversation'}
+                  {last ? `${previewPrefix}${last.content}` : 'No messages yet'}
                 </Text>
               </View>
 
