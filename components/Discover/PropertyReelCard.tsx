@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,96 @@ import type { FeedProperty } from '@/app/features/types';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
 
-export default function PropertyReelCard({
+// Memoized image component for performance
+const OptimizedImage = memo(({ 
+  uri, 
+  style, 
+  blurRadius = 0,
+  onError 
+}: { 
+  uri: string; 
+  style: any; 
+  blurRadius?: number;
+  onError?: () => void;
+}) => {
+  const [imageError, setImageError] = useState(false);
+  
+  const handleError = useCallback(() => {
+    setImageError(true);
+    onError?.();
+  }, [onError]);
+
+  return (
+    <Image
+      source={{
+        uri: imageError
+          ? 'https://via.placeholder.com/800x600?text=No+Image'
+          : uri,
+      }}
+      style={style}
+      resizeMode="cover"
+      onError={handleError}
+      blurRadius={blurRadius}
+      // Performance optimizations
+      cache="force-cache"
+    />
+  );
+});
+
+OptimizedImage.displayName = 'OptimizedImage';
+
+// Memoized carousel indicator dots
+const CarouselDots = memo(({ 
+  count, 
+  currentIndex 
+}: { 
+  count: number; 
+  currentIndex: number;
+}) => {
+  if (count <= 1) return null;
+  
+  const dotContainerStyle = {
+    position: 'absolute' as const,
+    top: SCREEN_HEIGHT * 0.15,
+    left: 0,
+    right: 0,
+    flexDirection: 'row' as const,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    zIndex: 5,
+  };
+  
+  const dotStyle = {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  };
+  
+  const dotActiveStyle = {
+    width: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  };
+  
+  return (
+    <View style={dotContainerStyle}>
+      {Array.from({ length: count }).map((_, index) => (
+        <View
+          key={index}
+          style={[
+            dotStyle,
+            index === currentIndex && dotActiveStyle,
+          ]}
+        />
+      ))}
+    </View>
+  );
+});
+
+CarouselDots.displayName = 'CarouselDots';
+
+function PropertyReelCard({
   property,
   onViewProperty,
   source,
@@ -50,34 +139,42 @@ export default function PropertyReelCard({
     return property?.favorites_count ?? 0;
   });
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [imageError, setImageError] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
   const lastTap = useRef<number>(0);
   const touchStartY = useRef<number>(0);
   const touchStartX = useRef<number>(0);
+  const scrollX = useRef(new Animated.Value(0)).current;
   const { getOrCreateThread } = useChat();
   const { isAuthenticated } = useUser();
-  const owner = property?.owner ?? {};
+  
+  // Memoize owner data
+  const owner = useMemo(() => property?.owner ?? {}, [property?.owner]);
   const ownerIdValue = owner?.id ?? null;
-  const ownerId =
-    ownerIdValue !== null && ownerIdValue !== undefined
-      ? Number(ownerIdValue)
-      : NaN;
-  // Agent name: prefer name, fallback to username
-  const agentName: string | null =
-    owner?.name ?? owner?.username ?? null;
-  const ownerUsername: string | null =
-    owner?.username ?? null;
+  const ownerId = useMemo(() => {
+    if (ownerIdValue === null || ownerIdValue === undefined) return NaN;
+    return Number(ownerIdValue);
+  }, [ownerIdValue]);
+  
+  const agentName: string | null = useMemo(() => 
+    owner?.name ?? owner?.username ?? null,
+    [owner?.name, owner?.username]
+  );
+  const ownerUsername: string | null = useMemo(() => 
+    owner?.username ?? null,
+    [owner?.username]
+  );
 
-  const getValidUrl = (uri?: string) => {
+  const getValidUrl = useCallback((uri?: string) => {
     if (!uri) return 'https://via.placeholder.com/800x600?text=No+Image';
     return uri.startsWith('http') ? uri : `${BASE_URL}${uri}`;
-  };
+  }, []);
 
-  const handleAgentProfilePress = () => {
+  const handleAgentProfilePress = useCallback(() => {
     if (!ownerUsername) {
       Alert.alert('Unavailable', 'Agent profile is currently unavailable.');
       return;
@@ -87,32 +184,40 @@ export default function PropertyReelCard({
       pathname: '/agent/[username]',
       params: { username: ownerUsername },
     } as never);
-  };
+  }, [ownerUsername, router]);
 
-  const images =
-    property.images && property.images.length > 0
-      ? property.images
-          .map((img: any) =>
-            typeof img === 'string' ? getValidUrl(img) : getValidUrl(img.image)
-          )
-          .filter(Boolean)
-      : [getValidUrl()];
+  // Memoize images array
+  const images = useMemo(() => {
+    if (property.images && property.images.length > 0) {
+      return property.images
+        .map((img: any) =>
+          typeof img === 'string' ? getValidUrl(img) : getValidUrl(img.image)
+        )
+        .filter(Boolean);
+    }
+    return [getValidUrl()];
+  }, [property.images, getValidUrl]);
 
-  const handleScroll = (event: any) => {
+  const handleScroll = useCallback((event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setCurrentIndex(index);
-  };
+    scrollX.setValue(event.nativeEvent.contentOffset.x);
+  }, [scrollX]);
 
-  const handleError = () => setImageError(true);
+  const handleImageError = useCallback((index: number) => {
+    setImageErrors(prev => new Set(prev).add(index));
+  }, []);
 
-  const formatPrice = (price: number) =>
+  const formatPrice = useCallback((price: number) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'EUR',
       minimumFractionDigits: 0,
-    }).format(price || 0);
+    }).format(price || 0),
+    []
+  );
 
-  const getCountryColor = (country: string) => {
+  const getCountryColor = useCallback((country: string) => {
     switch (country) {
       case 'Greece':
         return '#2563eb';
@@ -121,49 +226,76 @@ export default function PropertyReelCard({
       default:
         return '#6b7280';
     }
-  };
+  }, []);
 
-  const parseNumericValue = (value: number | string | null | undefined): number | null => {
+  const parseNumericValue = useCallback((value: number | string | null | undefined): number | null => {
     if (value === null || value === undefined) return null;
     const numeric = typeof value === 'string' ? parseFloat(value) : value;
     return Number.isFinite(numeric) ? numeric : null;
-  };
+  }, []);
 
-  const bedroomsValue = parseNumericValue(property.bedrooms);
-  const bathroomsValue = parseNumericValue(property.bathrooms);
-  const areaValue = parseNumericValue(property.area);
+  const bedroomsValue = useMemo(() => parseNumericValue(property.bedrooms), [property.bedrooms, parseNumericValue]);
+  const bathroomsValue = useMemo(() => parseNumericValue(property.bathrooms), [property.bathrooms, parseNumericValue]);
+  const areaValue = useMemo(() => parseNumericValue(property.area), [property.area, parseNumericValue]);
 
-  const formatBathrooms = (value: number | null) => {
+  const formatBathrooms = useCallback((value: number | null) => {
     if (value === null) return null;
     return Number.isInteger(value) ? value.toString() : value.toFixed(1);
-  };
+  }, []);
 
   // Navigation handler for the View button with source tracking
-  const handleViewPress = () => {
+  const handleViewPress = useCallback(() => {
     if (onViewProperty) {
       onViewProperty();
     } else if (property?.id) {
       const queryParams = source ? `?source=${source}` : '';
       router.push(`/property/${property.id}${queryParams}`);
     }
-  };
+  }, [onViewProperty, property?.id, source, router]);
 
   // Handle title press to navigate to property page
-  const handleTitlePress = () => {
+  const handleTitlePress = useCallback(() => {
     handleViewPress();
-  };
+  }, [handleViewPress]);
+
+  // Heart animation trigger
+  const triggerHeartAnimation = useCallback(() => {
+    setShowHeartAnimation(true);
+    heartScale.setValue(0);
+    heartOpacity.setValue(1);
+
+    Animated.parallel([
+      Animated.spring(heartScale, {
+        toValue: 1.2,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.delay(200),
+        Animated.timing(heartOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
+      setShowHeartAnimation(false);
+      heartScale.setValue(0);
+    });
+  }, [heartScale, heartOpacity]);
 
   // Handle touch start to detect taps vs swipes
-  const handleTouchStart = (event: any) => {
+  const handleTouchStart = useCallback((event: any) => {
     const touch = event.nativeEvent.touches[0];
     if (touch) {
       touchStartY.current = touch.pageY;
       touchStartX.current = touch.pageX;
     }
-  };
+  }, []);
 
   // Handle touch end to detect taps vs swipes
-  const handleTouchEnd = (event: any) => {
+  const handleTouchEnd = useCallback((event: any) => {
     const touch = event.nativeEvent.changedTouches?.[0];
     if (!touch) return;
 
@@ -188,37 +320,10 @@ export default function PropertyReelCard({
     } else {
       lastTap.current = now;
     }
-  };
-
-  // Heart animation trigger
-  const triggerHeartAnimation = () => {
-    setShowHeartAnimation(true);
-    heartScale.setValue(0);
-    heartOpacity.setValue(1);
-
-    Animated.parallel([
-      Animated.spring(heartScale, {
-        toValue: 1.2,
-        friction: 3,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.sequence([
-        Animated.delay(200),
-        Animated.timing(heartOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-      setShowHeartAnimation(false);
-      heartScale.setValue(0);
-    });
-  };
+  }, [isLiked, handleFavorite, triggerHeartAnimation]);
 
   // Favorite handler with API integration and success message
-  const handleFavorite = async () => {
+  const handleFavorite = useCallback(async () => {
     try {
       const response = await api.properties.toggleFavorite(property.id);
       setIsLiked(response.is_favourite || false);
@@ -236,10 +341,10 @@ export default function PropertyReelCard({
       console.error('Failed to toggle favorite:', e);
       Alert.alert('Error', 'Failed to update favorite. Please try again.');
     }
-  };
+  }, [property.id]);
 
   // Chat handler: open or create thread then navigate to chat
-  const handleChat = async () => {
+  const handleChat = useCallback(async () => {
     if (isChatLoading) return;
 
     if (!isAuthenticated) {
@@ -270,10 +375,10 @@ export default function PropertyReelCard({
     } finally {
       setIsChatLoading(false);
     }
-  };
+  }, [isChatLoading, isAuthenticated, ownerId, property?.id, property?.title, getOrCreateThread, router]);
 
   // Share handler with tracking and success message
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     try {
       // Note: Share tracking endpoint doesn't exist yet, but we'll show success message
       // When backend endpoint is ready, uncomment:
@@ -287,7 +392,7 @@ export default function PropertyReelCard({
       console.error('Failed to track share:', e);
       Alert.alert('Error', 'Failed to track share. Please try again.');
     }
-  };
+  }, []);
 
 
   return (
@@ -301,50 +406,45 @@ export default function PropertyReelCard({
       >
         {/* Horizontal image scroll with blurred background */}
         <ScrollView
+          ref={scrollViewRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           style={styles.imageScroll}
+          decelerationRate="fast"
+          snapToInterval={SCREEN_WIDTH}
+          snapToAlignment="center"
+          // Performance optimizations
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={2}
+          windowSize={3}
         >
           {images.map((uri: string, index: number) => (
-            <View key={index} style={styles.imageWrapper}>
-              {/* Blurred background */}
-              <Image
-                source={{
-                  uri: imageError
-                    ? 'https://via.placeholder.com/800x600?text=No+Image'
-                    : uri,
-                }}
-                style={StyleSheet.absoluteFillObject}
-                blurRadius={25}
-                resizeMode="cover"
-              />
+            <View key={`image-${index}`} style={styles.imageWrapper}>
+              {/* Blurred background - only render if not first image or if current */}
+              {(index === 0 || index === currentIndex) && (
+                <OptimizedImage
+                  uri={uri}
+                  style={StyleSheet.absoluteFillObject}
+                  blurRadius={25}
+                  onError={() => handleImageError(index)}
+                />
+              )}
 
               {/* Main image */}
-              <Image
-                source={{
-                  uri: imageError
-                    ? 'https://via.placeholder.com/800x600?text=No+Image'
-                    : uri,
-                }}
+              <OptimizedImage
+                uri={uri}
                 style={styles.image}
-                resizeMode="cover"
-                onError={handleError}
+                onError={() => handleImageError(index)}
               />
-
-              {/* Photo counter */}
-              {images.length > 1 && (
-                <View style={styles.photoCounter}>
-                  <Text style={styles.photoCounterText}>
-                    {index + 1}/{images.length}
-                  </Text>
-                </View>
-              )}
             </View>
           ))}
         </ScrollView>
+
+        {/* Enhanced carousel indicators */}
+        <CarouselDots count={images.length} currentIndex={currentIndex} />
 
         {/* Heart animation overlay */}
         {showHeartAnimation && (
@@ -368,24 +468,28 @@ export default function PropertyReelCard({
           style={styles.gradient}
         />
 
-        {/* Tags - aligned with photo counter */}
+        {/* Enhanced Tags - better positioning and visual hierarchy */}
         <View style={styles.tagsContainer}>
-          <View style={[styles.tag, { backgroundColor: '#111827' }]}>
-            <Text style={styles.tagText}>
+          <View style={[styles.tag, styles.tagPrimary, { backgroundColor: '#111827' }]}>
+            <Text style={styles.tagText} numberOfLines={1}>
               {property.property_type?.toUpperCase() || 'PROPERTY'}
             </Text>
           </View>
           <View
             style={[
               styles.tag,
+              styles.tagSecondary,
               { backgroundColor: getCountryColor(property.country || '') },
             ]}
           >
-            <Text style={styles.tagText}>{property.country || 'Unknown'}</Text>
+            <Text style={styles.tagText} numberOfLines={1}>
+              {property.country || 'Unknown'}
+            </Text>
           </View>
           <View
             style={[
               styles.tag,
+              styles.tagStatus,
               {
                 backgroundColor:
                   property.property_status === 'for_sale'
@@ -394,13 +498,22 @@ export default function PropertyReelCard({
               },
             ]}
           >
-            <Text style={styles.tagText}>
+            <Text style={styles.tagText} numberOfLines={1}>
               {property.property_status === 'for_sale'
                 ? 'For Sale'
                 : 'For Rent'}
             </Text>
           </View>
         </View>
+
+        {/* Photo counter - integrated with tags */}
+        {images.length > 1 && (
+          <View style={styles.photoCounter}>
+            <Text style={styles.photoCounterText}>
+              {currentIndex + 1}/{images.length}
+            </Text>
+          </View>
+        )}
 
         {/* Right side actions - moved lower */}
         <View style={styles.sideActions}>
@@ -583,32 +696,57 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: SCREEN_HEIGHT * 0.07,
     right: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 5,
   },
   photoCounterText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   tagsContainer: {
     position: 'absolute',
     top: SCREEN_HEIGHT * 0.07,
     left: 16,
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: 6,
+    maxWidth: SCREEN_WIDTH * 0.65,
+    zIndex: 5,
   },
   tag: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tagPrimary: {
+    backgroundColor: '#111827',
+  },
+  tagSecondary: {
+    backgroundColor: '#2563eb',
+  },
+  tagStatus: {
+    backgroundColor: '#10b981',
   },
   tagText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   sideActions: {
     position: 'absolute',
@@ -717,4 +855,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+});
+
+// Export memoized component for performance
+export default memo(PropertyReelCard, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return (
+    prevProps.property.id === nextProps.property.id &&
+    prevProps.property.is_favourite === nextProps.property.is_favourite &&
+    prevProps.property.favorites_count === nextProps.property.favorites_count &&
+    prevProps.source === nextProps.source
+  );
 });
