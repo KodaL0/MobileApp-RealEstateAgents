@@ -58,8 +58,8 @@ export default function PropertyReelCard({
   const lastTap = useRef<number>(0);
   const touchStartY = useRef<number>(0);
   const touchStartX = useRef<number>(0);
-  const { getOrCreateThread, threads } = useChat();
-  const { isAuthenticated, user } = useUser();
+  const { getOrCreateThread } = useChat();
+  const { isAuthenticated } = useUser();
   const owner = property?.owner ?? {};
   const ownerIdValue = owner?.id ?? null;
   const ownerId =
@@ -240,6 +240,8 @@ export default function PropertyReelCard({
 
   // Chat handler: open or create thread then navigate to chat
   const handleChat = async () => {
+    if (isChatLoading) return;
+
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to start a chat with the agent.');
       router.push('/(tabs)/profile');
@@ -247,58 +249,19 @@ export default function PropertyReelCard({
     }
 
     const propertyId = property?.id ? Number(property.id) : null;
-    if (!ownerId || Number.isNaN(ownerId)) {
+    if (!ownerId || Number.isNaN(ownerId) || !propertyId || Number.isNaN(propertyId)) {
       Alert.alert('Unavailable', 'Could not identify the agent for this property.');
       return;
     }
-
-    // If a thread already exists, navigate directly without creating another
-    let existingThreadId: string | null = null;
-    if (propertyId) {
-      const existing = threads.find(
-        thread => thread.property != null && Number(thread.property) === propertyId
-      );
-      if (existing) {
-        existingThreadId = existing.id;
-      }
-    }
-
-    if (!existingThreadId) {
-      const userId = user?.id ?? null;
-      const dmThread = threads.find(
-        thread =>
-          thread.property === null &&
-          userId !== null &&
-          ((thread.user1 === ownerId && thread.user2 === userId) ||
-            (thread.user2 === ownerId && thread.user1 === userId))
-      );
-      if (dmThread) {
-        existingThreadId = dmThread.id;
-      }
-    }
-
-    if (existingThreadId) {
-      if (propertyId) {
-        api.analytics.trackConversion(propertyId, 'chat').catch(err =>
-          console.warn('Failed to track chat conversion:', err)
-        );
-      }
-      router.push(`/chat/${existingThreadId}`);
-      return;
-    }
-
-    if (isChatLoading) return;
 
     try {
       setIsChatLoading(true);
       const threadId = await getOrCreateThread(ownerId, propertyId, property?.title);
 
       // Track conversion for analytics (non-blocking)
-      if (propertyId) {
-        api.analytics.trackConversion(propertyId, 'chat').catch(err =>
-          console.warn('Failed to track chat conversion:', err)
-        );
-      }
+      api.analytics.trackConversion(propertyId, 'chat').catch(err =>
+        console.warn('Failed to track chat conversion:', err)
+      );
 
       router.push(`/chat/${threadId}`);
     } catch (e: any) {

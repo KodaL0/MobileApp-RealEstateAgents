@@ -25,6 +25,7 @@ import {
   Share2,
   MessageCircle,
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { api } from '@/config/api';
 import { useChat } from '@/app/features/chat/context/ChatContext';
@@ -143,16 +144,29 @@ export default function AgentProfileScreen() {
 
   const displayName = (profile.name && profile.name.trim()) || profile.username || 'Agent';
   const initial = displayName.charAt(0).toUpperCase();
+  const memberSinceLabel = new Date(profile.date_joined).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const hasLocation = Boolean(profile.location && profile.location.trim());
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
       <View style={styles.hero}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <ArrowLeft size={22} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.heroContent}>
+        <LinearGradient
+          colors={['#10172b', '#16204a', '#1d2f70']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroBackground}
+        />
+        <View style={styles.heroHeaderRow}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} accessibilityRole="button" accessibilityLabel="Go back">
+            <ArrowLeft size={20} color="#E2E8F0" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.heroBody}>
           {profile.avatar ? (
             <Image source={{ uri: profile.avatar }} style={styles.heroAvatar} />
           ) : (
@@ -160,36 +174,43 @@ export default function AgentProfileScreen() {
               <Text style={styles.heroFallbackInitial}>{initial}</Text>
             </View>
           )}
-          <View style={styles.heroTextBlock}>
+          <View style={styles.heroInfo}>
             <Text style={styles.heroName}>{displayName}</Text>
             <Text style={styles.heroSubtitle}>{profile.office || 'Licensed Agent'}</Text>
-            <View style={styles.heroMetaRow}>
-              <MapPin size={14} color="#fff" />
-              <Text style={styles.heroMetaText}>
-                {profile.location || 'Location not provided'}
-              </Text>
+            <View style={styles.heroMetaChips}>
+              {hasLocation && (
+                <View style={styles.heroChip}>
+                  <MapPin size={14} color="#DDE8FF" />
+                  <Text style={styles.heroChipText}>{profile.location}</Text>
+                </View>
+              )}
+              <View style={styles.heroChip}>
+                <Text style={styles.heroChipText}>Member since {memberSinceLabel}</Text>
+              </View>
             </View>
-            <Text style={styles.heroMetaHint}>
-              Member since{' '}
-              {new Date(profile.date_joined).toLocaleDateString('en-US', {
-                month: 'long',
-                year: 'numeric',
-              })}
-            </Text>
           </View>
         </View>
-        <View style={styles.heroActions}>
+        <View style={styles.heroActionRow}>
           <TouchableOpacity
-            style={styles.heroActionPrimary}
+            style={styles.heroMessageButton}
             onPress={handleMessageAgent}
             accessibilityRole="button"
             accessibilityLabel="Message agent"
           >
-            <MessageCircle size={20} color="#fff" />
+            <LinearGradient
+              colors={['#34D399', '#0EA5E9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroMessageGradient}
+            >
+              <MessageCircle size={20} color="#FFFFFF" />
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.heroActionSecondary}
+            style={styles.heroShareButton}
             onPress={() => Alert.alert('Share', 'Sharing coming soon!')}
+            accessibilityRole="button"
+            accessibilityLabel="Share agent profile"
           >
             <Share2 size={18} color="#0F3460" />
           </TouchableOpacity>
@@ -285,23 +306,35 @@ const styles = StyleSheet.create({
   },
   hero: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingTop: 20,
+    paddingBottom: 28,
     backgroundColor: '#0F172A',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroBackground: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.92,
+  },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(226,232,240,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
+    backgroundColor: 'rgba(15,28,48,0.45)',
   },
-  heroContent: {
+  heroBody: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 18,
     alignItems: 'center',
   },
   heroAvatar: {
@@ -324,9 +357,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#EFF6FF',
   },
-  heroTextBlock: {
+  heroInfo: {
     flex: 1,
-    gap: 6,
+    gap: 8,
   },
   heroName: {
     fontSize: 24,
@@ -337,35 +370,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.75)',
   },
-  heroMetaRow: {
+  heroMetaChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  heroChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.14)',
   },
-  heroMetaText: {
-    color: '#F9FAFB',
-    fontSize: 13,
-  },
-  heroMetaHint: {
-    color: 'rgba(255,255,255,0.6)',
+  heroChipText: {
+    color: '#E0E7FF',
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: '500',
   },
-  heroActions: {
+  heroActionRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 20,
+    marginTop: 22,
   },
-  heroActionPrimary: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#10B981',
+  heroMessageButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  heroMessageGradient: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroActionSecondary: {
+  heroShareButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
