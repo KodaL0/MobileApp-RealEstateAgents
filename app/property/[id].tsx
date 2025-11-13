@@ -19,7 +19,6 @@ import {
   Heart,
   Share,
   ArrowLeft,
-  ArrowRight,
   MapPin,
   Phone,
   Mail,
@@ -30,34 +29,22 @@ import {
 import PropertyDocuments from '@/components/property/PropertyDocuments';
 import PropertyMapView from '@/components/property/PropertyMapView';
 import ChatButton from '@/components/property/ChatButton';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useUser } from '@/app/_userbase/UserContext';
-import { api } from '../../config/api'; // adjust path if needed
+import { api } from '../../config/api';
 
 const { width } = Dimensions.get('window');
 
-/**
- * Normalize raw API response into a consistent shape.
- * Ensure that `amenities`, etc. are always defined (even if empty arrays).
- */
+/* ------------------ NORMALIZER ------------------ */
 function normalizePropertyDetail(item: any) {
-  // 1) Images
   const rawImages = Array.isArray(item.images) ? item.images : [];
   const images: string[] = rawImages
     .map((imgObj: any) => {
-      // item.images might be array of strings or objects with `.image`
-      const raw =
-        typeof imgObj === 'string'
-          ? imgObj
-          : imgObj?.image || '';
+      const raw = typeof imgObj === 'string' ? imgObj : imgObj?.image || '';
       if (!raw) return '';
-      return raw.startsWith('http')
-        ? raw
-        : `https://api.propertpro.com${raw}`;
+      return raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`;
     })
-    .filter((uri: string) => !!uri);
+    .filter(Boolean);
 
-  // 2) forSale boolean
   let forSale = false;
   if (item.property_status) {
     forSale = item.property_status === 'for_sale';
@@ -67,55 +54,29 @@ function normalizePropertyDetail(item: any) {
     forSale = item.listing_type.toLowerCase() === 'sale';
   }
 
-  // 3) Basic fields
   const id = item.id;
-  const title: string = item.title || '';
-  const price: number =
-    item.price != null && !isNaN(Number(item.price))
-      ? Number(item.price)
-      : 0;
-  const location: string = item.location || '';
+  const title = item.title || '';
+  const price = !isNaN(Number(item.price)) ? Number(item.price) : 0;
+  const location = item.location || '';
 
-  // 4) Stats (we will not render the features row, but size may still be used elsewhere)
-  let size: number = 0;
-  if (item.area != null && !isNaN(Number(item.area))) {
-    const areaM2 = Number(item.area);
-    size = Math.round(areaM2 * 10.764);
+  let size = 0;
+  if (item.area && !isNaN(Number(item.area))) {
+    size = Math.round(Number(item.area) * 10.764);
   }
-  // bedrooms/bathrooms normalized in case used elsewhere (but features row removed)
-  const bedrooms: number =
-    item.bedrooms != null && !isNaN(Number(item.bedrooms))
-      ? Number(item.bedrooms)
-      : 0;
-  const bathrooms: number =
-    item.bathrooms != null && !isNaN(Number(item.bathrooms))
-      ? Number(item.bathrooms)
-      : 0;
 
-  // 5) propertyType
-  const rawType: string = item.property_type || '';
-  const propertyType = rawType
-    ? rawType.charAt(0).toUpperCase() + rawType.slice(1)
+  const propertyType = item.property_type
+    ? item.property_type.charAt(0).toUpperCase() + item.property_type.slice(1)
     : '';
 
-  // 6) Description
-  const description: string = item.description || '';
-
-  // 7) Amenities
-  const amenities: string[] = Array.isArray(item.amenities)
+  const amenities = Array.isArray(item.amenities)
     ? item.amenities.map((a: any) =>
         typeof a === 'string' ? a : a.name || String(a)
       )
     : [];
 
-  // 8) Additional features (not rendered here, but normalized if needed later)
+  const contactPhone = item.contact_phone || item.contactPhone || '';
+  const contactEmail = item.contact_email || item.contactEmail || '';
 
-
-  // 9) Contact info
-  const contactPhone: string = item.contact_phone || item.contactPhone || '';
-  const contactEmail: string = item.contact_email || item.contactEmail || '';
-
-  // 10) Owner (for message owner)
   const owner = item.owner
     ? {
         id: item.owner.id,
@@ -128,7 +89,6 @@ function normalizePropertyDetail(item: any) {
       }
     : null;
 
-  // 11) Agent
   const agent = item.agent
     ? {
         name: item.agent.name,
@@ -143,50 +103,6 @@ function normalizePropertyDetail(item: any) {
       }
     : null;
 
-  // 12) Other details for Property Details section
-  const yearBuilt: string = item.year_built
-    ? String(item.year_built)
-    : '';
-  const parkingSpaces: number =
-    item.parking_spaces != null
-      ? Number(item.parking_spaces)
-      : 0;
-  const lotSize: string = item.lot_size ? String(item.lot_size) : '';
-  const energyRating: string = item.energy_rating || '';
-  const constructionMaterial: string = item.construction_material || '';
-  const floorLevel: string =
-    item.floor_level != null ? String(item.floor_level) : '';
-  const totalFloors: string =
-    item.total_floors != null ? String(item.total_floors) : '';
-  const availableFrom: string = item.available_from || '';
-
-  // 13) Virtual tour / video
-  const virtualTourUrl: string = item.virtual_tour_url || '';
-  const videoUrl: string = item.video_url || '';
-
-  // 14) Financing URL
-  const financingUrl: string | null = item.financing_url || null;
-
-  // 15) Publication / favourite
-  const isPublished: boolean =
-    item.is_published != null
-      ? Boolean(item.is_published)
-      : true;
-  const isFavourite: boolean = Boolean(item.is_favourite);
-
-  // 16) Coordinates
-  const latitude: number | null =
-    item.latitude != null && !isNaN(Number(item.latitude))
-      ? Number(item.latitude)
-      : null;
-  const longitude: number | null =
-    item.longitude != null && !isNaN(Number(item.longitude))
-      ? Number(item.longitude)
-      : null;
-
-  // 17) Documents
-  const documents = Array.isArray(item.documents) ? item.documents : [];
-
   return {
     id,
     images,
@@ -194,58 +110,52 @@ function normalizePropertyDetail(item: any) {
     title,
     price,
     location,
-    bedrooms,
-    bathrooms,
-    size,
     propertyType,
-    description,
+    description: item.description || '',
     amenities,
-    
     contactPhone,
     contactEmail,
     owner,
     agent,
-    yearBuilt,
-    parkingSpaces,
-    lotSize,
-    energyRating,
-    constructionMaterial,
-    floorLevel,
-    totalFloors,
-    availableFrom,
-    virtualTourUrl,
-    videoUrl,
-    financingUrl,
-    isPublished,
-    isFavourite,
-    latitude,
-    longitude,
-    documents,
+    yearBuilt: item.year_built ? String(item.year_built) : '',
+    parkingSpaces:
+      item.parking_spaces != null ? Number(item.parking_spaces) : 0,
+    lotSize: item.lot_size ? String(item.lot_size) : '',
+    energyRating: item.energy_rating || '',
+    constructionMaterial: item.construction_material || '',
+    floorLevel: item.floor_level != null ? String(item.floor_level) : '',
+    totalFloors: item.total_floors != null ? String(item.total_floors) : '',
+    availableFrom: item.available_from || '',
+    virtualTourUrl: item.virtual_tour_url || '',
+    videoUrl: item.video_url || '',
+    financingUrl: item.financing_url || null,
+    isPublished: item.is_published != null ? Boolean(item.is_published) : true,
+    isFavourite: Boolean(item.is_favourite),
+    latitude:
+      item.latitude != null && !isNaN(Number(item.latitude))
+        ? Number(item.latitude)
+        : null,
+    longitude:
+      item.longitude != null && !isNaN(Number(item.longitude))
+        ? Number(item.longitude)
+        : null,
+    documents: Array.isArray(item.documents) ? item.documents : [],
   };
 }
 
-// Helper to format ordinal
+/* ------------------ ORDINAL HELPER ------------------ */
 function formatOrdinal(n: string | number): string {
   const num = Number(n);
   if (isNaN(num)) return String(n);
-  const absNum = Math.abs(num);
-  const tens = absNum % 100;
-  if (tens >= 11 && tens <= 13) {
-    return `${num}th`;
-  }
-  const unit = absNum % 10;
-  switch (unit) {
-    case 1:
-      return `${num}st`;
-    case 2:
-      return `${num}nd`;
-    case 3:
-      return `${num}rd`;
-    default:
-      return `${num}th`;
-  }
+  const tens = num % 100;
+  if (tens >= 11 && tens <= 13) return `${num}th`;
+  const unit = num % 10;
+  return `${num}${unit === 1 ? 'st' : unit === 2 ? 'nd' : unit === 3 ? 'rd' : 'th'}`;
 }
 
+/* =======================================================
+   MAIN SCREEN
+========================================================= */
 export default function PropertyDetailScreen() {
   const { id, source } = useLocalSearchParams();
   const router = useRouter();
@@ -257,56 +167,57 @@ export default function PropertyDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchDetail = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Pass source parameter if present (for feed click tracking)
-        const params = source ? { params: { source } } : undefined;
-        const rawResp = await api.properties.getById(Number(id), params);
-        const rawData = rawResp?.data ?? rawResp;
-        if (!isMounted) return;
-        const normalized = normalizePropertyDetail(rawData);
-        setProperty(normalized);
-        if (rawData.is_favourite !== undefined) {
-          setIsFavourite(Boolean(rawData.is_favourite));
-        }
-        setCurrentImageIndex(0);
-      } catch (e) {
-        console.error('Error fetching property detail:', e);
-        if (isMounted) setError('Failed to load property details.');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    fetchDetail();
-    return () => {
-      isMounted = false;
-    };
-  }, [id, source]);
+  /* ------------------ Fetch property ------------------ */
+useEffect(() => {
+  let mounted = true;
 
-  if (loading) {
+  const load = async () => {
+    setLoading(true);
+    try {
+      const params = source ? { params: { source } } : undefined;
+      const res = await api.properties.getById(Number(id), params);
+
+      if (!mounted) return;
+
+      const data = res?.data ?? res;
+      const normalized = normalizePropertyDetail(data);
+
+      setProperty(normalized);
+      setIsFavourite(Boolean(data.is_favourite));
+    } catch (err) {
+      console.log(err);
+      if (mounted) setError('Failed to load property details.');
+    } finally {
+      if (mounted) setLoading(false);
+    }
+  };
+
+  load();
+
+  return () => {
+    mounted = false;   // <-- THIS MUST NOT BE RETURNED, ONLY EXECUTED
+  };
+}, [id, source]);
+
+
+  /* ------------------ Loading / error states ------------------ */
+  if (loading)
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#0F3460" />
       </View>
     );
-  }
-  if (error) {
+
+  if (error)
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>{error}</Text>
       </View>
     );
-  }
-  if (!property) {
-    // In case still null
-    return null;
-  }
 
-  // Destructure only after confirming property is non-null
+  if (!property) return null;
+
+  /* ------------------ Destructure after load ------------------ */
   const {
     images,
     title,
@@ -315,7 +226,6 @@ export default function PropertyDetailScreen() {
     location,
     forSale,
     propertyType,
-    // bedrooms, bathrooms, size,  // features row removed
     yearBuilt,
     parkingSpaces,
     lotSize,
@@ -325,7 +235,6 @@ export default function PropertyDetailScreen() {
     totalFloors,
     availableFrom,
     amenities,
-    // additionalFeatures,         // not rendered here
     virtualTourUrl,
     videoUrl,
     contactPhone,
@@ -340,89 +249,61 @@ export default function PropertyDetailScreen() {
 
   const imgCount = images.length;
 
-  // Contact tracking handlers
+  /* ------------------ Contact handlers ------------------ */
   const handlePhoneClick = async () => {
-    if (property?.id) {
-      try {
-        await api.analytics.trackConversion(property.id, 'phone');
-      } catch (e) {
-        console.error('Failed to track phone click:', e);
-      }
-    }
-    Linking.openURL(`tel:${contactPhone}`);
+    try {
+      await api.analytics.trackConversion(property.id, 'phone');
+    } catch {}
+    if (contactPhone) Linking.openURL(`tel:${contactPhone}`);
   };
 
   const handleEmailClick = async () => {
-    if (property?.id) {
-      try {
-        await api.analytics.trackConversion(property.id, 'email');
-      } catch (e) {
-        console.error('Failed to track email click:', e);
-      }
-    }
-    Linking.openURL(`mailto:${contactEmail}`);
+    try {
+      await api.analytics.trackConversion(property.id, 'email');
+    } catch {}
+    if (contactEmail) Linking.openURL(`mailto:${contactEmail}`);
   };
 
   const handleAgentPhoneClick = async () => {
-    if (property?.id && agent?.phone) {
-      try {
+    try {
+      if (agent?.phone) {
         await api.analytics.trackConversion(property.id, 'phone');
-      } catch (e) {
-        console.error('Failed to track agent phone click:', e);
       }
-    }
-    if (agent?.phone) {
-      Linking.openURL(`tel:${agent.phone}`);
-    }
+    } catch {}
+    if (agent?.phone) Linking.openURL(`tel:${agent.phone}`);
   };
 
   const handleAgentEmailClick = async () => {
-    if (property?.id && agent?.email) {
-      try {
+    try {
+      if (agent?.email) {
         await api.analytics.trackConversion(property.id, 'email');
-      } catch (e) {
-        console.error('Failed to track agent email click:', e);
       }
-    }
-    if (agent?.email) {
-      Linking.openURL(`mailto:${agent.email}`);
-    }
+    } catch {}
+    if (agent?.email) Linking.openURL(`mailto:${agent.email}`);
   };
 
   const handleChatClick = async () => {
-    if (property?.id) {
-      try {
-        await api.analytics.trackConversion(property.id, 'chat');
-      } catch (e) {
-        console.error('Failed to track chat click:', e);
-      }
-    }
-    // Navigate to chat screen (placeholder)
-    // router.push(`/chat/${owner?.id || property.owner_id}`);
+    try {
+      await api.analytics.trackConversion(property.id, 'chat');
+    } catch {}
   };
 
-  // Share handler (placeholder until backend endpoint ready)
   const handleShare = () => {
-    Alert.alert(
-      'Share',
-      'Share functionality coming in a future update.',
-      [{ text: 'OK' }]
-    );
+    Alert.alert('Share', 'Share functionality coming soon.');
   };
 
-  const handleImageScroll = (event: any) => {
-    const index = Math.round(event.nativeEvent.contentOffset.x / width);
+  const handleImageScroll = (e: any) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / width);
     setCurrentImageIndex(index);
   };
 
+  /* ======================================================
+     RENDER
+  ======================================================= */
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea}>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Unpublished banner */}
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {!isPublished && (
           <View style={styles.unpublishedBanner}>
             <Text style={styles.unpublishedText}>
@@ -431,7 +312,7 @@ export default function PropertyDetailScreen() {
           </View>
         )}
 
-        {/* Reel-style Image Gallery */}
+        {/* IMAGE GALLERY */}
         <View style={styles.imageGalleryContainer}>
           <ScrollView
             horizontal
@@ -442,36 +323,28 @@ export default function PropertyDetailScreen() {
             style={styles.imageScroll}
           >
             {images.length > 0 ? (
-              images.map((uri: string, index: number) => {
-                const imageUri = uri.startsWith('http')
-                  ? uri
-                  : `https://api.propertpro.com${uri}`;
-                return (
-                  <View key={index} style={styles.imageWrapper}>
-                    {/* Blurred background */}
-                    <Image
-                      source={{ uri: imageUri }}
-                      style={StyleSheet.absoluteFillObject}
-                      blurRadius={25}
-                      resizeMode="cover"
-                    />
-                    {/* Main image */}
-                    <Image
-                      source={{ uri: imageUri }}
-                      style={styles.reelImage}
-                      resizeMode="contain"
-                    />
-                    {/* Photo counter */}
-                    {imgCount > 1 && (
-                      <View style={styles.photoCounter}>
-                        <Text style={styles.photoCounterText}>
-                          {index + 1}/{imgCount}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                );
-              })
+              images.map((imageUri: string, index: number) => (
+                <View key={index} style={styles.imageWrapper}>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={StyleSheet.absoluteFillObject}
+                    blurRadius={25}
+                    resizeMode="cover"
+                  />
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.reelImage}
+                    resizeMode="contain"
+                  />
+                  {imgCount > 1 && (
+                    <View style={styles.photoCounter}>
+                      <Text style={styles.photoCounterText}>
+                        {index + 1}/{imgCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))
             ) : (
               <View style={styles.imageWrapper}>
                 <View style={styles.noImagePlaceholder}>
@@ -481,24 +354,22 @@ export default function PropertyDetailScreen() {
             )}
           </ScrollView>
 
-          {/* Header overlay */}
+          {/* HEADER BUTTONS */}
           <View style={styles.imageHeader}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <ArrowLeft size={24} color="#fff" />
             </TouchableOpacity>
+
             <View style={styles.headerButtons}>
               <TouchableOpacity
                 style={styles.iconButton}
                 onPress={async () => {
                   try {
-                    const response = await api.properties.toggleFavorite(property.id);
-                    setIsFavourite(response.is_favourite || false);
-                  } catch (e) {
-                    console.error('Failed to toggle favorite:', e);
-                    Alert.alert('Error', 'Failed to update favorite. Please try again.');
+                    const resp = await api.properties.toggleFavorite(property.id);
+                    const fav = resp?.data?.is_favourite ?? false;
+                    setIsFavourite(fav);
+                  } catch {
+                    Alert.alert('Error', 'Failed to update favorite.');
                   }
                 }}
               >
@@ -508,6 +379,7 @@ export default function PropertyDetailScreen() {
                   fill={isFavourite ? '#FF6B6B' : 'transparent'}
                 />
               </TouchableOpacity>
+
               <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
                 <Share size={24} color="#fff" />
               </TouchableOpacity>
@@ -515,251 +387,172 @@ export default function PropertyDetailScreen() {
           </View>
         </View>
 
-        {/* Content */}
+        {/* CONTENT */}
         <View style={styles.contentContainer}>
-          {/* Status & type */}
+          {/* STATUS */}
           <View style={styles.statusRow}>
             <Text
               style={[
                 styles.statusBadge,
-                forSale
-                  ? styles.forSaleBadge
-                  : styles.forRentBadge,
+                forSale ? styles.forSaleBadge : styles.forRentBadge,
               ]}
             >
               {forSale ? 'For Sale' : 'For Rent'}
             </Text>
+
             {propertyType ? (
-              <Text style={styles.propertyTypeText}>
-                {propertyType}
-              </Text>
+              <Text style={styles.propertyTypeText}>{propertyType}</Text>
             ) : null}
           </View>
 
-          {/* Price */}
+          {/* PRICE */}
           <Text style={styles.priceText}>
             €{price.toLocaleString()}
-            {!forSale && (
-              <Text style={styles.periodText}>/mo</Text>
-            )}
+            {!forSale && <Text style={styles.periodText}>/mo</Text>}
           </Text>
 
-          {/* Title */}
+          {/* TITLE */}
           <Text style={styles.title}>{title}</Text>
 
-          {/* Location */}
+          {/* LOCATION */}
           <View style={styles.locationRow}>
             <MapPin size={16} color="#666" />
             <Text style={styles.locationText}>{location}</Text>
           </View>
 
-          {/* Property Details - Improved UI */}
+          {/* DETAILS */}
           <View style={styles.separator} />
           <Text style={styles.sectionTitle}>Property Details</Text>
 
           <View style={styles.detailsGrid}>
             {yearBuilt && (
-              <View style={styles.detailCard}>
-                <Calendar size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Year Built</Text>
-                <Text style={styles.detailCardValue}>{yearBuilt}</Text>
-              </View>
+              <DetailCard
+                icon={<Calendar size={20} color="#0F3460" />}
+                label="Year Built"
+                value={yearBuilt}
+              />
             )}
+
             {floorLevel && (
-              <View style={styles.detailCard}>
-                <Layers size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Floor Level</Text>
-                <Text style={styles.detailCardValue}>{formatOrdinal(floorLevel)}</Text>
-              </View>
+              <DetailCard
+                icon={<Layers size={20} color="#0F3460" />}
+                label="Floor Level"
+                value={formatOrdinal(floorLevel)}
+              />
             )}
+
             {totalFloors && (
-              <View style={styles.detailCard}>
-                <Layers size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Total Floors</Text>
-                <Text style={styles.detailCardValue}>{totalFloors}</Text>
-              </View>
+              <DetailCard
+                icon={<Layers size={20} color="#0F3460" />}
+                label="Total Floors"
+                value={totalFloors}
+              />
             )}
+
             {lotSize && (
-              <View style={styles.detailCard}>
-                <MapPin size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Lot Size</Text>
-                <Text style={styles.detailCardValue}>{lotSize} m²</Text>
-              </View>
+              <DetailCard
+                icon={<MapPin size={20} color="#0F3460" />}
+                label="Lot Size"
+                value={`${lotSize} m²`}
+              />
             )}
-            {parkingSpaces != null && parkingSpaces > 0 && (
-              <View style={styles.detailCard}>
-                <MapPin size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Parking</Text>
-                <Text style={styles.detailCardValue}>{parkingSpaces}</Text>
-              </View>
+
+            {parkingSpaces > 0 && (
+              <DetailCard
+                icon={<MapPin size={20} color="#0F3460" />}
+                label="Parking"
+                value={String(parkingSpaces)}
+              />
             )}
+
             {energyRating && (
-              <View style={styles.detailCard}>
-                <Calendar size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Energy Rating</Text>
-                <Text style={styles.detailCardValue}>{energyRating}</Text>
-              </View>
+              <DetailCard
+                icon={<Calendar size={20} color="#0F3460" />}
+                label="Energy Rating"
+                value={energyRating}
+              />
             )}
+
             {constructionMaterial && (
-              <View style={styles.detailCard}>
-                <Layers size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Construction</Text>
-                <Text style={styles.detailCardValue} numberOfLines={2}>
-                  {constructionMaterial}
-                </Text>
-              </View>
+              <DetailCard
+                icon={<Layers size={20} color="#0F3460" />}
+                label="Construction"
+                value={constructionMaterial}
+              />
             )}
+
             {availableFrom && (
-              <View style={styles.detailCard}>
-                <Calendar size={20} color="#0F3460" />
-                <Text style={styles.detailCardLabel}>Available From</Text>
-                <Text style={styles.detailCardValue}>{availableFrom}</Text>
-              </View>
+              <DetailCard
+                icon={<Calendar size={20} color="#0F3460" />}
+                label="Available From"
+                value={availableFrom}
+              />
             )}
           </View>
 
-          {/* Description */}
+          {/* DESCRIPTION */}
           <View style={styles.separator} />
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.description}>{description}</Text>
 
-          {/* Amenities (kept, below description) */}
+          {/* AMENITIES */}
           {amenities.length > 0 && (
             <>
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Amenities</Text>
+
               <View style={styles.listContainer}>
-                {amenities.map((amenityId: string, idx: number) => {
-                  // Map amenity IDs to user-friendly labels
-                  const amenityLabels: { [key: string]: string } = {
-                    // Building & Infrastructure
-                    elevator: 'Elevator',
-                    internal_staircase: 'Internal Staircase',
-                    secure_door: 'Secure Door',
-                    manned_reception: 'Manned Reception',
-                    attic: 'Attic',
-                    facade: 'Facade',
-                    corner: 'Corner',
-                    
-                    // Interior Features
-                    frames_wooden: 'Wooden Frames',
-                    floor_marble: 'Marble Floor',
-                    single_glass: 'Single Glass',
-                    bright: 'Bright',
-                    airy: 'Airy',
-                    fireplace: 'Fireplace',
-                    furnished: 'Furnished',
-                    storage: 'Storage Space',
-                    painted: 'Painted',
-                    luxury_home: 'Luxury Home',
-                    playroom: 'Playroom',
-                    
-                    // Climate & Comfort
-                    underfloor_heating: 'Underfloor Heating',
-                    air_conditioning: 'Air Conditioning',
-                    solar_water_heating: 'Solar Water Heating',
-                    night_power: 'Night Power',
-                    
-                    // Exterior & Outdoor
-                    garden: 'Garden',
-                    swimming_pool: 'Swimming Pool',
-                    awning: 'Awning',
-                    built_in_bbq: 'Built-in BBQ',
-                    window_screens: 'Window Screens',
-                    balcony: 'Balcony',
-                    
-                    // Parking & Access
-                    parking_space: 'Parking Space',
-                    garage: 'Garage',
-                    access_disabled: 'Access for People with Disabilities',
-                    ev_charging: 'Charging Facilities for Electric Car',
-                    
-                    // Security & Safety
-                    alarm: 'Alarm',
-                    security_system: 'Security System',
-                    doorman: 'Doorman',
-                    
-                    // Utilities & Technology
-                    satellite_receiver: 'Satellite Receiver',
-                    wifi: 'High-Speed Internet',
-                    dishwasher: 'Dishwasher',
-                    laundry: 'Laundry Facilities',
-                    
-                    // Location & Views
-                    residential_zone: 'Residential Zone',
-                    view: 'View',
-                    waterfront: 'Waterfront',
-                    
-                    // Community & Shared
-                    gym: 'Gym',
-                    pool: 'Swimming Pool',
-                    roof_deck: 'Roof Deck',
-                    
-                    // Policy & Lifestyle
-                    pets: 'Pet Friendly',
-                    
-                    // Legacy amenities
-                    parking: 'Parking',
-                    ac: 'Air Conditioning',
-                    heating: 'Central Heating',
-                  };
-                  
-                  const displayName = amenityLabels[amenityId] || amenityId;
-                  
-                  return (
-                    <View key={idx} style={styles.listItem}>
-                      <Text style={styles.bullet}>{'\u2022'}</Text>
-                      <Text style={styles.listText}>{displayName}</Text>
-                    </View>
-                  );
-                })}
+                {amenities.map((am: string, index: number) => (
+                  <View key={index} style={styles.listItem}>
+                    <Text style={styles.bullet}>{'\u2022'}</Text>
+                    <Text style={styles.listText}>{am}</Text>
+                  </View>
+                ))}
               </View>
             </>
           )}
 
-          {/* Virtual Tour / Video */}
+
+          {/* TOUR / VIDEO */}
           {(virtualTourUrl || videoUrl) && (
             <>
               <View style={styles.separator} />
-              <Text style={styles.sectionTitle}>
-                Virtual Tour / Video
-              </Text>
+              <Text style={styles.sectionTitle}>Virtual Tour / Video</Text>
+
               {virtualTourUrl && (
                 <TouchableOpacity
                   style={styles.linkButton}
                   onPress={() => Linking.openURL(virtualTourUrl)}
                 >
-                  <Text style={styles.linkText}>
-                    Open Virtual Tour
-                  </Text>
+                  <Text style={styles.linkText}>Open Virtual Tour</Text>
                 </TouchableOpacity>
               )}
+
               {videoUrl && (
                 <TouchableOpacity
                   style={styles.linkButton}
                   onPress={() => Linking.openURL(videoUrl)}
                 >
-                  <Text style={styles.linkText}>
-                    Watch Video
-                  </Text>
+                  <Text style={styles.linkText}>Watch Video</Text>
                 </TouchableOpacity>
               )}
             </>
           )}
 
-          {/* Property Documents */}
-          {documents && documents.length > 0 && (
+          {/* DOCUMENTS */}
+          {documents.length > 0 && (
             <>
               <View style={styles.separator} />
               <PropertyDocuments documents={documents} />
             </>
           )}
 
-          {/* Location Map */}
-          {(latitude != null && longitude != null) && (
+          {/* MAP */}
+          {latitude && longitude && (
             <>
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Location</Text>
+
               <PropertyMapView
                 latitude={latitude}
                 longitude={longitude}
@@ -767,6 +560,7 @@ export default function PropertyDetailScreen() {
                 location={location}
                 email={user?.email}
               />
+
               <View style={styles.detailRow}>
                 <MapPin size={16} color="#666" />
                 <Text style={styles.detailText}>{location}</Text>
@@ -774,38 +568,29 @@ export default function PropertyDetailScreen() {
             </>
           )}
 
-          {/* Contact Information */}
+          {/* CONTACT INFO */}
           <View style={styles.separator} />
           <Text style={styles.sectionTitle}>Contact Information</Text>
+
           {contactPhone ? (
-            <TouchableOpacity
-              style={styles.contactRow}
-              onPress={handlePhoneClick}
-            >
+            <TouchableOpacity style={styles.contactRow} onPress={handlePhoneClick}>
               <Phone size={16} color="#0F3460" />
-              <Text style={styles.contactText}>
-                {contactPhone}
-              </Text>
+              <Text style={styles.contactText}>{contactPhone}</Text>
             </TouchableOpacity>
           ) : null}
+
           {contactEmail ? (
-            <TouchableOpacity
-              style={styles.contactRow}
-              onPress={handleEmailClick}
-            >
+            <TouchableOpacity style={styles.contactRow} onPress={handleEmailClick}>
               <Mail size={16} color="#0F3460" />
-              <Text style={styles.contactText}>
-                {contactEmail}
-              </Text>
+              <Text style={styles.contactText}>{contactEmail}</Text>
             </TouchableOpacity>
           ) : null}
+
           {!contactPhone && !contactEmail && (
-            <Text style={styles.noContactText}>
-              Contact details not provided.
-            </Text>
+            <Text style={styles.noContactText}>Contact details not provided.</Text>
           )}
 
-          {/* Chat Button */}
+          {/* CHAT BUTTON */}
           {owner && (
             <View style={styles.chatButtonContainer}>
               <ChatButton
@@ -816,90 +601,66 @@ export default function PropertyDetailScreen() {
             </View>
           )}
 
-          {/* Agent Info */}
+          {/* AGENT */}
           {agent && (
             <>
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Agent</Text>
+
               <View style={styles.agentCard}>
                 {agent.photo ? (
-                  <Image
-                    source={{ uri: agent.photo }}
-                    style={styles.agentImage}
-                  />
+                  <Image source={{ uri: agent.photo }} style={styles.agentImage} />
                 ) : null}
+
                 <View style={styles.agentInfo}>
-                  <Text style={styles.agentName}>
-                    {agent.name}
-                  </Text>
-                  <Text style={styles.agentCompany}>
-                    {agent.company}
-                  </Text>
+                  <Text style={styles.agentName}>{agent.name}</Text>
+                  <Text style={styles.agentCompany}>{agent.company}</Text>
+
                   <View style={styles.agentRating}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <Text
-                        key={star}
-                        style={styles.star}
-                      >
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Text key={s} style={styles.star}>
                         ★
                       </Text>
                     ))}
-                    <Text style={styles.ratingText}>
-                      5.0
-                    </Text>
+                    <Text style={styles.ratingText}>5.0</Text>
                   </View>
                 </View>
               </View>
+
               <View style={styles.agentButtons}>
                 <TouchableOpacity
-                  style={[
-                    styles.agentButton,
-                    styles.messageButton,
-                  ]}
+                  style={[styles.agentButton, styles.messageButton]}
                   onPress={handleChatClick}
                 >
-                  <MessageSquare
-                    size={20}
-                    color="#fff"
-                  />
-                  <Text style={styles.agentButtonText}>
-                    Message
-                  </Text>
+                  <MessageSquare size={20} color="#fff" />
+                  <Text style={styles.agentButtonText}>Message</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
-                  style={[
-                    styles.agentButton,
-                    styles.callButton,
-                  ]}
+                  style={[styles.agentButton, styles.callButton]}
                   onPress={handleAgentPhoneClick}
                 >
                   <Phone size={20} color="#fff" />
-                  <Text style={styles.agentButtonText}>
-                    Call Agent
-                  </Text>
+                  <Text style={styles.agentButtonText}>Call Agent</Text>
                 </TouchableOpacity>
               </View>
             </>
           )}
-
         </View>
       </ScrollView>
 
-      {/* Footer */}
+      {/* FOOTER */}
       <View style={styles.footer}>
         <View>
           <Text style={styles.footerPrice}>
             €{price.toLocaleString()}
-            {!forSale && (
-              <Text style={styles.periodText}>/mo</Text>
-            )}
+            {!forSale && <Text style={styles.periodText}>/mo</Text>}
           </Text>
           <Text style={styles.footerSubtext}>
-            {forSale
-              ? 'View Financing Options'
-              : 'Available Now'}
+            {forSale ? 'View Financing Options' : 'Available Now'}
           </Text>
         </View>
+
         {owner && (
           <ChatButton
             sellerId={owner.id}
@@ -912,6 +673,24 @@ export default function PropertyDetailScreen() {
   );
 }
 
+/* ================== SMALL DETAIL CARD COMPONENT ================== */
+const DetailCard = ({
+  icon,
+  label,
+  value,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+}) => (
+  <View style={styles.detailCard}>
+    {icon}
+    <Text style={styles.detailCardLabel}>{label}</Text>
+    <Text style={styles.detailCardValue}>{value}</Text>
+  </View>
+);
+
+/* ============================ STYLES ============================== */
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -921,11 +700,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
   },
   errorText: {
     color: '#E74C3C',
-    fontFamily: 'Poppins-Medium',
     fontSize: 16,
   },
   container: {
@@ -942,22 +719,17 @@ const styles = StyleSheet.create({
   },
   unpublishedText: {
     color: '#856404',
-    fontFamily: 'Poppins-Medium',
     fontSize: 13,
   },
   imageGalleryContainer: {
     width: '100%',
     height: width * 0.8,
-    position: 'relative',
     backgroundColor: '#1A1A1A',
   },
-  imageScroll: {
-    flex: 1,
-  },
+  imageScroll: { flex: 1 },
   imageWrapper: {
-    width: width,
+    width,
     height: '100%',
-    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -973,27 +745,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
   photoCounterText: {
     color: '#fff',
-    fontFamily: 'Poppins-SemiBold',
     fontSize: 13,
-    letterSpacing: 0.3,
   },
   noImagePlaceholder: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#E9ECEF',
   },
   noImageText: {
-    fontFamily: 'Poppins-Medium',
     fontSize: 14,
     color: '#6C757D',
   },
@@ -1002,390 +765,201 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    zIndex: 10,
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: 'rgba(15, 52, 96, 0.9)',
-    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    alignItems: 'center',
   },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  headerButtons: { flexDirection: 'row', gap: 10 },
   iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: 'rgba(15, 52, 96, 0.9)',
-    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  imageCountBadge: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    backgroundColor: 'rgba(15, 52, 96, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  imageCountText: {
-    color: '#fff',
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 12,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
-    marginTop: 4,
-  },
-  detailCard: {
-    width: '47%',
-    margin: 6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 18,
     alignItems: 'center',
-    shadowColor: '#0F3460',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E8EDF2',
   },
-  detailCardLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 11,
-    color: '#6C757D',
-    marginTop: 10,
-    marginBottom: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  detailCardValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 15,
-    color: '#0F3460',
-    textAlign: 'center',
-  },
-  chatButtonContainer: {
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  contentContainer: {
-    padding: 20,
-    backgroundColor: '#F8F9FA',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
+
+  contentContainer: { padding: 20 },
+  statusRow: { flexDirection: 'row', marginBottom: 12, gap: 10 },
   statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 11,
     color: '#fff',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 11,
   },
-  forSaleBadge: {
-    backgroundColor: '#10B981',
-  },
-  forRentBadge: {
-    backgroundColor: '#3B82F6',
-  },
+  forSaleBadge: { backgroundColor: '#10B981' },
+  forRentBadge: { backgroundColor: '#3B82F6' },
+
   propertyTypeText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
-    color: '#0F3460',
     backgroundColor: '#E8EDF2',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    fontSize: 12,
   },
+
   priceText: {
-    fontFamily: 'Poppins-Bold',
     fontSize: 32,
     color: '#0F3460',
     marginBottom: 6,
-    letterSpacing: -0.5,
   },
-  periodText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: '#6C757D',
-  },
+  periodText: { fontSize: 18, color: '#6C757D' },
   title: {
-    fontFamily: 'Poppins-SemiBold',
     fontSize: 22,
     color: '#1A1A1A',
     marginBottom: 10,
-    lineHeight: 32,
   },
+
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    backgroundColor: '#FFFFFF',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8EDF2',
+    backgroundColor: '#FFF',
+    marginBottom: 20,
   },
-  locationText: {
-    marginLeft: 8,
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#495057',
-    flex: 1,
-  },
+  locationText: { marginLeft: 8, fontSize: 14, color: '#495057' },
+
   separator: {
     height: 1,
     backgroundColor: '#E8EDF2',
     marginVertical: 24,
   },
-  sectionTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
-    color: '#0F3460',
-    marginBottom: 16,
-    letterSpacing: -0.3,
-  },
-  description: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 15,
-    color: '#495057',
-    lineHeight: 26,
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E8EDF2',
-  },
-  listContainer: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E8EDF2',
-  },
-  listItem: {
+
+  sectionTitle: { fontSize: 20, color: '#0F3460', marginBottom: 16 },
+
+  detailsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  detailCard: {
+    width: '47%',
+    margin: 6,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
-    marginBottom: 10,
-    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#E8EDF2',
   },
-  bullet: {
-    fontSize: 14,
-    marginRight: 8,
-    color: '#0F3460',
+  detailCardLabel: {
+    fontSize: 11,
+    color: '#6C757D',
+    marginTop: 10,
+    marginBottom: 2,
   },
-  listText: {
-    marginLeft: 4,
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#495057',
-    flex: 1,
-  },
-  linkButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#0F3460',
-    borderRadius: 12,
-    marginBottom: 10,
-    shadowColor: '#0F3460',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  linkText: {
-    fontFamily: 'Poppins-SemiBold',
+  detailCardValue: {
     fontSize: 15,
-    color: '#FFFFFF',
+    color: '#0F3460',
     textAlign: 'center',
   },
+
+  description: {
+    fontSize: 15,
+    color: '#495057',
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8EDF2',
+  },
+
+  listContainer: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8EDF2',
+  },
+  listItem: { flexDirection: 'row', marginBottom: 10 },
+  bullet: { fontSize: 14, marginRight: 8, color: '#0F3460' },
+  listText: { fontSize: 14, color: '#495057' },
+
+  linkButton: {
+    backgroundColor: '#0F3460',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  linkText: { color: '#FFF', fontSize: 15, textAlign: 'center' },
+
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    backgroundColor: '#FFFFFF',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8EDF2',
+    backgroundColor: '#FFF',
+    marginTop: 12,
   },
-  detailLabel: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: '#1A1A1A',
-    marginRight: 6,
-  },
-  detailText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#495057',
-    marginLeft: 8,
-  },
+  detailText: { marginLeft: 8, fontSize: 14, color: '#495057' },
+
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E8EDF2',
-    shadowColor: '#0F3460',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#FFF',
   },
-  contactText: {
-    marginLeft: 12,
-    fontFamily: 'Poppins-Medium',
-    fontSize: 15,
-    color: '#0F3460',
-  },
-  noContactText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#6C757D',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
+  contactText: { marginLeft: 12, fontSize: 15, color: '#0F3460' },
+  noContactText: { fontSize: 14, color: '#6C757D', textAlign: 'center' },
+
+  chatButtonContainer: { marginTop: 20, marginBottom: 12 },
+
   agentCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
-    shadowColor: '#0F3460',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: 16,
+    backgroundColor: '#FFF',
     borderWidth: 1,
     borderColor: '#E8EDF2',
+    marginBottom: 16,
   },
-  agentImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    marginRight: 16,
-    borderWidth: 3,
-    borderColor: '#E8EDF2',
-  },
-  agentInfo: {
-    flex: 1,
-  },
-  agentName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 17,
-    color: '#1A1A1A',
-    marginBottom: 2,
-  },
-  agentCompany: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 13,
-    color: '#6C757D',
-    marginBottom: 6,
-  },
-  agentRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  star: {
-    color: '#FFC107',
-    fontSize: 14,
-    marginRight: 1,
-  },
-  ratingText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
-    color: '#495057',
-    marginLeft: 6,
-  },
-  agentButtons: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    gap: 10,
-  },
+  agentImage: { width: 70, height: 70, borderRadius: 35, marginRight: 16 },
+  agentInfo: { flex: 1 },
+  agentName: { fontSize: 17, color: '#1A1A1A' },
+  agentCompany: { fontSize: 13, color: '#6C757D' },
+  agentRating: { flexDirection: 'row', marginTop: 6 },
+  star: { color: '#FFC107', fontSize: 14 },
+  ratingText: { fontSize: 13, color: '#495057', marginLeft: 6 },
+
+  agentButtons: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   agentButton: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  messageButton: {
-    backgroundColor: '#0F3460',
-  },
-  callButton: {
-    backgroundColor: '#10B981',
-  },
-  agentButtonText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: '#fff',
-    marginLeft: 8,
-  },
+  messageButton: { backgroundColor: '#0F3460' },
+  callButton: { backgroundColor: '#10B981' },
+  agentButtonText: { color: '#FFF', marginLeft: 8, fontSize: 14 },
+
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFF',
     borderTopWidth: 1,
     borderTopColor: '#E8EDF2',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
   },
-  footerPrice: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 22,
-    color: '#0F3460',
-    letterSpacing: -0.3,
-  },
-  footerSubtext: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
-    color: '#6C757D',
-    marginTop: 2,
-  },
+  footerPrice: { fontSize: 22, color: '#0F3460' },
+  footerSubtext: { fontSize: 12, color: '#6C757D' },
 });
+
