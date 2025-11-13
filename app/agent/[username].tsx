@@ -179,9 +179,13 @@ export default function AgentProfileScreen() {
           </View>
         </View>
         <View style={styles.heroActions}>
-          <TouchableOpacity style={styles.heroActionPrimary} onPress={handleMessageAgent}>
-            <MessageCircle size={18} color="#fff" />
-                <Text style={styles.heroActionPrimaryText}>Message</Text>
+          <TouchableOpacity
+            style={styles.heroActionPrimary}
+            onPress={handleMessageAgent}
+            accessibilityRole="button"
+            accessibilityLabel="Message agent"
+          >
+            <MessageCircle size={20} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.heroActionSecondary}
@@ -354,19 +358,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   heroActionPrimary: {
-    flex: 1,
-    backgroundColor: '#10B981',
-    borderRadius: 999,
+    width: 44,
     height: 44,
-    flexDirection: 'row',
+    borderRadius: 22,
+    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-  },
-  heroActionPrimaryText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
   },
   heroActionSecondary: {
     width: 44,
