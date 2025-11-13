@@ -1,6 +1,6 @@
 // app/property/[id].tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,9 +12,9 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
-} from 'react-native';
-import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { useLocalSearchParams, Stack, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Heart,
   Share,
@@ -25,111 +25,94 @@ import {
   MessageSquare,
   Calendar,
   Layers,
-} from 'lucide-react-native';
-import PropertyDocuments from '@/components/property/PropertyDocuments';
-import PropertyMapView from '@/components/property/PropertyMapView';
-import ChatButton from '@/components/property/ChatButton';
-import { useUser } from '@/app/_userbase/UserContext';
-import { api } from '../../config/api';
+} from "lucide-react-native";
 
-const { width } = Dimensions.get('window');
+import PropertyDocuments from "@/components/property/PropertyDocuments";
+import PropertyMapView from "@/components/property/PropertyMapView";
+import ChatButton from "@/components/property/ChatButton";
+import { useUser } from "@/app/_userbase/UserContext";
+import { api } from "../../config/api";
+
+const { width } = Dimensions.get("window");
 
 /* ------------------ NORMALIZER ------------------ */
 function normalizePropertyDetail(item: any) {
   const rawImages = Array.isArray(item.images) ? item.images : [];
-  const images: string[] = rawImages
+  const images = rawImages
     .map((imgObj: any) => {
-      const raw = typeof imgObj === 'string' ? imgObj : imgObj?.image || '';
-      if (!raw) return '';
-      return raw.startsWith('http') ? raw : `https://api.propertpro.com${raw}`;
+      const raw = typeof imgObj === "string" ? imgObj : imgObj?.image || "";
+      if (!raw) return "";
+      return raw.startsWith("http") ? raw : `https://api.propertpro.com${raw}`;
     })
     .filter(Boolean);
 
   let forSale = false;
   if (item.property_status) {
-    forSale = item.property_status === 'for_sale';
-  } else if (typeof item.forSale === 'boolean') {
+    forSale = item.property_status === "for_sale";
+  } else if (typeof item.forSale === "boolean") {
     forSale = item.forSale;
   } else if (item.listing_type) {
-    forSale = item.listing_type.toLowerCase() === 'sale';
+    forSale = item.listing_type.toLowerCase() === "sale";
   }
-
-  const id = item.id;
-  const title = item.title || '';
-  const price = !isNaN(Number(item.price)) ? Number(item.price) : 0;
-  const location = item.location || '';
-
-  let size = 0;
-  if (item.area && !isNaN(Number(item.area))) {
-    size = Math.round(Number(item.area) * 10.764);
-  }
-
-  const propertyType = item.property_type
-    ? item.property_type.charAt(0).toUpperCase() + item.property_type.slice(1)
-    : '';
-
-  const amenities = Array.isArray(item.amenities)
-    ? item.amenities.map((a: any) =>
-        typeof a === 'string' ? a : a.name || String(a)
-      )
-    : [];
-
-  const contactPhone = item.contact_phone || item.contactPhone || '';
-  const contactEmail = item.contact_email || item.contactEmail || '';
-
-  const owner = item.owner
-    ? {
-        id: item.owner.id,
-        name: item.owner.name,
-        photo: item.owner.photo
-          ? item.owner.photo.startsWith('http')
-            ? item.owner.photo
-            : `https://api.propertpro.com${item.owner.photo}`
-          : '',
-      }
-    : null;
-
-  const agent = item.agent
-    ? {
-        name: item.agent.name,
-        photo: item.agent.photo
-          ? item.agent.photo.startsWith('http')
-            ? item.agent.photo
-            : `https://api.propertpro.com${item.agent.photo}`
-          : '',
-        company: item.agent.company,
-        phone: item.agent.phone,
-        email: item.agent.email,
-      }
-    : null;
 
   return {
-    id,
+    id: item.id,
     images,
     forSale,
-    title,
-    price,
-    location,
-    propertyType,
-    description: item.description || '',
-    amenities,
-    contactPhone,
-    contactEmail,
-    owner,
-    agent,
-    yearBuilt: item.year_built ? String(item.year_built) : '',
+    title: item.title || "",
+    price: !isNaN(Number(item.price)) ? Number(item.price) : 0,
+    location: item.location || "",
+    propertyType: item.property_type
+      ? item.property_type.charAt(0).toUpperCase() + item.property_type.slice(1)
+      : "",
+    description: item.description || "",
+    amenities: Array.isArray(item.amenities)
+      ? item.amenities.map((a: any) =>
+          typeof a === "string" ? a : a.name || String(a)
+        )
+      : [],
+    contactPhone: item.contact_phone || item.contactPhone || "",
+    contactEmail: item.contact_email || item.contactEmail || "",
+    owner: item.owner
+      ? {
+          id: item.owner.id,
+          name: item.owner.name,
+          photo: item.owner.photo
+            ? item.owner.photo.startsWith("http")
+              ? item.owner.photo
+              : `https://api.propertpro.com${item.owner.photo}`
+            : "",
+        }
+      : null,
+    agent: item.agent
+      ? {
+          name: item.agent.name,
+          photo: item.agent.photo
+            ? item.agent.photo.startsWith("http")
+              ? item.agent.photo
+              : `https://api.propertpro.com${item.agent.photo}`
+            : "",
+          company: item.agent.company,
+          phone: item.agent.phone,
+          email: item.agent.email,
+        }
+      : null,
+    yearBuilt: item.year_built ? String(item.year_built) : "",
     parkingSpaces:
       item.parking_spaces != null ? Number(item.parking_spaces) : 0,
-    lotSize: item.lot_size ? String(item.lot_size) : '',
-    energyRating: item.energy_rating || '',
-    constructionMaterial: item.construction_material || '',
-    floorLevel: item.floor_level != null ? String(item.floor_level) : '',
-    totalFloors: item.total_floors != null ? String(item.total_floors) : '',
-    availableFrom: item.available_from || '',
-    virtualTourUrl: item.virtual_tour_url || '',
-    videoUrl: item.video_url || '',
+    lotSize: item.lot_size ? String(item.lot_size) : "",
+    energyRating: item.energy_rating || "",
+    constructionMaterial: item.construction_material || "",
+    floorLevel:
+      item.floor_level != null ? String(item.floor_level) : "",
+    totalFloors:
+      item.total_floors != null ? String(item.total_floors) : "",
+    availableFrom: item.available_from || "",
+    virtualTourUrl: item.virtual_tour_url || "",
+    videoUrl: item.video_url || "",
     financingUrl: item.financing_url || null,
-    isPublished: item.is_published != null ? Boolean(item.is_published) : true,
+    isPublished:
+      item.is_published != null ? Boolean(item.is_published) : true,
     isFavourite: Boolean(item.is_favourite),
     latitude:
       item.latitude != null && !isNaN(Number(item.latitude))
@@ -143,19 +126,17 @@ function normalizePropertyDetail(item: any) {
   };
 }
 
-/* ------------------ ORDINAL HELPER ------------------ */
-function formatOrdinal(n: string | number): string {
+/* ------------------ ORDINALS ------------------ */
+function formatOrdinal(n: any) {
   const num = Number(n);
   if (isNaN(num)) return String(n);
   const tens = num % 100;
   if (tens >= 11 && tens <= 13) return `${num}th`;
   const unit = num % 10;
-  return `${num}${unit === 1 ? 'st' : unit === 2 ? 'nd' : unit === 3 ? 'rd' : 'th'}`;
+  return `${num}${unit === 1 ? "st" : unit === 2 ? "nd" : unit === 3 ? "rd" : "th"}`;
 }
 
-/* =======================================================
-   MAIN SCREEN
-========================================================= */
+/* ===================== MAIN SCREEN ======================= */
 export default function PropertyDetailScreen() {
   const { id, source } = useLocalSearchParams();
   const router = useRouter();
@@ -168,39 +149,37 @@ export default function PropertyDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   /* ------------------ Fetch property ------------------ */
-useEffect(() => {
-  let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const params = source ? { params: { source } } : undefined;
-      const res = await api.properties.getById(Number(id), params);
+    const load = async () => {
+      setLoading(true);
+      try {
+        const params = source ? { params: { source } } : undefined;
+        const res = await api.properties.getById(Number(id), params);
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      const data = res?.data ?? res;
-      const normalized = normalizePropertyDetail(data);
+        const data = res?.data ?? res;
+        const normalized = normalizePropertyDetail(data);
 
-      setProperty(normalized);
-      setIsFavourite(Boolean(data.is_favourite));
-    } catch (err) {
-      console.log(err);
-      if (mounted) setError('Failed to load property details.');
-    } finally {
-      if (mounted) setLoading(false);
-    }
-  };
+        setProperty(normalized);
+        setIsFavourite(Boolean(data.is_favourite));
+      } catch (err) {
+        if (mounted) setError("Failed to load property details.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
 
-  load();
+    load();
 
-  return () => {
-    mounted = false;   // <-- THIS MUST NOT BE RETURNED, ONLY EXECUTED
-  };
-}, [id, source]);
+    return () => {
+      mounted = false;
+    };
+  }, [id, source]);
 
-
-  /* ------------------ Loading / error states ------------------ */
+  /* ------------------ Loading / Error ------------------ */
   if (loading)
     return (
       <View style={styles.centered}>
@@ -217,7 +196,7 @@ useEffect(() => {
 
   if (!property) return null;
 
-  /* ------------------ Destructure after load ------------------ */
+  /* ------------------ Destructure ------------------ */
   const {
     images,
     title,
@@ -249,61 +228,21 @@ useEffect(() => {
 
   const imgCount = images.length;
 
-  /* ------------------ Contact handlers ------------------ */
-  const handlePhoneClick = async () => {
-    try {
-      await api.analytics.trackConversion(property.id, 'phone');
-    } catch {}
-    if (contactPhone) Linking.openURL(`tel:${contactPhone}`);
-  };
-
-  const handleEmailClick = async () => {
-    try {
-      await api.analytics.trackConversion(property.id, 'email');
-    } catch {}
-    if (contactEmail) Linking.openURL(`mailto:${contactEmail}`);
-  };
-
-  const handleAgentPhoneClick = async () => {
-    try {
-      if (agent?.phone) {
-        await api.analytics.trackConversion(property.id, 'phone');
-      }
-    } catch {}
-    if (agent?.phone) Linking.openURL(`tel:${agent.phone}`);
-  };
-
-  const handleAgentEmailClick = async () => {
-    try {
-      if (agent?.email) {
-        await api.analytics.trackConversion(property.id, 'email');
-      }
-    } catch {}
-    if (agent?.email) Linking.openURL(`mailto:${agent.email}`);
-  };
-
-  const handleChatClick = async () => {
-    try {
-      await api.analytics.trackConversion(property.id, 'chat');
-    } catch {}
-  };
-
-  const handleShare = () => {
-    Alert.alert('Share', 'Share functionality coming soon.');
-  };
-
   const handleImageScroll = (e: any) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
     setCurrentImageIndex(index);
   };
 
-  /* ======================================================
+  /* ==========================================================
      RENDER
-  ======================================================= */
+  ========================================================== */
   return (
     <SafeAreaView style={styles.safeArea}>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
         {!isPublished && (
           <View style={styles.unpublishedBanner}>
             <Text style={styles.unpublishedText}>
@@ -312,7 +251,7 @@ useEffect(() => {
           </View>
         )}
 
-        {/* IMAGE GALLERY */}
+        {/* ------------------ IMAGE GALLERY ------------------ */}
         <View style={styles.imageGalleryContainer}>
           <ScrollView
             horizontal
@@ -323,16 +262,15 @@ useEffect(() => {
             style={styles.imageScroll}
           >
             {images.length > 0 ? (
-              images.map((imageUri: string, index: number) => (
+              images.map((img: string, index: number) => (
                 <View key={index} style={styles.imageWrapper}>
                   <Image
-                    source={{ uri: imageUri }}
+                    source={{ uri: img }}
                     style={StyleSheet.absoluteFillObject}
                     blurRadius={25}
-                    resizeMode="cover"
                   />
                   <Image
-                    source={{ uri: imageUri }}
+                    source={{ uri: img }}
                     style={styles.reelImage}
                     resizeMode="contain"
                   />
@@ -348,15 +286,20 @@ useEffect(() => {
             ) : (
               <View style={styles.imageWrapper}>
                 <View style={styles.noImagePlaceholder}>
-                  <Text style={styles.noImageText}>No images available</Text>
+                  <Text style={styles.noImageText}>
+                    No images available
+                  </Text>
                 </View>
               </View>
             )}
           </ScrollView>
 
-          {/* HEADER BUTTONS */}
+          {/* ---------------- HEADER BUTTONS ---------------- */}
           <View style={styles.imageHeader}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
               <ArrowLeft size={24} color="#fff" />
             </TouchableOpacity>
 
@@ -365,31 +308,40 @@ useEffect(() => {
                 style={styles.iconButton}
                 onPress={async () => {
                   try {
-                    const resp = await api.properties.toggleFavorite(property.id);
+                    const resp =
+                      await api.properties.toggleFavorite(property.id);
                     const fav = resp?.data?.is_favourite ?? false;
                     setIsFavourite(fav);
                   } catch {
-                    Alert.alert('Error', 'Failed to update favorite.');
+                    Alert.alert(
+                      "Error",
+                      "Failed to update favorite."
+                    );
                   }
                 }}
               >
                 <Heart
                   size={24}
                   color="#fff"
-                  fill={isFavourite ? '#FF6B6B' : 'transparent'}
+                  fill={isFavourite ? "#FF6B6B" : "transparent"}
                 />
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() =>
+                  Alert.alert("Share", "Share coming soon.")
+                }
+              >
                 <Share size={24} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* CONTENT */}
+        {/* ------------------ MAIN CONTENT ------------------ */}
         <View style={styles.contentContainer}>
-          {/* STATUS */}
+          {/* STATUS + TYPE */}
           <View style={styles.statusRow}>
             <Text
               style={[
@@ -397,18 +349,22 @@ useEffect(() => {
                 forSale ? styles.forSaleBadge : styles.forRentBadge,
               ]}
             >
-              {forSale ? 'For Sale' : 'For Rent'}
+              {forSale ? "For Sale" : "For Rent"}
             </Text>
 
             {propertyType ? (
-              <Text style={styles.propertyTypeText}>{propertyType}</Text>
+              <Text style={styles.propertyTypeText}>
+                {propertyType}
+              </Text>
             ) : null}
           </View>
 
           {/* PRICE */}
           <Text style={styles.priceText}>
             €{price.toLocaleString()}
-            {!forSale && <Text style={styles.periodText}>/mo</Text>}
+            {!forSale && (
+              <Text style={styles.periodText}>/mo</Text>
+            )}
           </Text>
 
           {/* TITLE */}
@@ -420,126 +376,129 @@ useEffect(() => {
             <Text style={styles.locationText}>{location}</Text>
           </View>
 
-          {/* DETAILS */}
+          {/* ------------------ DETAILS GRID ------------------ */}
           <View style={styles.separator} />
           <Text style={styles.sectionTitle}>Property Details</Text>
 
           <View style={styles.detailsGrid}>
-            {yearBuilt && (
+            {yearBuilt ? (
               <DetailCard
                 icon={<Calendar size={20} color="#0F3460" />}
                 label="Year Built"
                 value={yearBuilt}
               />
-            )}
+            ) : null}
 
-            {floorLevel && (
+            {floorLevel ? (
               <DetailCard
                 icon={<Layers size={20} color="#0F3460" />}
                 label="Floor Level"
                 value={formatOrdinal(floorLevel)}
               />
-            )}
+            ) : null}
 
-            {totalFloors && (
+            {totalFloors ? (
               <DetailCard
                 icon={<Layers size={20} color="#0F3460" />}
                 label="Total Floors"
                 value={totalFloors}
               />
-            )}
+            ) : null}
 
-            {lotSize && (
+            {lotSize ? (
               <DetailCard
                 icon={<MapPin size={20} color="#0F3460" />}
                 label="Lot Size"
                 value={`${lotSize} m²`}
               />
-            )}
+            ) : null}
 
-            {parkingSpaces > 0 && (
+            {parkingSpaces > 0 ? (
               <DetailCard
                 icon={<MapPin size={20} color="#0F3460" />}
                 label="Parking"
                 value={String(parkingSpaces)}
               />
-            )}
+            ) : null}
 
-            {energyRating && (
+            {energyRating ? (
               <DetailCard
                 icon={<Calendar size={20} color="#0F3460" />}
                 label="Energy Rating"
                 value={energyRating}
               />
-            )}
+            ) : null}
 
-            {constructionMaterial && (
+            {constructionMaterial ? (
               <DetailCard
                 icon={<Layers size={20} color="#0F3460" />}
                 label="Construction"
                 value={constructionMaterial}
               />
-            )}
+            ) : null}
 
-            {availableFrom && (
+            {availableFrom ? (
               <DetailCard
                 icon={<Calendar size={20} color="#0F3460" />}
                 label="Available From"
                 value={availableFrom}
               />
-            )}
+            ) : null}
           </View>
 
-          {/* DESCRIPTION */}
+          {/* ------------------ DESCRIPTION ------------------ */}
           <View style={styles.separator} />
           <Text style={styles.sectionTitle}>Description</Text>
+
           <Text style={styles.description}>{description}</Text>
 
-          {/* AMENITIES */}
+          {/* ------------------ AMENITIES (WEB STYLE PILLS) ------------------ */}
           {amenities.length > 0 && (
             <>
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Amenities</Text>
 
-              <View style={styles.listContainer}>
+              <View style={styles.amenitiesContainer}>
                 {amenities.map((am: string, index: number) => (
-                  <View key={index} style={styles.listItem}>
-                    <Text style={styles.bullet}>{'\u2022'}</Text>
-                    <Text style={styles.listText}>{am}</Text>
+                  <View key={index} style={styles.amenityPill}>
+                    <Text style={styles.amenityText}>{am}</Text>
                   </View>
                 ))}
               </View>
             </>
           )}
 
-
-          {/* TOUR / VIDEO */}
+          {/* ------------------ TOUR / VIDEO ------------------ */}
           {(virtualTourUrl || videoUrl) && (
             <>
               <View style={styles.separator} />
-              <Text style={styles.sectionTitle}>Virtual Tour / Video</Text>
+              <Text style={styles.sectionTitle}>
+                Virtual Tour / Video
+              </Text>
 
-              {virtualTourUrl && (
+              {virtualTourUrl ? (
                 <TouchableOpacity
                   style={styles.linkButton}
                   onPress={() => Linking.openURL(virtualTourUrl)}
                 >
-                  <Text style={styles.linkText}>Open Virtual Tour</Text>
+                  <Text style={styles.linkText}>
+                    Open Virtual Tour
+                  </Text>
                 </TouchableOpacity>
-              )}
+              ) : null}
 
-              {videoUrl && (
+              {videoUrl ? (
                 <TouchableOpacity
                   style={styles.linkButton}
                   onPress={() => Linking.openURL(videoUrl)}
                 >
                   <Text style={styles.linkText}>Watch Video</Text>
                 </TouchableOpacity>
-              )}
+              ) : null}
             </>
           )}
 
-          {/* DOCUMENTS */}
+          {/* ------------------ DOCUMENTS ------------------ */}
           {documents.length > 0 && (
             <>
               <View style={styles.separator} />
@@ -547,8 +506,8 @@ useEffect(() => {
             </>
           )}
 
-          {/* MAP */}
-          {latitude && longitude && (
+          {/* ------------------ MAP ------------------ */}
+          {latitude && longitude ? (
             <>
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Location</Text>
@@ -566,32 +525,48 @@ useEffect(() => {
                 <Text style={styles.detailText}>{location}</Text>
               </View>
             </>
-          )}
+          ) : null}
 
-          {/* CONTACT INFO */}
+          {/* ------------------ CONTACT INFO ------------------ */}
           <View style={styles.separator} />
-          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <Text style={styles.sectionTitle}>
+            Contact Information
+          </Text>
 
           {contactPhone ? (
-            <TouchableOpacity style={styles.contactRow} onPress={handlePhoneClick}>
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() => Linking.openURL(`tel:${contactPhone}`)}
+            >
               <Phone size={16} color="#0F3460" />
-              <Text style={styles.contactText}>{contactPhone}</Text>
+              <Text style={styles.contactText}>
+                {contactPhone}
+              </Text>
             </TouchableOpacity>
           ) : null}
 
           {contactEmail ? (
-            <TouchableOpacity style={styles.contactRow} onPress={handleEmailClick}>
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() =>
+                Linking.openURL(`mailto:${contactEmail}`)
+              }
+            >
               <Mail size={16} color="#0F3460" />
-              <Text style={styles.contactText}>{contactEmail}</Text>
+              <Text style={styles.contactText}>
+                {contactEmail}
+              </Text>
             </TouchableOpacity>
           ) : null}
 
-          {!contactPhone && !contactEmail && (
-            <Text style={styles.noContactText}>Contact details not provided.</Text>
-          )}
+          {!contactPhone && !contactEmail ? (
+            <Text style={styles.noContactText}>
+              Contact details not provided.
+            </Text>
+          ) : null}
 
-          {/* CHAT BUTTON */}
-          {owner && (
+          {/* ------------------ CHAT BUTTON ------------------ */}
+          {owner ? (
             <View style={styles.chatButtonContainer}>
               <ChatButton
                 sellerId={owner.id}
@@ -599,25 +574,32 @@ useEffect(() => {
                 title={title}
               />
             </View>
-          )}
+          ) : null}
 
-          {/* AGENT */}
-          {agent && (
+          {/* ------------------ AGENT ------------------ */}
+          {agent ? (
             <>
               <View style={styles.separator} />
               <Text style={styles.sectionTitle}>Agent</Text>
 
               <View style={styles.agentCard}>
                 {agent.photo ? (
-                  <Image source={{ uri: agent.photo }} style={styles.agentImage} />
+                  <Image
+                    source={{ uri: agent.photo }}
+                    style={styles.agentImage}
+                  />
                 ) : null}
 
                 <View style={styles.agentInfo}>
-                  <Text style={styles.agentName}>{agent.name}</Text>
-                  <Text style={styles.agentCompany}>{agent.company}</Text>
+                  <Text style={styles.agentName}>
+                    {agent.name}
+                  </Text>
+                  <Text style={styles.agentCompany}>
+                    {agent.company}
+                  </Text>
 
                   <View style={styles.agentRating}>
-                    {[1, 2, 3, 4, 5].map(s => (
+                    {[1, 2, 3, 4, 5].map((s) => (
                       <Text key={s} style={styles.star}>
                         ★
                       </Text>
@@ -630,50 +612,59 @@ useEffect(() => {
               <View style={styles.agentButtons}>
                 <TouchableOpacity
                   style={[styles.agentButton, styles.messageButton]}
-                  onPress={handleChatClick}
                 >
                   <MessageSquare size={20} color="#fff" />
-                  <Text style={styles.agentButtonText}>Message</Text>
+                  <Text style={styles.agentButtonText}>
+                    Message
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.agentButton, styles.callButton]}
-                  onPress={handleAgentPhoneClick}
+                  onPress={() =>
+                    Linking.openURL(`tel:${agent.phone}`)
+                  }
                 >
                   <Phone size={20} color="#fff" />
-                  <Text style={styles.agentButtonText}>Call Agent</Text>
+                  <Text style={styles.agentButtonText}>
+                    Call Agent
+                  </Text>
                 </TouchableOpacity>
               </View>
             </>
-          )}
+          ) : null}
         </View>
       </ScrollView>
 
-      {/* FOOTER */}
+      {/* ------------------ FOOTER ------------------ */}
       <View style={styles.footer}>
         <View>
           <Text style={styles.footerPrice}>
             €{price.toLocaleString()}
-            {!forSale && <Text style={styles.periodText}>/mo</Text>}
+            {!forSale && (
+              <Text style={styles.periodText}>/mo</Text>
+            )}
           </Text>
           <Text style={styles.footerSubtext}>
-            {forSale ? 'View Financing Options' : 'Available Now'}
+            {forSale
+              ? "View Financing Options"
+              : "Available Now"}
           </Text>
         </View>
 
-        {owner && (
+        {owner ? (
           <ChatButton
             sellerId={owner.id}
             propertyId={property.id}
             title={title}
           />
-        )}
+        ) : null}
       </View>
     </SafeAreaView>
   );
 }
 
-/* ================== SMALL DETAIL CARD COMPONENT ================== */
+/* ------------------ DETAIL CARD ------------------ */
 const DetailCard = ({
   icon,
   label,
@@ -690,26 +681,29 @@ const DetailCard = ({
   </View>
 );
 
-/* ============================ STYLES ============================== */
+/* =====================================================
+   STYLES — FULL MOBILE THEME MATCHING YOUR WEB UI
+===================================================== */
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#E74C3C',
-    fontSize: 16,
+    backgroundColor: "#F8F9FA",
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: "#F8F9FA",
   },
-  unpublishedBanner: {
+
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    color: "#E74C3C",
+    fontSize: 16,
+  },
+    unpublishedBanner: {
     backgroundColor: '#FFF3CD',
     padding: 14,
     borderRadius: 8,
@@ -720,246 +714,366 @@ const styles = StyleSheet.create({
   unpublishedText: {
     color: '#856404',
     fontSize: 13,
+    fontWeight: '500',
   },
+
+
+  /* ------------------ IMAGE GALLERY ------------------ */
   imageGalleryContainer: {
-    width: '100%',
+    width: "100%",
     height: width * 0.8,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: "#1A1A1A",
   },
   imageScroll: { flex: 1 },
   imageWrapper: {
     width,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
   reelImage: {
-    width: '100%',
-    height: '100%',
-  },
-  photoCounter: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: 'rgba(15, 52, 96, 0.9)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  photoCounterText: {
-    color: '#fff',
-    fontSize: 13,
+    width: "100%",
+    height: "100%",
   },
   noImagePlaceholder: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E9ECEF',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#E9ECEF",
   },
   noImageText: {
     fontSize: 14,
-    color: '#6C757D',
+    color: "#6C757D",
   },
+
   imageHeader: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(15, 52, 96, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(15, 52, 96, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerButtons: { flexDirection: 'row', gap: 10 },
+  headerButtons: {
+    flexDirection: "row",
+    gap: 10,
+  },
   iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(15, 52, 96, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(15, 52, 96, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  photoCounter: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "rgba(15, 52, 96, 0.9)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  photoCounterText: { color: "#fff", fontSize: 13 },
+
+  /* ------------------ CONTENT ------------------ */
+  contentContainer: {
+    padding: 20,
   },
 
-  contentContainer: { padding: 20 },
-  statusRow: { flexDirection: 'row', marginBottom: 12, gap: 10 },
+  /* STATUS & TYPE */
+  statusRow: {
+    flexDirection: "row",
+    marginBottom: 12,
+    gap: 10,
+  },
   statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    color: '#fff',
+    color: "#fff",
     fontSize: 11,
   },
-  forSaleBadge: { backgroundColor: '#10B981' },
-  forRentBadge: { backgroundColor: '#3B82F6' },
+  forSaleBadge: {
+    backgroundColor: "#10B981",
+  },
+  forRentBadge: {
+    backgroundColor: "#3B82F6",
+  },
 
   propertyTypeText: {
-    backgroundColor: '#E8EDF2',
+    backgroundColor: "#E8EDF2",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     fontSize: 12,
+    color: "#0F3460",
   },
 
+  /* PRICE */
   priceText: {
     fontSize: 32,
-    color: '#0F3460',
+    color: "#0F3460",
     marginBottom: 6,
+    fontWeight: "700",
   },
-  periodText: { fontSize: 18, color: '#6C757D' },
+  periodText: {
+    fontSize: 18,
+    color: "#6C757D",
+  },
+
+  /* TITLE */
   title: {
     fontSize: 22,
-    color: '#1A1A1A',
+    color: "#1A1A1A",
     marginBottom: 10,
+    fontWeight: "600",
   },
 
+  /* LOCATION */
   locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8EDF2',
-    backgroundColor: '#FFF',
+    borderColor: "#E8EDF2",
+    backgroundColor: "#FFF",
     marginBottom: 20,
   },
-  locationText: { marginLeft: 8, fontSize: 14, color: '#495057' },
+  locationText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#495057",
+  },
 
+  /* SEPARATOR */
   separator: {
     height: 1,
-    backgroundColor: '#E8EDF2',
+    backgroundColor: "#E8EDF2",
     marginVertical: 24,
   },
 
-  sectionTitle: { fontSize: 20, color: '#0F3460', marginBottom: 16 },
+  /* SECTION TITLE */
+  sectionTitle: {
+    fontSize: 20,
+    color: "#0F3460",
+    marginBottom: 16,
+    fontWeight: "600",
+  },
 
+  /* DETAILS GRID */
   detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginHorizontal: -6,
   },
   detailCard: {
-    width: '47%',
+    width: "47%",
     margin: 6,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 18,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#E8EDF2',
+    borderColor: "#E8EDF2",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
   detailCardLabel: {
     fontSize: 11,
-    color: '#6C757D',
+    color: "#6C757D",
     marginTop: 10,
     marginBottom: 2,
   },
   detailCardValue: {
     fontSize: 15,
-    color: '#0F3460',
-    textAlign: 'center',
+    color: "#0F3460",
+    fontWeight: "600",
+    textAlign: "center",
   },
 
+  /* DESCRIPTION */
   description: {
     fontSize: 15,
-    color: '#495057',
-    backgroundColor: '#FFF',
+    color: "#495057",
+    backgroundColor: "#FFF",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8EDF2',
+    borderColor: "#E8EDF2",
+    lineHeight: 22,
   },
 
-  listContainer: {
-    backgroundColor: '#FFF',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E8EDF2',
+  /* AMENITY PILLS */
+  amenitiesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
-  listItem: { flexDirection: 'row', marginBottom: 10 },
-  bullet: { fontSize: 14, marginRight: 8, color: '#0F3460' },
-  listText: { fontSize: 14, color: '#495057' },
+  amenityPill: {
+    backgroundColor: "#E8EDF2",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  amenityText: {
+    color: "#0F3460",
+    fontSize: 13,
+    fontWeight: "500",
+  },
 
+  /* LINKS */
   linkButton: {
-    backgroundColor: '#0F3460',
+    backgroundColor: "#0F3460",
     paddingVertical: 14,
     borderRadius: 12,
     marginBottom: 10,
   },
-  linkText: { color: '#FFF', fontSize: 15, textAlign: 'center' },
+  linkText: {
+    color: "#FFF",
+    fontSize: 15,
+    textAlign: "center",
+    fontWeight: "500",
+  },
 
+  /* LOCATION ROW AFTER MAP */
   detailRow: {
-    flexDirection: 'row',
-    padding: 12,
+    flexDirection: "row",
+    padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8EDF2',
-    backgroundColor: '#FFF',
+    borderColor: "#E8EDF2",
+    backgroundColor: "#FFF",
     marginTop: 12,
   },
-  detailText: { marginLeft: 8, fontSize: 14, color: '#495057' },
+  detailText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#495057",
+  },
 
+  /* CONTACT */
   contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E8EDF2',
-    backgroundColor: '#FFF',
+    borderColor: "#E8EDF2",
+    backgroundColor: "#FFF",
   },
-  contactText: { marginLeft: 12, fontSize: 15, color: '#0F3460' },
-  noContactText: { fontSize: 14, color: '#6C757D', textAlign: 'center' },
+  contactText: {
+    marginLeft: 12,
+    fontSize: 15,
+    color: "#0F3460",
+  },
+  noContactText: {
+    fontSize: 14,
+    color: "#6C757D",
+    textAlign: "center",
+  },
 
-  chatButtonContainer: { marginTop: 20, marginBottom: 12 },
+  /* CHAT BUTTON */
+  chatButtonContainer: {
+    marginTop: 20,
+    marginBottom: 12,
+  },
 
+  /* AGENT */
   agentCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 20,
     borderRadius: 16,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderWidth: 1,
-    borderColor: '#E8EDF2',
+    borderColor: "#E8EDF2",
     marginBottom: 16,
   },
-  agentImage: { width: 70, height: 70, borderRadius: 35, marginRight: 16 },
+  agentImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginRight: 16,
+  },
   agentInfo: { flex: 1 },
-  agentName: { fontSize: 17, color: '#1A1A1A' },
-  agentCompany: { fontSize: 13, color: '#6C757D' },
-  agentRating: { flexDirection: 'row', marginTop: 6 },
-  star: { color: '#FFC107', fontSize: 14 },
-  ratingText: { fontSize: 13, color: '#495057', marginLeft: 6 },
-
-  agentButtons: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  agentName: {
+    fontSize: 17,
+    color: "#1A1A1A",
+    fontWeight: "600",
+  },
+  agentCompany: {
+    fontSize: 13,
+    color: "#6C757D",
+  },
+  agentRating: {
+    flexDirection: "row",
+    marginTop: 6,
+  },
+  star: {
+    color: "#FFC107",
+    fontSize: 14,
+  },
+  ratingText: {
+    fontSize: 13,
+    color: "#495057",
+    marginLeft: 6,
+  },
+  agentButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 24,
+  },
   agentButton: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     paddingVertical: 14,
     borderRadius: 12,
   },
-  messageButton: { backgroundColor: '#0F3460' },
-  callButton: { backgroundColor: '#10B981' },
-  agentButtonText: { color: '#FFF', marginLeft: 8, fontSize: 14 },
-
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: '#FFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E8EDF2',
+  messageButton: {
+    backgroundColor: "#0F3460",
   },
-  footerPrice: { fontSize: 22, color: '#0F3460' },
-  footerSubtext: { fontSize: 12, color: '#6C757D' },
-});
+  callButton: {
+    backgroundColor: "#10B981",
+  },
+  agentButtonText: {
+    color: "#FFF",
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: "600",
+  },
 
+  /* FOOTER */
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 20,
+    backgroundColor: "#FFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E8EDF2",
+  },
+  footerPrice: {
+    fontSize: 22,
+    color: "#0F3460",
+    fontWeight: "700",
+  },
+  footerSubtext: {
+    fontSize: 12,
+    color: "#6C757D",
+  },
+});
