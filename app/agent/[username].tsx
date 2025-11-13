@@ -145,6 +145,7 @@ export default function AgentProfileScreen() {
   const displayName = (profile.name && profile.name.trim()) || profile.username || 'Agent';
   const initial = displayName.charAt(0).toUpperCase();
   const city = profile.location?.split(',')[0]?.trim() || null;
+  const officeAddress = profile.office?.trim() || null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -178,11 +179,6 @@ export default function AgentProfileScreen() {
               <Text style={styles.heroName} numberOfLines={1}>
                 {displayName}
               </Text>
-              {profile.office ? (
-                <Text style={styles.heroSubtitle} numberOfLines={1}>
-                  {profile.office}
-                </Text>
-              ) : null}
             </View>
           </View>
           <View style={styles.heroHeaderSpacer} />
@@ -300,6 +296,14 @@ export default function AgentProfileScreen() {
                 {profile.website || 'Website unavailable'}
               </Text>
             </TouchableOpacity>
+            {officeAddress ? (
+              <View style={styles.contactButton}>
+                <MapPin size={18} color="#0F3460" />
+                <Text style={[styles.contactButtonLabel, styles.contactButtonAddress]}>
+                  {officeAddress}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </ScrollView>
@@ -530,6 +534,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1F2937',
     flex: 1,
+  },
+  contactButtonAddress: {
+    color: '#4B5563',
   },
   centerContent: {
     flex: 1,

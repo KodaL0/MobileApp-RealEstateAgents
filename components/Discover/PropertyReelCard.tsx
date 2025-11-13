@@ -330,7 +330,7 @@ export default function PropertyReelCard({
                     : uri,
                 }}
                 style={styles.image}
-                resizeMode="contain"
+                resizeMode="cover"
                 onError={handleError}
               />
 
@@ -556,10 +556,21 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: SCREEN_HEIGHT * 0.08,
+    paddingBottom: SCREEN_HEIGHT * 0.12,
   },
   image: {
-    width: SCREEN_WIDTH * 0.98,
-    height: SCREEN_HEIGHT * 0.85,
+    width: SCREEN_WIDTH - 48,
+    height: SCREEN_HEIGHT * 0.68,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: '#111827',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
   gradient: {
     position: 'absolute',
