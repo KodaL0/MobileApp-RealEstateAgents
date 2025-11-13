@@ -183,7 +183,8 @@ export default function PropertyDetailScreen() {
   if (loading)
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#0F3460" />
+        <ActivityIndicator size="large" color="#1F509A"
+ />
       </View>
     );
 
@@ -383,7 +384,7 @@ export default function PropertyDetailScreen() {
           <View style={styles.detailsGrid}>
             {yearBuilt ? (
               <DetailCard
-                icon={<Calendar size={20} color="#0F3460" />}
+                icon={<Calendar size={20} color="#1F509A" />}
                 label="Year Built"
                 value={yearBuilt}
               />
@@ -391,7 +392,7 @@ export default function PropertyDetailScreen() {
 
             {floorLevel ? (
               <DetailCard
-                icon={<Layers size={20} color="#0F3460" />}
+                icon={<Layers size={20} color="#1F509A" />}
                 label="Floor Level"
                 value={formatOrdinal(floorLevel)}
               />
@@ -399,7 +400,7 @@ export default function PropertyDetailScreen() {
 
             {totalFloors ? (
               <DetailCard
-                icon={<Layers size={20} color="#0F3460" />}
+                icon={<Layers size={20} color="#1F509A" />}
                 label="Total Floors"
                 value={totalFloors}
               />
@@ -407,7 +408,7 @@ export default function PropertyDetailScreen() {
 
             {lotSize ? (
               <DetailCard
-                icon={<MapPin size={20} color="#0F3460" />}
+                icon={<MapPin size={20} color="#1F509A" />}
                 label="Lot Size"
                 value={`${lotSize} m²`}
               />
@@ -415,7 +416,7 @@ export default function PropertyDetailScreen() {
 
             {parkingSpaces > 0 ? (
               <DetailCard
-                icon={<MapPin size={20} color="#0F3460" />}
+                icon={<MapPin size={20} color="#1F509A" />}
                 label="Parking"
                 value={String(parkingSpaces)}
               />
@@ -423,7 +424,7 @@ export default function PropertyDetailScreen() {
 
             {energyRating ? (
               <DetailCard
-                icon={<Calendar size={20} color="#0F3460" />}
+                icon={<Calendar size={20} color="#1F509A" />}
                 label="Energy Rating"
                 value={energyRating}
               />
@@ -431,7 +432,7 @@ export default function PropertyDetailScreen() {
 
             {constructionMaterial ? (
               <DetailCard
-                icon={<Layers size={20} color="#0F3460" />}
+                icon={<Layers size={20} color="#1F509A" />}
                 label="Construction"
                 value={constructionMaterial}
               />
@@ -439,7 +440,7 @@ export default function PropertyDetailScreen() {
 
             {availableFrom ? (
               <DetailCard
-                icon={<Calendar size={20} color="#0F3460" />}
+                icon={<Calendar size={20} color="#1F509A" />}
                 label="Available From"
                 value={availableFrom}
               />
@@ -538,7 +539,7 @@ export default function PropertyDetailScreen() {
               style={styles.contactRow}
               onPress={() => Linking.openURL(`tel:${contactPhone}`)}
             >
-              <Phone size={16} color="#0F3460" />
+              <Phone size={16} color="#1F509A" />
               <Text style={styles.contactText}>
                 {contactPhone}
               </Text>
@@ -552,7 +553,7 @@ export default function PropertyDetailScreen() {
                 Linking.openURL(`mailto:${contactEmail}`)
               }
             >
-              <Mail size={16} color="#0F3460" />
+              <Mail size={16} color="#1F509A" />
               <Text style={styles.contactText}>
                 {contactEmail}
               </Text>
@@ -818,13 +819,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     fontSize: 12,
-    color: "#0F3460",
+    color: "#1F509A",
   },
 
   /* PRICE */
   priceText: {
     fontSize: 32,
-    color: "#0F3460",
+    color: "#1F509A",
     marginBottom: 6,
     fontWeight: "700",
   },
@@ -868,7 +869,7 @@ const styles = StyleSheet.create({
   /* SECTION TITLE */
   sectionTitle: {
     fontSize: 20,
-    color: "#0F3460",
+    color: "#1F509A",
     marginBottom: 16,
     fontWeight: "600",
   },
@@ -901,7 +902,7 @@ const styles = StyleSheet.create({
   },
   detailCardValue: {
     fontSize: 15,
-    color: "#0F3460",
+    color: "#1F509A",
     fontWeight: "600",
     textAlign: "center",
   },
@@ -931,14 +932,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   amenityText: {
-    color: "#0F3460",
+    color: "#1F509A",
     fontSize: 13,
     fontWeight: "500",
   },
 
   /* LINKS */
   linkButton: {
-    backgroundColor: "#0F3460",
+    backgroundColor: "#1F509A",
     paddingVertical: 14,
     borderRadius: 12,
     marginBottom: 10,
@@ -980,7 +981,7 @@ const styles = StyleSheet.create({
   contactText: {
     marginLeft: 12,
     fontSize: 15,
-    color: "#0F3460",
+    color: "#1F509A",
   },
   noContactText: {
     fontSize: 14,
@@ -1046,7 +1047,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   messageButton: {
-    backgroundColor: "#0F3460",
+    backgroundColor: "#1F509A"
+,
   },
   callButton: {
     backgroundColor: "#10B981",
@@ -1069,7 +1071,8 @@ const styles = StyleSheet.create({
   },
   footerPrice: {
     fontSize: 22,
-    color: "#0F3460",
+    color: "#1F509A"
+,
     fontWeight: "700",
   },
   footerSubtext: {
