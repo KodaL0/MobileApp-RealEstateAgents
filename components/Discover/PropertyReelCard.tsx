@@ -305,6 +305,27 @@ function PropertyReelCard({
     });
   }, [heartScale, heartOpacity]);
 
+  // Favorite handler with API integration and success message
+  const handleFavorite = useCallback(async () => {
+    try {
+      const response = await api.properties.toggleFavorite(property.id);
+      setIsLiked(response.is_favourite || false);
+      setFavoriteCount(prev =>
+        response.is_favourite ? prev + 1 : Math.max(0, prev - 1)
+      );
+      Alert.alert(
+        'Success',
+        response.is_favourite 
+          ? 'Property added to favorites!' 
+          : 'Property removed from favorites!',
+        [{ text: 'OK' }]
+      );
+    } catch (e: any) {
+      console.error('Failed to toggle favorite:', e);
+      Alert.alert('Error', 'Failed to update favorite. Please try again.');
+    }
+  }, [property.id]);
+
   // Handle touch start to detect taps vs swipes
   const handleTouchStart = useCallback((event: any) => {
     const touch = event.nativeEvent.touches[0];
@@ -341,27 +362,6 @@ function PropertyReelCard({
       lastTap.current = now;
     }
   }, [isLiked, handleFavorite, triggerHeartAnimation]);
-
-  // Favorite handler with API integration and success message
-  const handleFavorite = useCallback(async () => {
-    try {
-      const response = await api.properties.toggleFavorite(property.id);
-      setIsLiked(response.is_favourite || false);
-      setFavoriteCount(prev =>
-        response.is_favourite ? prev + 1 : Math.max(0, prev - 1)
-      );
-      Alert.alert(
-        'Success',
-        response.is_favourite 
-          ? 'Property added to favorites!' 
-          : 'Property removed from favorites!',
-        [{ text: 'OK' }]
-      );
-    } catch (e: any) {
-      console.error('Failed to toggle favorite:', e);
-      Alert.alert('Error', 'Failed to update favorite. Please try again.');
-    }
-  }, [property.id]);
 
   // Chat handler: open or create thread then navigate to chat
   const handleChat = useCallback(async () => {
