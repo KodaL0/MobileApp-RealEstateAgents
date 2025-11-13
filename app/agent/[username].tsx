@@ -144,11 +144,8 @@ export default function AgentProfileScreen() {
 
   const displayName = (profile.name && profile.name.trim()) || profile.username || 'Agent';
   const initial = displayName.charAt(0).toUpperCase();
-  const memberSinceLabel = new Date(profile.date_joined).toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
-  const hasLocation = Boolean(profile.location && profile.location.trim());
+  const addressLine = profile.office?.trim() || null;
+  const city = profile.location?.split(',')[0]?.trim() || null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -162,58 +159,34 @@ export default function AgentProfileScreen() {
           style={styles.heroBackground}
         />
         <View style={styles.heroHeaderRow}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack} accessibilityRole="button" accessibilityLabel="Go back">
-            <ArrowLeft size={20} color="#E2E8F0" />
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <ArrowLeft size={18} color="#E2E8F0" />
           </TouchableOpacity>
+          <Text style={styles.heroHeaderTitle} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <View style={styles.heroHeaderSpacer} />
         </View>
         <View style={styles.heroBody}>
-          {profile.avatar ? (
-            <Image source={{ uri: profile.avatar }} style={styles.heroAvatar} />
-          ) : (
-            <View style={styles.heroFallbackAvatar}>
-              <Text style={styles.heroFallbackInitial}>{initial}</Text>
-            </View>
-          )}
-          <View style={styles.heroInfo}>
-            <Text style={styles.heroName}>{displayName}</Text>
-            <Text style={styles.heroSubtitle}>{profile.office || 'Licensed Agent'}</Text>
-            <View style={styles.heroMetaChips}>
-              {hasLocation && (
-                <View style={styles.heroChip}>
-                  <MapPin size={14} color="#DDE8FF" />
-                  <Text style={styles.heroChipText}>{profile.location}</Text>
-                </View>
-              )}
-              <View style={styles.heroChip}>
-                <Text style={styles.heroChipText}>Member since {memberSinceLabel}</Text>
+          <View style={styles.heroAvatarColumn}>
+            {profile.avatar ? (
+              <Image source={{ uri: profile.avatar }} style={styles.heroAvatar} />
+            ) : (
+              <View style={styles.heroFallbackAvatar}>
+                <Text style={styles.heroFallbackInitial}>{initial}</Text>
               </View>
-            </View>
+            )}
+            {addressLine ? (
+              <Text style={styles.heroAddress} numberOfLines={2}>
+                {addressLine}
+              </Text>
+            ) : null}
           </View>
-        </View>
-        <View style={styles.heroActionRow}>
-          <TouchableOpacity
-            style={styles.heroMessageButton}
-            onPress={handleMessageAgent}
-            accessibilityRole="button"
-            accessibilityLabel="Message agent"
-          >
-            <LinearGradient
-              colors={['#34D399', '#0EA5E9']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroMessageGradient}
-            >
-              <MessageCircle size={20} color="#FFFFFF" />
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.heroShareButton}
-            onPress={() => Alert.alert('Share', 'Sharing coming soon!')}
-            accessibilityRole="button"
-            accessibilityLabel="Share agent profile"
-          >
-            <Share2 size={18} color="#0F3460" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -224,6 +197,42 @@ export default function AgentProfileScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0F3460" />
         }
       >
+        <View style={styles.ctaSection}>
+          <TouchableOpacity
+            style={styles.ctaMessageButton}
+            onPress={handleMessageAgent}
+            accessibilityRole="button"
+            accessibilityLabel="Message agent"
+          >
+            <LinearGradient
+              colors={['#34D399', '#0EA5E9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.ctaMessageGradient}
+            >
+              <MessageCircle size={20} color="#FFFFFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.ctaShareButton}
+            onPress={() => Alert.alert('Share', 'Sharing coming soon!')}
+            accessibilityRole="button"
+            accessibilityLabel="Share agent profile"
+          >
+            <Share2 size={18} color="#0F3460" />
+          </TouchableOpacity>
+        </View>
+
+        {city ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoCardLabel}>City</Text>
+            <View style={styles.infoCardValueRow}>
+              <MapPin size={14} color="#0F3460" />
+              <Text style={styles.infoCardValue}>{city}</Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* Compact Action Buttons */}
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity
@@ -332,10 +341,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(15,28,48,0.45)',
   },
+  heroHeaderTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    paddingHorizontal: 12,
+  },
+  heroHeaderSpacer: {
+    width: 32,
+    height: 32,
+  },
   heroBody: {
-    flexDirection: 'row',
-    gap: 14,
     alignItems: 'center',
+  },
+  heroAvatarColumn: {
+    alignItems: 'center',
+    gap: 8,
   },
   heroAvatar: {
     width: 64,
@@ -357,71 +380,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#EFF6FF',
   },
-  heroInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  heroName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  heroSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.75)',
-  },
-  heroMetaChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10,
-  },
-  heroChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  heroChipText: {
-    color: '#E0E7FF',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  heroActionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  heroMessageButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  heroMessageGradient: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroShareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F9FAFB',
-    alignItems: 'center',
-    justifyContent: 'center',
+  heroAddress: {
+    color: '#E5EDFF',
+    fontSize: 12,
+    textAlign: 'center',
+    maxWidth: 160,
   },
   scroll: {
     flex: 1,
@@ -431,6 +394,71 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
     paddingBottom: 40,
+  },
+  ctaSection: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  ctaMessageButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaMessageGradient: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaShareButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    gap: 8,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  infoCardLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  infoCardValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoCardValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
   },
   actionButtonsRow: {
     flexDirection: 'row',
