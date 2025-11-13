@@ -144,7 +144,13 @@ export default function AgentProfileScreen() {
 
   const displayName = (profile.name && profile.name.trim()) || profile.username || 'Agent';
   const initial = displayName.charAt(0).toUpperCase();
-  const city = profile.location?.split(',')[0]?.trim() || null;
+  const [city, country] = (() => {
+    if (!profile.location) return [null, null];
+    const parts = profile.location.split(',').map(part => part.trim()).filter(Boolean);
+    if (parts.length === 0) return [null, null];
+    if (parts.length === 1) return [parts[0], null];
+    return [parts[0], parts[parts.length - 1]];
+  })();
   const officeAddress = profile.office?.trim() || null;
 
   return (
@@ -167,21 +173,19 @@ export default function AgentProfileScreen() {
           >
             <ArrowLeft size={18} color="#E2E8F0" />
           </TouchableOpacity>
-          <View style={styles.heroHeaderCenter}>
-            {profile.avatar ? (
-              <Image source={{ uri: profile.avatar }} style={styles.heroAvatar} />
-            ) : (
-              <View style={styles.heroFallbackAvatar}>
-                <Text style={styles.heroFallbackInitial}>{initial}</Text>
-              </View>
-            )}
-            <View style={styles.heroHeaderText}>
-              <Text style={styles.heroName} numberOfLines={1}>
-                {displayName}
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.heroTitle} numberOfLines={1}>
+            {displayName}
+          </Text>
           <View style={styles.heroHeaderSpacer} />
+        </View>
+        <View style={styles.heroAvatarRow}>
+          {profile.avatar ? (
+            <Image source={{ uri: profile.avatar }} style={styles.heroAvatar} />
+          ) : (
+            <View style={styles.heroFallbackAvatar}>
+              <Text style={styles.heroFallbackInitial}>{initial}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -220,10 +224,12 @@ export default function AgentProfileScreen() {
 
         {city ? (
           <View style={styles.infoCard}>
-            <Text style={styles.infoCardLabel}>City</Text>
+            <Text style={styles.infoCardLabel}>Location</Text>
             <View style={styles.infoCardValueRow}>
               <MapPin size={14} color="#0F3460" />
-              <Text style={styles.infoCardValue}>{city}</Text>
+              <Text style={styles.infoCardValue}>
+                {country ? `${city}, ${country}` : city}
+              </Text>
             </View>
           </View>
         ) : null}
@@ -330,7 +336,6 @@ const styles = StyleSheet.create({
   },
   heroHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
@@ -344,39 +349,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(15,28,48,0.45)',
   },
-  heroHeaderCenter: {
+  heroTitle: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#F8FAFC',
     paddingHorizontal: 12,
-  },
-  heroHeaderText: {
-    flexShrink: 1,
-    gap: 2,
   },
   heroHeaderSpacer: {
     width: 32,
     height: 32,
   },
+  heroAvatarRow: {
+    alignItems: 'flex-start',
+    marginTop: 8,
+  },
   heroAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.45)',
   },
   heroFallbackAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: '#1D4ED8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroFallbackInitial: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '700',
     color: '#EFF6FF',
   },
