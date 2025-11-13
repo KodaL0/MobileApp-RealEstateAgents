@@ -152,11 +152,6 @@ function PropertyReelCard({
   onViewProperty?: () => void;
   source?: string;
 }) {
-  // Defensive check for property
-  if (!property) {
-    return null;
-  }
-
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(property?.is_favourite || false);
   const [favoriteCount, setFavoriteCount] = useState<number>(() => {
@@ -210,8 +205,9 @@ function PropertyReelCard({
     } as never);
   }, [ownerUsername, router]);
 
-  // Memoize images array
+  // Memoize images array with safe property access
   const images = useMemo(() => {
+    if (!property) return [getValidUrl()];
     if (property.images && property.images.length > 0) {
       return property.images
         .map((img: any) =>
@@ -220,7 +216,7 @@ function PropertyReelCard({
         .filter(Boolean);
     }
     return [getValidUrl()];
-  }, [property.images, getValidUrl]);
+  }, [property, getValidUrl]);
 
   const handleScroll = useCallback((event: any) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
@@ -258,9 +254,9 @@ function PropertyReelCard({
     return Number.isFinite(numeric) ? numeric : null;
   }, []);
 
-  const bedroomsValue = useMemo(() => parseNumericValue(property.bedrooms), [property.bedrooms, parseNumericValue]);
-  const bathroomsValue = useMemo(() => parseNumericValue(property.bathrooms), [property.bathrooms, parseNumericValue]);
-  const areaValue = useMemo(() => parseNumericValue(property.area), [property.area, parseNumericValue]);
+  const bedroomsValue = useMemo(() => property ? parseNumericValue(property.bedrooms) : null, [property, parseNumericValue]);
+  const bathroomsValue = useMemo(() => property ? parseNumericValue(property.bathrooms) : null, [property, parseNumericValue]);
+  const areaValue = useMemo(() => property ? parseNumericValue(property.area) : null, [property, parseNumericValue]);
 
   const formatBathrooms = useCallback((value: number | null) => {
     if (value === null) return null;
@@ -418,6 +414,10 @@ function PropertyReelCard({
     }
   }, []);
 
+  // Defensive check after all hooks (following rules of hooks)
+  if (!property) {
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
@@ -890,16 +890,8 @@ const styles = StyleSheet.create({
   },
 });
 
-// Export memoized component for performance
-export default memo(PropertyReelCard, (prevProps, nextProps) => {
-  // Custom comparison for better performance with safe property access
-  if (!prevProps.property || !nextProps.property) {
-    return prevProps.property === nextProps.property;
-  }
-  return (
-    prevProps.property.id === nextProps.property.id &&
-    prevProps.property.is_favourite === nextProps.property.is_favourite &&
-    prevProps.property.favorites_count === nextProps.property.favorites_count &&
-    prevProps.source === nextProps.source
-  );
-});
+// Memoized component for performance
+const MemoizedPropertyReelCard = memo(PropertyReelCard);
+
+// Export memoized component
+export default MemoizedPropertyReelCard;
