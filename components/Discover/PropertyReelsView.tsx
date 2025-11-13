@@ -237,10 +237,11 @@ export default function PropertyReelsView() {
           offset: SCREEN_HEIGHT * index,
           index,
         })}
-        windowSize={3}
-        initialNumToRender={2}
-        maxToRenderPerBatch={2}
-        removeClippedSubviews={true}
+        windowSize={5}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={false}
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
         }}

@@ -60,31 +60,69 @@ const OptimizedImage = memo(({
   containerStyle?: any;
 }) => {
   const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   
   const handleError = useCallback(() => {
     setImageError(true);
+    setImageLoading(false);
     onError?.();
   }, [onError]);
 
+  const handleLoad = useCallback(() => {
+    setImageLoading(false);
+  }, []);
+
+  const imageUri = imageError
+    ? 'https://via.placeholder.com/800x600?text=No+Image'
+    : uri;
+
   return (
     <View style={containerStyle || style}>
+      {/* Loading placeholder */}
+      {imageLoading && !imageError && (
+        <View style={[
+          StyleSheet.absoluteFillObject,
+          {
+            backgroundColor: '#111827',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1,
+          }
+        ]}>
+          <ActivityIndicator size="large" color="#6b7280" />
+        </View>
+      )}
+      
+      {/* Error placeholder */}
+      {imageError && (
+        <View style={[
+          StyleSheet.absoluteFillObject,
+          {
+            backgroundColor: '#111827',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1,
+          }
+        ]}>
+          <Text style={{ color: '#6b7280', fontSize: 12 }}>Image unavailable</Text>
+        </View>
+      )}
+      
       <Image
-        source={{
-          uri: imageError
-            ? 'https://via.placeholder.com/800x600?text=No+Image'
-            : uri,
-        }}
+        source={{ uri: imageUri }}
         style={[
           StyleSheet.absoluteFillObject,
-          { width: '100%', height: '100%' }
+          { width: '100%', height: '100%' },
+          imageLoading && { opacity: 0 }
         ]}
         resizeMode="cover"
         onError={handleError}
+        onLoad={handleLoad}
         blurRadius={blurRadius}
         // Performance optimizations
         cache="force-cache"
-        // Ensure consistent rendering
-        defaultSource={undefined}
+        // Progressive loading
+        progressiveRenderingEnabled={true}
       />
     </View>
   );
@@ -441,9 +479,9 @@ function PropertyReelCard({
           snapToInterval={SCREEN_WIDTH}
           snapToAlignment="center"
           // Performance optimizations
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={2}
-          windowSize={3}
+          removeClippedSubviews={false}
+          maxToRenderPerBatch={1}
+          windowSize={2}
         >
           {images.map((uri: string, index: number) => (
             <View key={`image-${index}`} style={styles.imageWrapper}>
@@ -702,6 +740,7 @@ const styles = StyleSheet.create({
     paddingBottom: SCREEN_HEIGHT * 0.12,
     // Ensure consistent positioning regardless of image content
     position: 'relative',
+    backgroundColor: '#000',
   },
   image: {
     // Fixed dimensions for consistency - all images render at same size
