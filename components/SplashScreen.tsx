@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Image, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, Image, Animated, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface SplashScreenProps {
@@ -16,6 +16,9 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
   const shimmerAnim = useRef(new Animated.Value(-width)).current;
 
   useEffect(() => {
+    // Native driver only works on iOS/Android, not on web
+    const useNative = Platform.OS !== 'web';
+
     // Start animations sequence
     const animationSequence = Animated.sequence([
       // Initial fade in and scale
@@ -23,13 +26,13 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 800,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
         Animated.spring(scaleAnim, {
           toValue: 1,
           tension: 50,
           friction: 7,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
       ]),
       
@@ -37,7 +40,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       Animated.timing(logoRotateAnim, {
         toValue: 1,
         duration: 1000,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
     ]);
 
@@ -47,12 +50,12 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
         Animated.timing(pulseAnim, {
           toValue: 1.1,
           duration: 1000,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 1000,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
       ])
     );
@@ -62,7 +65,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       Animated.timing(shimmerAnim, {
         toValue: width,
         duration: 2000,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       })
     );
 
@@ -76,7 +79,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }).start(() => {
         onFinish();
       });

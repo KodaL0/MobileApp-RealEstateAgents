@@ -322,19 +322,22 @@ function PropertyReelCard({
     heartScale.setValue(0);
     heartOpacity.setValue(1);
 
+    // Native driver only works on iOS/Android, not on web
+    const useNative = Platform.OS !== 'web';
+
     Animated.parallel([
       Animated.spring(heartScale, {
         toValue: 1.2,
         friction: 3,
         tension: 40,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
       Animated.sequence([
         Animated.delay(200),
         Animated.timing(heartOpacity, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
       ]),
     ]).start(() => {
