@@ -35,17 +35,29 @@ import type { FeedProperty } from '@/app/features/types';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
 
-// Memoized image component for performance
+// Calculate consistent image dimensions
+const IMAGE_PADDING = 48;
+const IMAGE_WIDTH = SCREEN_WIDTH - IMAGE_PADDING;
+const IMAGE_ASPECT_RATIO = 16 / 9;
+const IMAGE_MAX_HEIGHT = SCREEN_HEIGHT * 0.68;
+const IMAGE_HEIGHT = Math.min(
+  IMAGE_WIDTH / IMAGE_ASPECT_RATIO,
+  IMAGE_MAX_HEIGHT
+);
+
+// Memoized image component for performance with consistent sizing
 const OptimizedImage = memo(({ 
   uri, 
   style, 
   blurRadius = 0,
-  onError 
+  onError,
+  containerStyle
 }: { 
   uri: string; 
   style: any; 
   blurRadius?: number;
   onError?: () => void;
+  containerStyle?: any;
 }) => {
   const [imageError, setImageError] = useState(false);
   
@@ -55,19 +67,26 @@ const OptimizedImage = memo(({
   }, [onError]);
 
   return (
-    <Image
-      source={{
-        uri: imageError
-          ? 'https://via.placeholder.com/800x600?text=No+Image'
-          : uri,
-      }}
-      style={style}
-      resizeMode="cover"
-      onError={handleError}
-      blurRadius={blurRadius}
-      // Performance optimizations
-      cache="force-cache"
-    />
+    <View style={containerStyle || style}>
+      <Image
+        source={{
+          uri: imageError
+            ? 'https://via.placeholder.com/800x600?text=No+Image'
+            : uri,
+        }}
+        style={[
+          StyleSheet.absoluteFillObject,
+          { width: '100%', height: '100%' }
+        ]}
+        resizeMode="cover"
+        onError={handleError}
+        blurRadius={blurRadius}
+        // Performance optimizations
+        cache="force-cache"
+        // Ensure consistent rendering
+        defaultSource={undefined}
+      />
+    </View>
   );
 });
 
@@ -430,15 +449,19 @@ function PropertyReelCard({
                   style={StyleSheet.absoluteFillObject}
                   blurRadius={25}
                   onError={() => handleImageError(index)}
+                  containerStyle={StyleSheet.absoluteFillObject}
                 />
               )}
 
-              {/* Main image */}
-              <OptimizedImage
-                uri={uri}
-                style={styles.image}
-                onError={() => handleImageError(index)}
-              />
+              {/* Main image - consistent sizing with fixed aspect ratio */}
+              <View style={styles.image}>
+                <OptimizedImage
+                  uri={uri}
+                  style={StyleSheet.absoluteFillObject}
+                  onError={() => handleImageError(index)}
+                  containerStyle={StyleSheet.absoluteFillObject}
+                />
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -672,10 +695,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: SCREEN_HEIGHT * 0.08,
     paddingBottom: SCREEN_HEIGHT * 0.12,
+    // Ensure consistent positioning regardless of image content
+    position: 'relative',
   },
   image: {
-    width: SCREEN_WIDTH - 48,
-    height: SCREEN_HEIGHT * 0.68,
+    // Fixed dimensions for consistency - all images render at same size
+    width: IMAGE_WIDTH,
+    height: IMAGE_HEIGHT,
     borderRadius: 28,
     overflow: 'hidden',
     backgroundColor: '#111827',
@@ -684,6 +710,8 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 12 },
     elevation: 8,
+    // Ensure consistent positioning
+    alignSelf: 'center',
   },
   gradient: {
     position: 'absolute',
