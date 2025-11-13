@@ -144,7 +144,6 @@ export default function AgentProfileScreen() {
 
   const displayName = (profile.name && profile.name.trim()) || profile.username || 'Agent';
   const initial = displayName.charAt(0).toUpperCase();
-  const addressLine = profile.office?.trim() || null;
   const city = profile.location?.split(',')[0]?.trim() || null;
 
   return (
@@ -167,13 +166,7 @@ export default function AgentProfileScreen() {
           >
             <ArrowLeft size={18} color="#E2E8F0" />
           </TouchableOpacity>
-          <Text style={styles.heroHeaderTitle} numberOfLines={1}>
-            {displayName}
-          </Text>
-          <View style={styles.heroHeaderSpacer} />
-        </View>
-        <View style={styles.heroBody}>
-          <View style={styles.heroAvatarColumn}>
+          <View style={styles.heroHeaderCenter}>
             {profile.avatar ? (
               <Image source={{ uri: profile.avatar }} style={styles.heroAvatar} />
             ) : (
@@ -181,12 +174,18 @@ export default function AgentProfileScreen() {
                 <Text style={styles.heroFallbackInitial}>{initial}</Text>
               </View>
             )}
-            {addressLine ? (
-              <Text style={styles.heroAddress} numberOfLines={2}>
-                {addressLine}
+            <View style={styles.heroHeaderText}>
+              <Text style={styles.heroName} numberOfLines={1}>
+                {displayName}
               </Text>
-            ) : null}
+              {profile.office ? (
+                <Text style={styles.heroSubtitle} numberOfLines={1}>
+                  {profile.office}
+                </Text>
+              ) : null}
+            </View>
           </View>
+          <View style={styles.heroHeaderSpacer} />
         </View>
       </View>
 
@@ -341,24 +340,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(15,28,48,0.45)',
   },
-  heroHeaderTitle: {
+  heroHeaderCenter: {
     flex: 1,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
     paddingHorizontal: 12,
+  },
+  heroHeaderText: {
+    flexShrink: 1,
+    gap: 2,
   },
   heroHeaderSpacer: {
     width: 32,
     height: 32,
-  },
-  heroBody: {
-    alignItems: 'center',
-  },
-  heroAvatarColumn: {
-    alignItems: 'center',
-    gap: 8,
   },
   heroAvatar: {
     width: 64,
@@ -379,12 +375,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '700',
     color: '#EFF6FF',
-  },
-  heroAddress: {
-    color: '#E5EDFF',
-    fontSize: 12,
-    textAlign: 'center',
-    maxWidth: 160,
   },
   scroll: {
     flex: 1,
@@ -410,7 +400,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   ctaMessageButton: {
-    flex: 1,
+    width: 48,
     height: 48,
     borderRadius: 24,
     overflow: 'hidden',
