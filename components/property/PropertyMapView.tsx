@@ -1,16 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+// components/property/PropertyMapView.tsx
 
-// Fix for default marker icons in React Leaflet
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface PropertyMapViewProps {
   latitude: number;
@@ -19,15 +10,6 @@ interface PropertyMapViewProps {
   location?: string;
   email?: string;
 }
-
-// Map Panner component - same as web version
-const PanTo: React.FC<{ lat: number; lng: number }> = ({ lat, lng }) => {
-  const map = useMap();
-  useEffect(() => {
-    map.setView([lat, lng], 13, { animate: false });
-  }, [lat, lng, map]);
-  return null;
-};
 
 export default function PropertyMapView({
   latitude,
@@ -38,17 +20,18 @@ export default function PropertyMapView({
 }: PropertyMapViewProps) {
   const [address, setAddress] = useState('Loading address…');
 
-  // Reverse-geocode current coords - same as web version
+  // Reverse geocode (safe)
   useEffect(() => {
     (async () => {
-      const params = new URLSearchParams({
-        format: 'json',
-        lat: latitude.toString(),
-        lon: longitude.toString(),
-        addressdetails: '1',
-        ...(email ? { email } : {})
-      });
       try {
+        const params = new URLSearchParams({
+          format: 'json',
+          lat: String(latitude),
+          lon: String(longitude),
+          addressdetails: '1',
+          ...(email ? { email } : {}),
+        });
+
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`);
         const data = await res.json();
         setAddress(data.display_name || location || 'Address not found');
@@ -58,55 +41,29 @@ export default function PropertyMapView({
     })();
   }, [latitude, longitude, email, location]);
 
-  // For web platform, use react-leaflet directly
-  if (Platform.OS === 'web') {
-    return (
-      <div style={{ width: '100%', height: '300px', borderRadius: '12px', overflow: 'hidden' }}>
-        <MapContainer
-          center={[latitude, longitude]}
-          zoom={13}
-          scrollWheelZoom={false}
-          style={{ width: '100%', height: '100%' }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <PanTo lat={latitude} lng={longitude} />
-          <Marker position={[latitude, longitude] as [number, number]}>
-            <Popup>{address}</Popup>
-          </Marker>
-        </MapContainer>
-      </div>
-    );
-  }
-
-  // For native platforms, show a placeholder or use a native map component
-  // For now, we'll show coordinates as fallback
   return (
     <View style={styles.container}>
       <View style={styles.placeholder}>
-        <View style={styles.placeholderContent}>
-          <View style={styles.coordinateRow}>
-            <View style={styles.coordinateItem}>
-              <View style={styles.coordinateLabel}>Latitude</View>
-              <View style={styles.coordinateValue}>{latitude.toFixed(6)}</View>
-            </View>
-            <View style={styles.coordinateItem}>
-              <View style={styles.coordinateLabel}>Longitude</View>
-              <View style={styles.coordinateValue}>{longitude.toFixed(6)}</View>
-            </View>
+        <Text style={styles.title}>Location Preview</Text>
+
+        <View style={styles.row}>
+          <View style={styles.box}>
+            <Text style={styles.label}>Latitude</Text>
+            <Text style={styles.value}>{latitude.toFixed(6)}</Text>
           </View>
-          {address && (
-            <View style={styles.addressContainer}>
-              <View style={styles.addressLabel}>Address</View>
-              <View style={styles.addressValue}>{address}</View>
-            </View>
-          )}
-          <View style={styles.note}>
-            Map view available on web platform
+
+          <View style={styles.box}>
+            <Text style={styles.label}>Longitude</Text>
+            <Text style={styles.value}>{longitude.toFixed(6)}</Text>
           </View>
         </View>
+
+        <View style={styles.addressBox}>
+          <Text style={styles.label}>Address</Text>
+          <Text style={styles.address}>{address}</Text>
+        </View>
+
+        <Text style={styles.note}>Map temporarily disabled — UI test mode</Text>
       </View>
     </View>
   );
@@ -115,79 +72,67 @@ export default function PropertyMapView({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 300,
+    height: 260,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    marginTop: 12,
   },
   placeholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  placeholderContent: {
-    width: '100%',
-    maxWidth: 400,
-  },
-  coordinateRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 12,
-  },
-  coordinateItem: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    padding: 16,
+    justifyContent: 'center',
   },
-  coordinateLabel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 11,
-    color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  coordinateValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
+  title: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 10,
     color: '#0F3460',
+    textAlign: 'center',
   },
-  addressContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  row: {
+    flexDirection: 'row',
+    gap: 12,
     marginBottom: 12,
   },
-  addressLabel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 11,
-    color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+  box: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#EEE',
   },
-  addressValue: {
-    fontFamily: 'Poppins-Regular',
+  label: {
+    fontSize: 11,
+    color: '#777',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  value: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F3460',
+  },
+  addressBox: {
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#EEE',
+    marginBottom: 10,
+  },
+  address: {
     fontSize: 13,
     color: '#333',
-    lineHeight: 18,
   },
   note: {
-    fontFamily: 'Poppins-Regular',
     fontSize: 11,
     color: '#999',
     textAlign: 'center',
+    marginTop: 8,
     fontStyle: 'italic',
   },
 });
-
