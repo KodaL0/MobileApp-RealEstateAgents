@@ -152,8 +152,13 @@ function PropertyReelCard({
   onViewProperty?: () => void;
   source?: string;
 }) {
+  // Defensive check for property
+  if (!property) {
+    return null;
+  }
+
   const router = useRouter();
-  const [isLiked, setIsLiked] = useState(property.is_favourite || false);
+  const [isLiked, setIsLiked] = useState(property?.is_favourite || false);
   const [favoriteCount, setFavoriteCount] = useState<number>(() => {
     return property?.favorites_count ?? 0;
   });
@@ -887,7 +892,10 @@ const styles = StyleSheet.create({
 
 // Export memoized component for performance
 export default memo(PropertyReelCard, (prevProps, nextProps) => {
-  // Custom comparison for better performance
+  // Custom comparison for better performance with safe property access
+  if (!prevProps.property || !nextProps.property) {
+    return prevProps.property === nextProps.property;
+  }
   return (
     prevProps.property.id === nextProps.property.id &&
     prevProps.property.is_favourite === nextProps.property.is_favourite &&
