@@ -1,8 +1,9 @@
 // File: app/(tabs)/_layout.tsx
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, usePathname, useRouter } from 'expo-router';
+import React, { useMemo } from 'react';
 import { StyleSheet, Platform, Dimensions } from 'react-native';
 import { Home, Search, MapPin, MessageSquare, User } from 'lucide-react-native';
+import { getLastChatRoute } from '../features/chat/navigationState';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IS_SMALL_SCREEN = SCREEN_WIDTH < 450 || SCREEN_HEIGHT < 900;
@@ -23,6 +24,12 @@ export default function TabLayout() {
   const tabBarStyle = IS_SMALL_SCREEN 
     ? [styles.tabBar, styles.tabBarSmall, getShadow()]
     : [styles.tabBar, getShadow()];
+  const router = useRouter();
+  const pathname = usePathname();
+  const isInChatStack = useMemo(
+    () => pathname?.startsWith('/(tabs)/chat') ?? false,
+    [pathname]
+  );
 
   return (
     <Tabs
@@ -61,6 +68,20 @@ export default function TabLayout() {
         options={{
           title: IS_SMALL_SCREEN ? '' : 'Chat',
           tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
+        }}
+        listeners={{
+          tabPress: e => {
+            if (!isInChatStack) {
+              e.preventDefault();
+              const target = getLastChatRoute() || '/(tabs)/chat';
+              if (target !== pathname) {
+                router.push(target);
+              }
+            } else if (pathname !== '/(tabs)/chat') {
+              e.preventDefault();
+              router.replace('/(tabs)/chat');
+            }
+          },
         }}
       />
       <Tabs.Screen

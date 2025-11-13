@@ -10,11 +10,13 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, usePathname, useFocusEffect } from 'expo-router';
 import { useChat } from '../../features/chat/context/ChatContext';
 import { useUser } from '../../_userbase/UserContext';
-import { Home, Clock, User } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Home, Clock, User, Search } from 'lucide-react-native';
 import type { Thread } from '../../features/types';
+import { setLastChatRoute } from '../../features/chat/navigationState';
 
 export default function ThreadList() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function ThreadList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'property' | 'dm'>('dm');
   const [filtered, setFiltered] = useState<Thread[]>(threads);
+  const pathname = usePathname();
 
   // Handle URL parameters for creating new threads (from property details)
   useEffect(() => {
@@ -87,6 +90,14 @@ export default function ThreadList() {
     setFiltered(list);
   }, [threads, searchTerm, activeTab, getLastMessage]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (pathname) {
+        setLastChatRoute(pathname);
+      }
+    }, [pathname])
+  );
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -97,39 +108,63 @@ export default function ThreadList() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
-        <TextInput
-          style={styles.search}
-          placeholder="Search conversations..."
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-        />
-      </View>
+    <LinearGradient
+      colors={['#EEF2FF', '#FFFFFF']}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>Messages</Text>
+            <Text style={styles.subtitle}>
+              Continue the conversation or start a new connection.
+            </Text>
+          </View>
+          <View style={styles.avatarShell}>
+            <User size={20} color="#FFFFFF" />
+          </View>
+        </View>
 
-      {/* Tab selector */}
-      <View style={styles.tabRow}>
-        {/* DM tab on the left */}
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'dm' && styles.tabActive]}
-          onPress={() => setActiveTab('dm')}
-        >
-          <User size={18} color={activeTab === 'dm' ? '#0F3460' : '#666'} />
-        </TouchableOpacity>
-        {/* Property tab on the right */}
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'property' && styles.tabActive]}
-          onPress={() => setActiveTab('property')}
-        >
-          <Home size={18} color={activeTab === 'property' ? '#0F3460' : '#666'} />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.searchWrapper}>
+          <View style={styles.search}>
+            <Search size={18} color="#5B6C8F" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search conversations..."
+              placeholderTextColor="#8C9AC2"
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+            />
+          </View>
+        </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={item => item.id}
-        renderItem={({ item: thread }) => {
+        {/* Tab selector */}
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'dm' && styles.tabActive]}
+            onPress={() => setActiveTab('dm')}
+          >
+            <View style={[styles.tabIcon, activeTab === 'dm' && styles.tabIconActive]}>
+              <User size={18} color={activeTab === 'dm' ? '#0F3460' : '#5B6C8F'} />
+            </View>
+            <Text style={[styles.tabLabel, activeTab === 'dm' && styles.tabLabelActive]}>Direct</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'property' && styles.tabActive]}
+            onPress={() => setActiveTab('property')}
+          >
+            <View style={[styles.tabIcon, activeTab === 'property' && styles.tabIconActive]}>
+              <Home size={18} color={activeTab === 'property' ? '#0F3460' : '#5B6C8F'} />
+            </View>
+            <Text style={[styles.tabLabel, activeTab === 'property' && styles.tabLabelActive]}>Property</Text>
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={filtered}
+          keyExtractor={item => item.id}
+          contentContainerStyle={filtered.length === 0 ? styles.emptyListContent : styles.listContent}
+          renderItem={({ item: thread }) => {
           const last = getLastMessage(thread.id);
           const unread = (messages[thread.id] || []).filter(
             m => !m.read_at && m.sender !== user?.id
@@ -181,35 +216,76 @@ export default function ThreadList() {
               </View>
             </TouchableOpacity>
           );
-        }}
-      />
-    </SafeAreaView>
+          }}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Start a conversation with an agent or property owner directly from a listing.
+              </Text>
+            </View>
+          }
+        />
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  gradient: { flex: 1 },
+  container: { flex: 1, backgroundColor: 'transparent' },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  title: { fontSize: 28, fontWeight: '700', color: '#0F3460' },
+  subtitle: { marginTop: 4, fontSize: 14, color: '#5B6C8F', maxWidth: 240 },
+  avatarShell: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0F3460',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F3460',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  searchWrapper: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: '#f0f0f0',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CBD5F5',
+    shadowColor: '#0F3460',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#0F3460' },
-  search: {
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 20,
-  },
+  searchInput: { flex: 1, fontSize: 15, color: '#0F3460' },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderColor: '#f0f0f0',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E3E8FF',
+    backgroundColor: 'rgba(255,255,255,0.88)',
   },
   avatar: { marginRight: 12, position: 'relative' },
   iconBg: {
@@ -243,18 +319,66 @@ const styles = StyleSheet.create({
   tabRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    gap: 12,
   },
   tabBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 8,
-    backgroundColor: '#F0F2F5',
+    gap: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    paddingVertical: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CBD5F5',
   },
   tabActive: {
-    backgroundColor: '#DCE4FF',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#0F3460',
+    shadowColor: '#0F3460',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
+  tabIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 52, 96, 0.12)',
+  },
+  tabIconActive: {
+    backgroundColor: 'rgba(15, 52, 96, 0.18)',
+  },
+  tabLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5B6C8F',
+  },
+  tabLabelActive: {
+    color: '#FFFFFF',
+  },
+  emptyState: {
+    marginTop: 60,
+    marginHorizontal: 32,
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#0F3460',
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4,
+  },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#0F3460' },
+  emptySubtitle: { fontSize: 14, color: '#5B6C8F', textAlign: 'center' },
+  listContent: { paddingBottom: 24 },
+  emptyListContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: 48 },
 });
