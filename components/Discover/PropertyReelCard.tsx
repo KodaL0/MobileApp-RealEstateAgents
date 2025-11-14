@@ -119,10 +119,6 @@ const OptimizedImage = memo(({
         onError={handleError}
         onLoad={handleLoad}
         blurRadius={blurRadius}
-        // Performance optimizations
-        cache="force-cache"
-        // Progressive loading
-        progressiveRenderingEnabled={true}
       />
     </View>
   );
@@ -537,10 +533,6 @@ function PropertyReelCard({
           decelerationRate="fast"
           snapToInterval={SCREEN_WIDTH}
           snapToAlignment="center"
-          // Performance optimizations
-          removeClippedSubviews={false}
-          maxToRenderPerBatch={1}
-          windowSize={2}
         >
           {images.map((uri: string, index: number) => (
             <View key={`image-${index}`} style={styles.imageWrapper}>
