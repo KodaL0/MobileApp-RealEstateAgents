@@ -1,296 +1,931 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, {
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+  memo,
+  useEffect,
+} from 'react';
 import {
   View,
-  FlatList,
+  Text,
   StyleSheet,
   Dimensions,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
   ActivityIndicator,
-  Text,
-  StatusBar,
+  Animated,
+  Alert,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import PropertyReelCard from './PropertyReelCard';
+import {
+  Heart,
+  MapPin,
+  Square,
+  UserCircle,
+  MessageCircle,
+  Share,
+  Bed,
+  Bath,
+} from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { api } from '@/config/api';
+import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
-import type { ViewToken } from 'react-native';
 import type { FeedProperty } from '@/app/features/types';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const BASE_URL = 'https://propertprodjango.onrender.com';
 
-type FeedListItem = FeedProperty & { __cycle?: number; __listKey?: string };
+// 9:16 vertical frame – clamped so it doesn't exceed the screen
+const REEL_ASPECT_RATIO = 16 / 9;
+const REEL_HEIGHT = Math.min(
+  SCREEN_WIDTH * REEL_ASPECT_RATIO,
+  SCREEN_HEIGHT * 0.9
+);
 
-export default function PropertyReelsView() {
-  const [properties, setProperties] = useState<FeedListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [nextPage, setNextPage] = useState<number | null>(2);
-  const [hasMore, setHasMore] = useState(true);
-  const flatListRef = useRef<FlatList>(null);
-  const { isAuthenticated, isLoading: authLoading } = useUser();
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
-  const isFetchingRef = useRef(false);
-  const propertiesRef = useRef<FeedListItem[]>([]);
-  const nextPageRef = useRef<number | null>(2);
-  const hasMoreRef = useRef(true);
-  const cycleRef = useRef(0);
-  const hasInitializedRef = useRef(false);
-  const scrollOffsetRef = useRef<number>(0);
+// ---------- OptimizedImage (unchanged logic, used for blur BG) ----------
+const OptimizedImage = memo(
+  ({
+    uri,
+    style,
+    blurRadius = 0,
+    onError,
+    containerStyle,
+  }: {
+    uri: string;
+    style: any;
+    blurRadius?: number;
+    onError?: () => void;
+    containerStyle?: any;
+  }) => {
+    const [imageError, setImageError] = useState(false);
+    const [imageLoading, setImageLoading] = useState(true);
 
-  // Keep refs in sync with state
+    const handleError = useCallback(() => {
+      setImageError(true);
+      setImageLoading(false);
+      onError?.();
+    }, [onError]);
+
+    const handleLoad = useCallback(() => {
+      setImageLoading(false);
+    }, []);
+
+    const imageUri = imageError
+      ? 'https://via.placeholder.com/800x600?text=No+Image'
+      : uri;
+
+    return (
+      <View style={containerStyle || style}>
+        {imageLoading && !imageError && (
+          <View
+            style={[
+              StyleSheet.absoluteFillObject,
+              styles.imageLoadingOverlay,
+            ]}
+          >
+            <ActivityIndicator size="large" color="#6b7280" />
+          </View>
+        )}
+
+        {imageError && (
+          <View
+            style={[
+              StyleSheet.absoluteFillObject,
+              styles.imageErrorOverlay,
+            ]}
+          >
+            <Text style={styles.imageErrorText}>Image unavailable</Text>
+          </View>
+        )}
+
+        <Image
+          source={{ uri: imageUri }}
+          style={[StyleSheet.absoluteFillObject, style]}
+          resizeMode="cover"
+          onError={handleError}
+          onLoad={handleLoad}
+          blurRadius={blurRadius}
+        />
+      </View>
+    );
+  }
+);
+OptimizedImage.displayName = 'OptimizedImage';
+
+// ---------- Carousel dots ----------
+const CarouselDots = memo(
+  ({ count, currentIndex }: { count: number; currentIndex: number }) => {
+    if (count <= 1) return null;
+
+    return (
+      <View style={styles.carouselDotsContainer}>
+        {Array.from({ length: count }).map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.carouselDot,
+              index === currentIndex && styles.carouselDotActive,
+            ]}
+          />
+        ))}
+      </View>
+    );
+  }
+);
+CarouselDots.displayName = 'CarouselDots';
+
+// ---------- Main Reel Card ----------
+function PropertyReelCard({
+  property,
+  onViewProperty,
+  source,
+}: {
+  property: FeedProperty;
+  onViewProperty?: () => void;
+  source?: string;
+}) {
+  const router = useRouter();
+  const [isLiked, setIsLiked] = useState(property?.is_favourite || false);
+  const [favoriteCount, setFavoriteCount] = useState<number>(
+    property?.favorites_count ?? 0
+  );
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+  const lastTap = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const touchStartX = useRef<number>(0);
+  const { getOrCreateThread } = useChat();
+  const { isAuthenticated } = useUser();
+  const hasInitialFavoriteMeta =
+    typeof property?.favorites_count === 'number';
+
   useEffect(() => {
-    propertiesRef.current = properties;
-    nextPageRef.current = nextPage;
-    hasMoreRef.current = hasMore;
-  }, [properties, nextPage, hasMore]);
+    setIsLiked(property?.is_favourite || false);
+  }, [property?.is_favourite]);
 
-  const fetchFeed = useCallback(
-    async (page: number = 1, append: boolean = false) => {
-      if (isFetchingRef.current) return;
-      isFetchingRef.current = true;
+  useEffect(() => {
+    if (typeof property?.favorites_count === 'number') {
+      setFavoriteCount(property.favorites_count);
+    }
+  }, [property?.favorites_count]);
+
+  useEffect(() => {
+    if (!property?.id || hasInitialFavoriteMeta) return;
+
+    let isMounted = true;
+
+    const fetchFavoriteMeta = async () => {
+      try {
+        const details = await api.properties.getById(property.id);
+        if (!isMounted) return;
+
+        if (typeof details?.favorites_count === 'number') {
+          setFavoriteCount(details.favorites_count);
+        }
+        if (typeof details?.is_favourite === 'boolean') {
+          setIsLiked(details.is_favourite);
+        }
+      } catch (error) {
+        console.warn(
+          'PropertyReelCard: Failed to refresh favorite metadata',
+          error
+        );
+      }
+    };
+
+    fetchFavoriteMeta();
+    return () => {
+      isMounted = false;
+    };
+  }, [property?.id, hasInitialFavoriteMeta]);
+
+  const owner = useMemo(() => property?.owner ?? {}, [property?.owner]);
+  const ownerIdValue = owner?.id ?? null;
+  const ownerId = useMemo(() => {
+    if (ownerIdValue === null || ownerIdValue === undefined) return NaN;
+    return Number(ownerIdValue);
+  }, [ownerIdValue]);
+
+  const agentName: string | null = useMemo(
+    () => owner?.name ?? owner?.username ?? null,
+    [owner?.name, owner?.username]
+  );
+  const ownerUsername: string | null = useMemo(
+    () => owner?.username ?? null,
+    [owner?.username]
+  );
+
+  const getValidUrl = useCallback((uri?: string) => {
+    if (!uri) return 'https://via.placeholder.com/800x600?text=No+Image';
+    return uri.startsWith('http') ? uri : `${BASE_URL}${uri}`;
+  }, []);
+
+  const handleAgentProfilePress = useCallback(() => {
+    if (!ownerUsername) {
+      Alert.alert('Unavailable', 'Agent profile is currently unavailable.');
+      return;
+    }
+
+    router.push({
+      pathname: '/agent/[username]',
+      params: { username: ownerUsername },
+    } as never);
+  }, [ownerUsername, router]);
+
+  const images = useMemo(() => {
+    if (!property) return [getValidUrl()];
+    if (property.images && property.images.length > 0) {
+      return property.images
+        .map((img: any) =>
+          typeof img === 'string' ? getValidUrl(img) : getValidUrl(img.image)
+        )
+        .filter(Boolean);
+    }
+    return [getValidUrl()];
+  }, [property, getValidUrl]);
+
+  const handleScroll = useCallback((event: any) => {
+    const index = Math.round(
+      event.nativeEvent.contentOffset.x / SCREEN_WIDTH
+    );
+    setCurrentIndex(index);
+  }, []);
+
+  const formatPrice = useCallback(
+    (price: number) =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 0,
+      }).format(price || 0),
+    []
+  );
+
+  const parseNumericValue = useCallback(
+    (value: number | string | null | undefined): number | null => {
+      if (value === null || value === undefined) return null;
+      const numeric = typeof value === 'string' ? parseFloat(value) : value;
+      return Number.isFinite(numeric) ? numeric : null;
+    },
+    []
+  );
+
+  const bedroomsValue = useMemo(
+    () => (property ? parseNumericValue(property.bedrooms) : null),
+    [property, parseNumericValue]
+  );
+  const bathroomsValue = useMemo(
+    () => (property ? parseNumericValue(property.bathrooms) : null),
+    [property, parseNumericValue]
+  );
+  const areaValue = useMemo(
+    () => (property ? parseNumericValue(property.area) : null),
+    [property, parseNumericValue]
+  );
+
+  const formatBathrooms = useCallback((value: number | null) => {
+    if (value === null) return null;
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  }, []);
+
+  const handleViewPress = useCallback(() => {
+    if (onViewProperty) {
+      onViewProperty();
+    } else if (property?.id) {
+      const queryParams = source ? `?source=${source}` : '';
+      router.push(`/property/${property.id}${queryParams}`);
+    }
+  }, [onViewProperty, property?.id, source, router]);
+
+  const handleTitlePress = useCallback(() => {
+    handleViewPress();
+  }, [handleViewPress]);
+
+  // Heart animation
+  const triggerHeartAnimation = useCallback(() => {
+    setShowHeartAnimation(true);
+    heartScale.setValue(0);
+    heartOpacity.setValue(1);
+
+    const useNative = Platform.OS !== 'web';
+
+    Animated.parallel([
+      Animated.spring(heartScale, {
+        toValue: 1.2,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: useNative,
+      }),
+      Animated.sequence([
+        Animated.delay(200),
+        Animated.timing(heartOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: useNative,
+        }),
+      ]),
+    ]).start(() => {
+      setShowHeartAnimation(false);
+      heartScale.setValue(0);
+    });
+  }, [heartScale, heartOpacity]);
+
+  const handleFavorite = useCallback(async () => {
+    try {
+      const response = await api.properties.toggleFavorite(property.id);
+      setIsLiked(response.is_favourite || false);
+
+      setFavoriteCount(prev =>
+        response.is_favourite ? prev + 1 : Math.max(0, prev - 1)
+      );
 
       try {
-        console.log(
-          `[Feed] requesting page ${page} (append=${append}) | isAuthenticated=${isAuthenticated}`
+        const details = await api.properties.getById(property.id);
+        if (typeof details?.favorites_count === 'number') {
+          setFavoriteCount(details.favorites_count);
+        }
+      } catch (fetchError) {
+        console.warn(
+          'PropertyReelCard: Failed to refresh favorites_count after toggle',
+          fetchError
         );
-        if (!append) {
-          setLoading(true);
-        } else {
-          setLoadingMore(true);
-        }
-        setError(null);
-
-        const response = await api.feed.list({ page });
-        const newProperties = response.results || [];
-
-        if (newProperties.length > 0) {
-          let cycle = cycleRef.current;
-
-          if (!append) {
-            cycleRef.current = 0;
-            cycle = 0;
-          } else if (page === 1 && !response.next) {
-            cycleRef.current += 1;
-            cycle = cycleRef.current;
-          }
-
-          const decorated = newProperties.map((item: any, idx: number) => ({
-            ...item,
-            __cycle: cycle,
-            __listKey: `cycle-${cycle}-property-${item?.id ?? idx}`,
-          }));
-
-          if (append) {
-            setProperties(prev => [...prev, ...decorated]);
-          } else {
-            setProperties(decorated);
-          }
-          console.log(
-            `[Feed] loaded ${decorated.length} items for page ${page} (append=${append}) | cycle=${cycle}`
-          );
-        } else if (!append && page === 1) {
-          setProperties([]);
-          console.log('[Feed] initial load returned 0 items');
-        }
-
-        // Update pagination state
-        if (response.next) {
-          setNextPage(page + 1);
-          setHasMore(true);
-        } else if (newProperties.length > 0) {
-          // Loop back to page 1 for infinite scroll
-          setNextPage(1);
-          setHasMore(true);
-        } else {
-          setNextPage(null);
-          setHasMore(false);
-        }
-      } catch (err: any) {
-        console.error('Error fetching feed:', err);
-        if (err.response?.status === 401) {
-          setError('Please log in to view your property feed.');
-        } else {
-          setError('Failed to load feed. Please try again.');
-        }
-        if (!append) {
-          setProperties([]);
-        }
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        isFetchingRef.current = false;
       }
-    },
-    [isAuthenticated]
-  );
-
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
-      if (!viewableItems.length || !isAuthenticated) return;
-
-      const index = viewableItems[0].index ?? 0;
-      const total = propertiesRef.current.length;
-      const currentNextPage = nextPageRef.current;
-      const currentHasMore = hasMoreRef.current;
-
-      if (
-        currentHasMore &&
-        !isFetchingRef.current &&
-        total >= 5 &&
-        index >= total - 2 &&
-        currentNextPage
-      ) {
-        fetchFeed(currentNextPage, true);
-      }
-
-      const currentItem = propertiesRef.current[index];
-      const itemId = currentItem?.id ?? 'unknown';
-      console.log(`[Feed] user viewing index ${index} of ${total} | propertyId=${itemId}`);
-    },
-    [isAuthenticated, fetchFeed]
-  );
-
-  // Initial fetch - only on mount and auth state change
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (isAuthenticated) {
-      // Only fetch if we haven't initialized yet
-      if (!hasInitializedRef.current) {
-        hasInitializedRef.current = true;
-        fetchFeed(1, false);
-      }
-    } else {
-      // Reset only if auth state changes to unauthenticated
-      if (hasInitializedRef.current) {
-        hasInitializedRef.current = false;
-      }
-      setLoading(false);
-      setLoadingMore(false);
-      setError('Please log in to view your property feed.');
-      setProperties([]);
-      setHasMore(false);
-      setNextPage(null);
+    } catch (e: any) {
+      console.error('Failed to toggle favorite:', e);
+      Alert.alert('Error', 'Failed to update favorite. Please try again.');
     }
-    // Only depend on auth state, not fetchFeed to prevent refetch on navigation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]);
+  }, [property.id]);
 
-  // Handle screen focus - don't refetch, just ensure we have data
-  useFocusEffect(
-    useCallback(() => {
-      // When screen comes into focus, don't refetch if we already have data
-      // This prevents refetching when navigating back from agent profile
-      if (isAuthenticated && !authLoading && properties.length === 0 && !loading && !hasInitializedRef.current) {
-        hasInitializedRef.current = true;
-        fetchFeed(1, false);
+  // Tap / double-tap handler
+  const handleTouchStart = useCallback((event: any) => {
+    const touch = event.nativeEvent.touches[0];
+    if (touch) {
+      touchStartY.current = touch.pageY;
+      touchStartX.current = touch.pageX;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (event: any) => {
+      const touch = event.nativeEvent.changedTouches?.[0];
+      if (!touch) return;
+
+      const deltaY = Math.abs(touch.pageY - touchStartY.current);
+      const deltaX = Math.abs(touch.pageX - touchStartX.current);
+
+      if (deltaY > 15 || deltaX > 15) return;
+
+      const now = Date.now();
+      const DOUBLE_TAP_DELAY = 300;
+
+      if (lastTap.current && now - lastTap.current < DOUBLE_TAP_DELAY) {
+        if (!isLiked) {
+          handleFavorite();
+        }
+        triggerHeartAnimation();
+      } else {
+        lastTap.current = now;
       }
-    }, [isAuthenticated, authLoading, properties.length, loading, fetchFeed])
+    },
+    [isLiked, handleFavorite, triggerHeartAnimation]
   );
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0F3460" />
-        <Text style={styles.loadingText}>Loading properties...</Text>
-      </View>
-    );
-  }
+  const handleChat = useCallback(async () => {
+    if (isChatLoading) return;
 
-  if (error) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to start a chat with the agent.'
+      );
+      router.push('/(tabs)/profile');
+      return;
+    }
 
-  if (properties.length === 0) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emptyText}>No properties available</Text>
-      </View>
-    );
-  }
+    const propertyId = property?.id ? Number(property.id) : null;
+    if (!ownerId || Number.isNaN(ownerId) || !propertyId || Number.isNaN(propertyId)) {
+      Alert.alert('Unavailable', 'Could not identify the agent for this property.');
+      return;
+    }
+
+    try {
+      setIsChatLoading(true);
+      const threadId = await getOrCreateThread(
+        ownerId,
+        propertyId,
+        property?.title
+      );
+
+      api.analytics
+        .trackConversion(propertyId, 'chat')
+        .catch(err =>
+          console.warn('Failed to track chat conversion:', err)
+        );
+
+      router.push(`/chat/${threadId}`);
+    } catch (e: any) {
+      console.error('Failed to initiate chat:', e);
+      Alert.alert('Error', 'Failed to open chat. Please try again.');
+    } finally {
+      setIsChatLoading(false);
+    }
+  }, [
+    isChatLoading,
+    isAuthenticated,
+    ownerId,
+    property?.id,
+    property?.title,
+    getOrCreateThread,
+    router,
+  ]);
+
+  const handleShare = useCallback(async () => {
+    try {
+      Alert.alert(
+        'Success',
+        'Share tracked! Full sharing functionality coming soon.',
+        [{ text: 'OK' }]
+      );
+    } catch (e: any) {
+      console.error('Failed to track share:', e);
+      Alert.alert('Error', 'Failed to track share. Please try again.');
+    }
+  }, []);
+
+  if (!property) return null;
+
+  // Tag line (top-left)
+  const propertyType = property.property_type
+    ? property.property_type.toUpperCase()
+    : 'PROPERTY';
+  const country = property.country || 'Unknown';
+  const statusLabel =
+    property.property_status === 'for_sale' ? 'For Sale' : 'For Rent';
+  const tagLine = `${propertyType} · ${country} · ${statusLabel}`;
 
   return (
-    <View style={styles.container}>
-      <StatusBar hidden />
-      <FlatList
-        ref={flatListRef}
-        data={properties}
-        renderItem={({ item }) => <PropertyReelCard property={item} source="feed" />}
-        keyExtractor={(item, index) => item?.__listKey ?? `property-${item?.id ?? index}-${index}`}
-        pagingEnabled
-        showsVerticalScrollIndicator={false}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        snapToInterval={SCREEN_HEIGHT}
-        viewabilityConfig={viewabilityConfig.current}
-        onViewableItemsChanged={onViewableItemsChanged}
-        onScroll={(event) => {
-          scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-        }}
-        scrollEventThrottle={16}
-        getItemLayout={(data, index) => ({
-          length: SCREEN_HEIGHT,
-          offset: SCREEN_HEIGHT * index,
-          index,
-        })}
-        windowSize={5}
-        initialNumToRender={1}
-        maxToRenderPerBatch={1}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={false}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-        }}
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={styles.footerLoader}>
-              <ActivityIndicator size="small" color="#0F3460" />
-              <Text style={styles.loadingMoreText}>Loading more...</Text>
+    <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
+      <View
+        style={styles.container}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onStartShouldSetResponder={() => false}
+        onMoveShouldSetResponder={() => false}
+      >
+        {/* IMAGE CAROUSEL – fixed 9:16-ish frame, blur + contain */}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.imageScroll}
+          decelerationRate="fast"
+          snapToInterval={SCREEN_WIDTH}
+          snapToAlignment="center"
+        >
+          {images.map((uri: string, index: number) => (
+            <View key={`image-${index}`} style={styles.imageWrapper}>
+              {/* Blurred BG */}
+              <OptimizedImage
+                uri={uri}
+                style={StyleSheet.absoluteFillObject}
+                containerStyle={StyleSheet.absoluteFillObject}
+                blurRadius={25}
+              />
+
+              {/* Dark overlay to boost contrast */}
+              <View style={styles.imageOverlay} />
+
+              {/* Foreground 9:16 frame – full image visible (contain) */}
+              <View style={styles.imageFrame}>
+                <Image
+                  source={{ uri }}
+                  style={styles.image}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
-          ) : null
-        }
-      />
-    </View>
+          ))}
+        </ScrollView>
+
+        {/* Gradient from bottom for text legibility */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
+          style={styles.bottomGradient}
+        />
+
+        {/* Top bar: compact tags + photo counter */}
+        <View style={styles.topBar}>
+          <Text style={styles.tagLine} numberOfLines={1}>
+            {tagLine}
+          </Text>
+          {images.length > 1 && (
+            <View style={styles.photoCounter}>
+              <Text style={styles.photoCounterText}>
+                {currentIndex + 1}/{images.length}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Carousel dots (optional, subtle) */}
+        <CarouselDots count={images.length} currentIndex={currentIndex} />
+
+        {/* Heart animation overlay */}
+        {showHeartAnimation && (
+          <Animated.View
+            style={[
+              styles.heartAnimation,
+              {
+                opacity: heartOpacity,
+                transform: [{ scale: heartScale }],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Heart size={80} color="#FF385C" fill="#FF385C" />
+          </Animated.View>
+        )}
+
+        {/* RIGHT-SIDE ACTION COLUMN: Heart → Chat → Share → Agent → View */}
+        <View style={styles.sideActions}>
+          {/* Heart + count */}
+          <TouchableOpacity
+            style={styles.iconCircle}
+            onPress={handleFavorite}
+            activeOpacity={0.8}
+          >
+            <Heart
+              size={28}
+              color="#fff"
+              fill={isLiked ? '#FF385C' : 'transparent'}
+              strokeWidth={2}
+            />
+          </TouchableOpacity>
+          <Text style={styles.likeCount}>{favoriteCount}</Text>
+
+          {/* Chat */}
+          <TouchableOpacity
+            style={styles.iconCircle}
+            onPress={handleChat}
+            disabled={isChatLoading}
+            activeOpacity={0.8}
+          >
+            {isChatLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <MessageCircle size={28} color="#fff" strokeWidth={2.2} />
+            )}
+          </TouchableOpacity>
+
+          {/* Share */}
+          <TouchableOpacity
+            style={styles.iconCircle}
+            onPress={handleShare}
+            activeOpacity={0.8}
+          >
+            <Share size={28} color="#fff" strokeWidth={2} />
+          </TouchableOpacity>
+
+          {/* Agent */}
+          <TouchableOpacity
+            style={styles.iconCircle}
+            onPress={handleAgentProfilePress}
+            activeOpacity={0.8}
+          >
+            <UserCircle size={28} color="#fff" strokeWidth={2} />
+          </TouchableOpacity>
+
+          {/* View */}
+          <TouchableOpacity
+            style={styles.viewCircle}
+            onPress={handleViewPress}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.viewText}>View</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* BOTTOM CAPTION INFO */}
+        <View style={styles.bottomInfo}>
+          {agentName && (
+            <TouchableOpacity
+              onPress={handleAgentProfilePress}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.agentName}>{agentName}</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={handleTitlePress}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.title} numberOfLines={2}>
+              {property.title || 'Untitled Property'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Price row */}
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(property.price)}</Text>
+            <Text style={styles.priceLabel}>
+              {property.property_status === 'for_sale'
+                ? 'Purchase Price'
+                : '/month'}
+            </Text>
+          </View>
+
+          {/* Location */}
+          <View style={styles.locationRow}>
+            <MapPin size={16} color="#10b981" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {property.location || 'Unknown Location'}
+            </Text>
+          </View>
+
+          {/* Stats row */}
+          <View style={styles.statsRow}>
+            {bedroomsValue !== null && (
+              <View style={styles.statPill}>
+                <Bed size={14} color="#fff" />
+                <Text style={styles.statText}>
+                  {bedroomsValue.toString()}
+                </Text>
+              </View>
+            )}
+            {formatBathrooms(bathroomsValue) && (
+              <View style={styles.statPill}>
+                <Bath size={14} color="#fff" />
+                <Text style={styles.statText}>
+                  {formatBathrooms(bathroomsValue)}
+                </Text>
+              </View>
+            )}
+            {areaValue !== null && (
+              <View style={styles.statPill}>
+                <Square size={14} color="#fff" />
+                <Text style={styles.statText}>
+                  {areaValue.toLocaleString()} m²
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
+const ICON_CIRCLE_SIZE = 40;
+
 const styles = StyleSheet.create({
-  container: {
+  safeContainer: {
     flex: 1,
     backgroundColor: '#000',
   },
-  centerContainer: {
-    flex: 1,
+  container: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  imageScroll: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  imageWrapper: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    position: 'relative',
+    backgroundColor: '#000',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  errorText: {
-    fontSize: 16,
-    color: '#FF385C',
-    textAlign: 'center',
+  imageFrame: {
+    width: SCREEN_WIDTH,
+    height: REEL_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
+  image: {
+    width: '100%',
+    height: '100%',
   },
-  footerLoader: {
-    paddingVertical: 20,
+  bottomGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.45,
+  },
+
+  // Loading / error overlay for OptimizedImage
+  imageLoadingOverlay: {
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  imageErrorOverlay: {
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  imageErrorText: {
+    color: '#6b7280',
+    fontSize: 12,
+  },
+
+  // Top bar
+  topBar: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  tagLine: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    maxWidth: SCREEN_WIDTH * 0.7,
+  },
+  photoCounter: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  photoCounterText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Carousel dots
+  carouselDotsContainer: {
+    position: 'absolute',
+    bottom: SCREEN_HEIGHT * 0.18,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 8,
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  carouselDotActive: {
+    width: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+
+  // Heart animation
+  heartAnimation: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -40,
+    marginTop: -40,
+    zIndex: 1000,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingMoreText: {
+
+  // Right-side actions
+  sideActions: {
+    position: 'absolute',
+    right: 16,
+    top: SCREEN_HEIGHT * 0.25,
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  iconCircle: {
+    width: ICON_CIRCLE_SIZE,
+    height: ICON_CIRCLE_SIZE,
+    borderRadius: ICON_CIRCLE_SIZE / 2,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 6,
+  },
+  likeCount: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  viewCircle: {
+    width: ICON_CIRCLE_SIZE,
+    height: ICON_CIRCLE_SIZE,
+    borderRadius: ICON_CIRCLE_SIZE / 2,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
+  },
+  viewText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // Bottom caption info
+  bottomInfo: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 92, // leave space for right actions
+    zIndex: 15,
+  },
+  agentName: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '600',
+    color: '#d1d5db',
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 6,
+    gap: 8,
+  },
+  price: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  priceLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#d1d5db',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationText: {
+    marginLeft: 6,
+    color: '#fff',
+    fontSize: 14,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 6,
+  },
+  statText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
+
+const MemoizedPropertyReelCard = memo(PropertyReelCard);
+export default MemoizedPropertyReelCard;
