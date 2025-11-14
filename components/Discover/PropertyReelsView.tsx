@@ -31,7 +31,6 @@ import {
   Bath,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { api } from '@/config/api';
 import { useChat } from '@/app/features/chat/context/ChatContext';
@@ -516,7 +515,7 @@ function PropertyReelCard({
   const tagLine = `${propertyType} · ${country} · ${statusLabel}`;
 
   return (
-    <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
+    <View style={styles.safeContainer}>
       <View
         style={styles.container}
         onTouchStart={handleTouchStart}
@@ -724,7 +723,7 @@ function PropertyReelCard({
           </View>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -908,12 +907,15 @@ const ICON_CIRCLE_SIZE = 40;
 
 const styles = StyleSheet.create({
   feedContainer: {
-    flex: 1,
+    height: SCREEN_HEIGHT,
+    width: SCREEN_WIDTH,
     backgroundColor: '#000',
+    overflow: 'hidden',
   },
   reelItem: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+    overflow: 'hidden',
   },
   loadingContainer: {
     flex: 1,
@@ -972,7 +974,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   safeContainer: {
-    flex: 1,
+    height: SCREEN_HEIGHT,
+    width: SCREEN_WIDTH,
     backgroundColor: '#000',
   },
   container: {
@@ -980,6 +983,7 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     position: 'relative',
     backgroundColor: '#000',
+    overflow: 'hidden',
   },
   imageScroll: {
     width: SCREEN_WIDTH,
@@ -992,6 +996,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     backgroundColor: '#000',
+    overflow: 'hidden',
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
