@@ -209,6 +209,13 @@ function PropertyReelCard({
     };
   }, [property?.id, getFavoriteCountValue]);
 
+  useEffect(() => {
+    setCurrentIndex(0);
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ x: 0, animated: false });
+    }
+  }, [property?.id]);
+
   const owner = useMemo(() => property?.owner ?? {}, [property?.owner]);
   const ownerIdValue = owner?.id ?? null;
   const ownerId = useMemo(() => {
