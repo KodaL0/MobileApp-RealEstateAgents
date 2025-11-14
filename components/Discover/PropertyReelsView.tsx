@@ -340,8 +340,17 @@ function PropertyReelCard({
   }, [heartScale, heartOpacity]);
 
   const handleFavorite = useCallback(async () => {
+    if (!property?.id) {
+      console.warn(
+        'PropertyReelCard: handleFavorite called without a property id'
+      );
+      return;
+    }
+
+    const propertyId = property.id;
+
     try {
-      const response = await api.properties.toggleFavorite(property.id);
+      const response = await api.properties.toggleFavorite(propertyId);
       setIsLiked(response.is_favourite || false);
 
       setFavoriteCount(prev =>
@@ -349,7 +358,7 @@ function PropertyReelCard({
       );
 
       try {
-        const details = await api.properties.getById(property.id);
+        const details = await api.properties.getById(propertyId);
         if (typeof details?.favorites_count === 'number') {
           setFavoriteCount(details.favorites_count);
         }
@@ -363,7 +372,7 @@ function PropertyReelCard({
       console.error('Failed to toggle favorite:', e);
       Alert.alert('Error', 'Failed to update favorite. Please try again.');
     }
-  }, [property.id]);
+  }, [property?.id]);
 
   // Tap / double-tap handler
   const handleTouchStart = useCallback((event: any) => {
