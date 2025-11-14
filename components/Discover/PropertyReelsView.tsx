@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
   // Top bar
   topBar: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.08,
+    top: SCREEN_HEIGHT * 0.05,
     left: 20,
     right: 20,
     flexDirection: 'row',
@@ -1038,7 +1038,7 @@ const styles = StyleSheet.create({
   // Bottom caption info
   bottomInfo: {
     position: 'absolute',
-    bottom: 32,
+    bottom: 72,
     left: 16,
     right: 92, // leave space for right actions
     zIndex: 15,
