@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  FlatList,
 } from 'react-native';
 import {
   Heart,
@@ -139,7 +140,7 @@ const CarouselDots = memo(
 );
 CarouselDots.displayName = 'CarouselDots';
 
-// ---------- Main Reel Card ----------
+// ---------- Main Reel Card Component ----------
 function PropertyReelCard({
   property,
   onViewProperty,
@@ -697,9 +698,213 @@ function PropertyReelCard({
   );
 }
 
+// ---------- Feed Container Component ----------
+export default function PropertyReelsView() {
+  const [properties, setProperties] = useState<FeedProperty[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const { isAuthenticated } = useUser();
+  const flatListRef = useRef<FlatList>(null);
+
+  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false) => {
+    if (!isAuthenticated) {
+      setError('Please sign in to view your personalized feed.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const response = await api.feed.list({ page: pageNum, page_size: 5 });
+      
+      if (append) {
+        setProperties(prev => [...prev, ...response.results]);
+      } else {
+        setProperties(response.results);
+      }
+
+      setHasNextPage(response.next !== null);
+    } catch (err: any) {
+      console.error('Failed to fetch feed:', err);
+      setError(err?.response?.data?.detail || 'Failed to load feed. Please try again.');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchFeed(1, false);
+  }, [fetchFeed]);
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasNextPage) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchFeed(nextPage, true);
+    }
+  }, [page, loadingMore, hasNextPage, fetchFeed]);
+
+  const renderItem = useCallback(({ item }: { item: FeedProperty }) => {
+    return (
+      <View style={styles.reelItem}>
+        <PropertyReelCard property={item} source="feed" />
+      </View>
+    );
+  }, []);
+
+  const keyExtractor = useCallback((item: FeedProperty) => {
+    return item.id?.toString() || `property-${Math.random()}`;
+  }, []);
+
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: SCREEN_HEIGHT,
+      offset: SCREEN_HEIGHT * index,
+      index,
+    }),
+    []
+  );
+
+  if (loading && properties.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#10b981" />
+        <Text style={styles.loadingText}>Loading your feed...</Text>
+      </View>
+    );
+  }
+
+  if (error && properties.length === 0) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => fetchFeed(1, false)}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (properties.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No properties found</Text>
+        <Text style={styles.emptySubtext}>Check back later for new listings</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.feedContainer}>
+      <FlatList
+        ref={flatListRef}
+        data={properties}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        getItemLayout={getItemLayout}
+        pagingEnabled
+        snapToInterval={SCREEN_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        showsVerticalScrollIndicator={false}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" color="#10b981" />
+            </View>
+          ) : null
+        }
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={2}
+      />
+    </View>
+  );
+}
+
 const ICON_CIRCLE_SIZE = 40;
 
 const styles = StyleSheet.create({
+  feedContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  reelItem: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 20,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 20,
+  },
+  emptyText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    color: '#9ca3af',
+    fontSize: 14,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
   safeContainer: {
     flex: 1,
     backgroundColor: '#000',
@@ -935,6 +1140,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
-const MemoizedPropertyReelCard = memo(PropertyReelCard);
-export default MemoizedPropertyReelCard;
