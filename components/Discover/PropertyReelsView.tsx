@@ -352,16 +352,27 @@ function PropertyReelCard({
 
     try {
       const response = await api.properties.toggleFavorite(propertyId);
-      setIsLiked(response.is_favourite || false);
+      const nextLiked =
+        typeof response?.is_favourite === 'boolean' ? response.is_favourite : !isLiked;
 
-      setFavoriteCount(prev =>
-        response.is_favourite ? prev + 1 : Math.max(0, prev - 1)
-      );
+      setIsLiked(nextLiked);
+
+      setFavoriteCount(prev => {
+        if (typeof response?.favorites_count === 'number') {
+          return response.favorites_count;
+        }
+
+        const safePrev = typeof prev === 'number' ? prev : 0;
+        return nextLiked ? safePrev + 1 : Math.max(0, safePrev - 1);
+      });
 
       try {
         const details = await api.properties.getById(propertyId);
         if (typeof details?.favorites_count === 'number') {
           setFavoriteCount(details.favorites_count);
+        }
+        if (typeof details?.is_favourite === 'boolean') {
+          setIsLiked(details.is_favourite);
         }
       } catch (fetchError) {
         console.warn(
@@ -373,7 +384,7 @@ function PropertyReelCard({
       console.error('Failed to toggle favorite:', e);
       Alert.alert('Error', 'Failed to update favorite. Please try again.');
     }
-  }, [property?.id]);
+  }, [property?.id, isLiked]);
 
   // Tap / double-tap handler
   const handleTouchStart = useCallback((event: any) => {
@@ -474,9 +485,13 @@ function PropertyReelCard({
   if (!property) return null;
 
   // Tag line (top-left)
-  const propertyType = property.property_type
-    ? property.property_type.toUpperCase()
-    : 'PROPERTY';
+  const propertyType = (() => {
+    if (!property?.property_type) return 'PROPERTY';
+    if (property.property_type.toLowerCase() === 'residential_building') {
+      return 'RESIDENTIAL';
+    }
+    return property.property_type.toUpperCase();
+  })();
   const country = property.country || 'Unknown';
   const statusLabel =
     property.property_status === 'for_sale' ? 'For Sale' : 'For Rent';
@@ -541,11 +556,9 @@ function PropertyReelCard({
             {tagLine}
           </Text>
           {images.length > 1 && (
-            <View style={styles.photoCounter}>
-              <Text style={styles.photoCounterText}>
-                {currentIndex + 1}/{images.length}
-              </Text>
-            </View>
+            <Text style={styles.photoCounterText}>
+              {currentIndex + 1}/{images.length}
+            </Text>
           )}
         </View>
 
@@ -970,9 +983,9 @@ const styles = StyleSheet.create({
   // Top bar
   topBar: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
+    top: SCREEN_HEIGHT * 0.12,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -988,16 +1001,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
     maxWidth: SCREEN_WIDTH * 0.7,
   },
-  photoCounter: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
   photoCounterText: {
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   // Carousel dots
@@ -1076,7 +1086,7 @@ const styles = StyleSheet.create({
   // Bottom caption info
   bottomInfo: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 32,
     left: 16,
     right: 92, // leave space for right actions
     zIndex: 15,
