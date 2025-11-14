@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback, memo } from 'react';
+import React, { useState, useRef, useMemo, useCallback, memo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -208,6 +208,47 @@ function PropertyReelCard({
   const scrollX = useRef(new Animated.Value(0)).current;
   const { getOrCreateThread } = useChat();
   const { isAuthenticated } = useUser();
+  const hasInitialFavoriteMeta = typeof property?.favorites_count === 'number';
+
+  useEffect(() => {
+    setIsLiked(property?.is_favourite || false);
+  }, [property?.is_favourite]);
+
+  useEffect(() => {
+    if (typeof property?.favorites_count === 'number') {
+      setFavoriteCount(property.favorites_count);
+    }
+  }, [property?.favorites_count]);
+
+  useEffect(() => {
+    if (!property?.id || hasInitialFavoriteMeta) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchFavoriteMeta = async () => {
+      try {
+        const details = await api.properties.getById(property.id);
+        if (!isMounted) return;
+
+        if (typeof details?.favorites_count === 'number') {
+          setFavoriteCount(details.favorites_count);
+        }
+        if (typeof details?.is_favourite === 'boolean') {
+          setIsLiked(details.is_favourite);
+        }
+      } catch (error) {
+        console.warn('PropertyReelCard: Failed to refresh favorite metadata', error);
+      }
+    };
+
+    fetchFavoriteMeta();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [property?.id, hasInitialFavoriteMeta]);
   
   // Memoize owner data
   const owner = useMemo(() => property?.owner ?? {}, [property?.owner]);
@@ -351,9 +392,24 @@ function PropertyReelCard({
     try {
       const response = await api.properties.toggleFavorite(property.id);
       setIsLiked(response.is_favourite || false);
+      
+      // Optimistic update
       setFavoriteCount(prev =>
         response.is_favourite ? prev + 1 : Math.max(0, prev - 1)
       );
+      
+      // Refetch property details to get accurate favorites_count
+      // (toggle API doesn't return favorites_count)
+      try {
+        const details = await api.properties.getById(property.id);
+        if (typeof details?.favorites_count === 'number') {
+          setFavoriteCount(details.favorites_count);
+        }
+      } catch (fetchError) {
+        // Silently fail - optimistic update already applied
+        console.warn('PropertyReelCard: Failed to refresh favorites_count after toggle', fetchError);
+      }
+      
       Alert.alert(
         'Success',
         response.is_favourite 
