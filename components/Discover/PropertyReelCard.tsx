@@ -181,10 +181,15 @@ function PropertyReelCard({
   property,
   onViewProperty,
   source,
+  onFavoriteMetaUpdate,
 }: {
   property: FeedProperty;
   onViewProperty?: () => void;
   source?: string;
+  onFavoriteMetaUpdate?: (
+    propertyId: number | string,
+    meta: { favorites_count?: number | null; is_favourite?: boolean | null }
+  ) => void;
 }) {
   const router = useRouter();
   const getFavoriteCountValue = useCallback((value: unknown): number | null => {
@@ -246,6 +251,13 @@ function PropertyReelCard({
         if (typeof details?.is_favourite === 'boolean') {
           setIsLiked(details.is_favourite);
         }
+        onFavoriteMetaUpdate?.(property.id, {
+          favorites_count: fetchedCount ?? details?.favorites_count ?? null,
+          is_favourite:
+            typeof details?.is_favourite === 'boolean'
+              ? details.is_favourite
+              : null,
+        });
       } catch (error) {
         console.warn('PropertyReelCard: Failed to refresh favorite metadata', error);
       }
@@ -419,6 +431,13 @@ function PropertyReelCard({
         if (refreshedCount !== null) {
           setFavoriteCount(refreshedCount);
         }
+        onFavoriteMetaUpdate?.(property.id, {
+          favorites_count: refreshedCount ?? details?.favorites_count ?? null,
+          is_favourite:
+            typeof details?.is_favourite === 'boolean'
+              ? details.is_favourite
+              : null,
+        });
       } catch (fetchError) {
         // Silently fail - optimistic update already applied
         console.warn('PropertyReelCard: Failed to refresh favorites_count after toggle', fetchError);

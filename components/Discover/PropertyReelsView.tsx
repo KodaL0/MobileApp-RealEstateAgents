@@ -123,10 +123,15 @@ function PropertyReelCard({
   property,
   onViewProperty,
   source,
+  onFavoriteMetaUpdate,
 }: {
   property: FeedProperty;
   onViewProperty?: () => void;
   source?: string;
+  onFavoriteMetaUpdate?: (
+    propertyId: number | string,
+    meta: { favorites_count?: number | null; is_favourite?: boolean | null }
+  ) => void;
 }) {
   const router = useRouter();
   const getFavoriteCountValue = useCallback((value: unknown): number | null => {
@@ -183,6 +188,13 @@ function PropertyReelCard({
         if (typeof details?.is_favourite === 'boolean') {
           setIsLiked(details.is_favourite);
         }
+        onFavoriteMetaUpdate?.(property.id, {
+          favorites_count: fetchedCount ?? details?.favorites_count ?? null,
+          is_favourite:
+            typeof details?.is_favourite === 'boolean'
+              ? details.is_favourite
+              : null,
+        });
       } catch (error) {
         console.warn(
           'PropertyReelCard: Failed to refresh favorite metadata',
@@ -364,6 +376,13 @@ function PropertyReelCard({
         if (typeof details?.is_favourite === 'boolean') {
           setIsLiked(details.is_favourite);
         }
+        onFavoriteMetaUpdate?.(propertyId, {
+          favorites_count: refreshedCount ?? details?.favorites_count ?? null,
+          is_favourite:
+            typeof details?.is_favourite === 'boolean'
+              ? details.is_favourite
+              : null,
+        });
       } catch (fetchError) {
         console.warn(
           'PropertyReelCard: Failed to refresh favorites_count after toggle',
@@ -711,6 +730,37 @@ export default function PropertyReelsView() {
   const { isAuthenticated } = useUser();
   const flatListRef = useRef<FlatList>(null);
 
+  const handleFavoriteMetaUpdate = useCallback(
+    (
+      propertyId: number | string,
+      meta: { favorites_count?: number | null; is_favourite?: boolean | null }
+    ) => {
+      setProperties(prev =>
+        prev.map(propertyItem => {
+          if (!propertyItem || propertyItem.id !== propertyId) return propertyItem;
+
+          const updates: Partial<FeedProperty> = {};
+          if (meta.favorites_count !== undefined && meta.favorites_count !== null) {
+            updates.favorites_count = meta.favorites_count;
+          }
+          if (typeof meta.is_favourite === 'boolean') {
+            updates.is_favourite = meta.is_favourite;
+          }
+
+          if (Object.keys(updates).length === 0) {
+            return propertyItem;
+          }
+
+          return {
+            ...propertyItem,
+            ...updates,
+          };
+        })
+      );
+    },
+    []
+  );
+
   const fetchFeed = useCallback(async (pageNum: number, append: boolean = false) => {
     if (!isAuthenticated) {
       setError('Please sign in to view your personalized feed.');
@@ -759,10 +809,14 @@ export default function PropertyReelsView() {
   const renderItem = useCallback(({ item }: { item: FeedProperty }) => {
     return (
       <View style={styles.reelItem}>
-        <PropertyReelCard property={item} source="feed" />
+        <PropertyReelCard
+          property={item}
+          source="feed"
+          onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
+        />
       </View>
     );
-  }, []);
+  }, [handleFavoriteMetaUpdate]);
 
   const keyExtractor = useCallback((item: FeedProperty) => {
     return item.id?.toString() || `property-${Math.random()}`;
