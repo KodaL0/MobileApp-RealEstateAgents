@@ -530,14 +530,16 @@ function PropertyReelCard({
 
         {/* Top bar: compact tags + photo counter */}
         <View style={styles.topBar}>
-          <Text style={styles.tagLine} numberOfLines={1}>
-            {tagLine}
-          </Text>
-          {images.length > 1 && (
-            <Text style={styles.photoCounterText}>
-              {currentIndex + 1}/{images.length}
+          <View style={styles.tagContainer}>
+            <Text style={styles.tagLine} numberOfLines={1}>
+              {tagLine}
             </Text>
-          )}
+            {images.length > 1 && (
+              <Text style={styles.photoCounterText}>
+                {currentIndex + 1}/{images.length}
+              </Text>
+            )}
+          </View>
         </View>
 
         {/* Heart animation overlay */}
@@ -961,15 +963,26 @@ const styles = StyleSheet.create({
     top: SCREEN_HEIGHT * 0.05,
     left: 20,
     right: 20,
+    zIndex: 10,
+  },
+  tagContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    zIndex: 10,
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    gap: 12,
   },
   tagLine: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+    flex: 1,
     letterSpacing: 0.3,
     textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 1 },
