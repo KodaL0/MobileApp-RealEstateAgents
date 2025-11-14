@@ -210,6 +210,8 @@ function PropertyReelCard({
   }, [property?.id, getFavoriteCountValue]);
 
   useEffect(() => {
+    setShowHeartAnimation(false);
+    setIsChatLoading(false);
     setCurrentIndex(0);
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ x: 0, animated: false });
