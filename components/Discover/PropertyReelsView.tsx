@@ -896,6 +896,7 @@ export default function PropertyReelsView() {
         maxToRenderPerBatch={3}
         windowSize={5}
         initialNumToRender={2}
+        snapToOffsets={properties.map((_, index) => SCREEN_HEIGHT * index)}
       />
     </View>
   );
