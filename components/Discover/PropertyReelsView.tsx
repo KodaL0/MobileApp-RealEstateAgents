@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
   // Top bar
   topBar: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.12,
+    top: SCREEN_HEIGHT * 0.08,
     left: 20,
     right: 20,
     flexDirection: 'row',
