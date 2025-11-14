@@ -155,9 +155,6 @@ function PropertyReelCard({
   const touchStartX = useRef<number>(0);
   const { getOrCreateThread } = useChat();
   const { isAuthenticated } = useUser();
-  const hasInitialFavoriteMeta =
-    getFavoriteCountValue(property?.favorites_count) !== null;
-
   useEffect(() => {
     setIsLiked(property?.is_favourite || false);
   }, [property?.is_favourite]);
@@ -170,7 +167,7 @@ function PropertyReelCard({
   }, [property?.favorites_count, getFavoriteCountValue]);
 
   useEffect(() => {
-    if (!property?.id || hasInitialFavoriteMeta) return;
+    if (!property?.id) return;
 
     let isMounted = true;
 
@@ -198,7 +195,7 @@ function PropertyReelCard({
     return () => {
       isMounted = false;
     };
-  }, [property?.id, hasInitialFavoriteMeta]);
+  }, [property?.id, getFavoriteCountValue]);
 
   const owner = useMemo(() => property?.owner ?? {}, [property?.owner]);
   const ownerIdValue = owner?.id ?? null;
