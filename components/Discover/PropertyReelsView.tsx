@@ -129,9 +129,20 @@ function PropertyReelCard({
   source?: string;
 }) {
   const router = useRouter();
+  const getFavoriteCountValue = useCallback((value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }, []);
+
   const [isLiked, setIsLiked] = useState(property?.is_favourite || false);
   const [favoriteCount, setFavoriteCount] = useState<number>(
-    property?.favorites_count ?? 0
+    getFavoriteCountValue(property?.favorites_count) ?? 0
   );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -145,17 +156,18 @@ function PropertyReelCard({
   const { getOrCreateThread } = useChat();
   const { isAuthenticated } = useUser();
   const hasInitialFavoriteMeta =
-    typeof property?.favorites_count === 'number';
+    getFavoriteCountValue(property?.favorites_count) !== null;
 
   useEffect(() => {
     setIsLiked(property?.is_favourite || false);
   }, [property?.is_favourite]);
 
   useEffect(() => {
-    if (typeof property?.favorites_count === 'number') {
-      setFavoriteCount(property.favorites_count);
+    const parsedCount = getFavoriteCountValue(property?.favorites_count);
+    if (parsedCount !== null) {
+      setFavoriteCount(parsedCount);
     }
-  }, [property?.favorites_count]);
+  }, [property?.favorites_count, getFavoriteCountValue]);
 
   useEffect(() => {
     if (!property?.id || hasInitialFavoriteMeta) return;
@@ -167,8 +179,9 @@ function PropertyReelCard({
         const details = await api.properties.getById(property.id);
         if (!isMounted) return;
 
-        if (typeof details?.favorites_count === 'number') {
-          setFavoriteCount(details.favorites_count);
+        const fetchedCount = getFavoriteCountValue(details?.favorites_count);
+        if (fetchedCount !== null) {
+          setFavoriteCount(fetchedCount);
         }
         if (typeof details?.is_favourite === 'boolean') {
           setIsLiked(details.is_favourite);
@@ -336,8 +349,9 @@ function PropertyReelCard({
       setIsLiked(nextLiked);
 
       setFavoriteCount(prev => {
-        if (typeof response?.favorites_count === 'number') {
-          return response.favorites_count;
+        const responseCount = getFavoriteCountValue(response?.favorites_count);
+        if (responseCount !== null) {
+          return responseCount;
         }
 
         const safePrev = typeof prev === 'number' ? prev : 0;
@@ -346,8 +360,9 @@ function PropertyReelCard({
 
       try {
         const details = await api.properties.getById(propertyId);
-        if (typeof details?.favorites_count === 'number') {
-          setFavoriteCount(details.favorites_count);
+        const refreshedCount = getFavoriteCountValue(details?.favorites_count);
+        if (refreshedCount !== null) {
+          setFavoriteCount(refreshedCount);
         }
         if (typeof details?.is_favourite === 'boolean') {
           setIsLiked(details.is_favourite);
