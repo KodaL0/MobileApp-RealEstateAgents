@@ -118,28 +118,6 @@ const OptimizedImage = memo(
 );
 OptimizedImage.displayName = 'OptimizedImage';
 
-// ---------- Carousel dots ----------
-const CarouselDots = memo(
-  ({ count, currentIndex }: { count: number; currentIndex: number }) => {
-    if (count <= 1) return null;
-
-    return (
-      <View style={styles.carouselDotsContainer}>
-        {Array.from({ length: count }).map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.carouselDot,
-              index === currentIndex && styles.carouselDotActive,
-            ]}
-          />
-        ))}
-      </View>
-    );
-  }
-);
-CarouselDots.displayName = 'CarouselDots';
-
 // ---------- Main Reel Card Component ----------
 function PropertyReelCard({
   property,
@@ -561,9 +539,6 @@ function PropertyReelCard({
             </Text>
           )}
         </View>
-
-        {/* Carousel dots (optional, subtle) */}
-        <CarouselDots count={images.length} currentIndex={currentIndex} />
 
         {/* Heart animation overlay */}
         {showHeartAnimation && (
@@ -1008,29 +983,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
-  },
-
-  // Carousel dots
-  carouselDotsContainer: {
-    position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.18,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    zIndex: 8,
-  },
-  carouselDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  carouselDotActive: {
-    width: 20,
-    backgroundColor: 'rgba(255,255,255,0.9)',
   },
 
   // Heart animation
