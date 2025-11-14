@@ -892,7 +892,7 @@ export default function PropertyReelsView() {
             </View>
           ) : null
         }
-        removeClippedSubviews={true}
+        removeClippedSubviews={false}
         maxToRenderPerBatch={3}
         windowSize={5}
         initialNumToRender={2}
