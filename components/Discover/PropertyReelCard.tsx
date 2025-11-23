@@ -31,6 +31,7 @@ import { Alert } from 'react-native';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
 import type { FeedProperty } from '@/app/features/types';
+import { analytics } from '@/services/analytics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -513,10 +514,11 @@ function PropertyReelCard({
       setIsChatLoading(true);
       const threadId = await getOrCreateThread(ownerId, propertyId, property?.title);
 
-      // Track conversion for analytics (non-blocking)
-      api.analytics.trackConversion(propertyId, 'chat').catch(err =>
-        console.warn('Failed to track chat conversion:', err)
-      );
+      // Track chat conversion using centralized analytics service
+      analytics.trackPropertyContact({
+        propertyId,
+        contactMethod: 'chat',
+      });
 
       router.push(`/chat/${threadId}`);
     } catch (e: any) {
@@ -530,9 +532,11 @@ function PropertyReelCard({
   // Share handler with tracking and success message
   const handleShare = useCallback(async () => {
     try {
-      // Note: Share tracking endpoint doesn't exist yet, but we'll show success message
-      // When backend endpoint is ready, uncomment:
-      // await api.analytics.trackShare(property.id, 'copy_link');
+      // Track share using centralized analytics service
+      analytics.trackPropertyShare({
+        propertyId: property.id,
+        method: 'copy_link',
+      });
       Alert.alert(
         'Success',
         'Share tracked! Full sharing functionality coming soon.',

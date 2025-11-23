@@ -3,7 +3,6 @@ import React, {
   useRef,
   useMemo,
   useCallback,
-  memo,
   useEffect,
 } from 'react';
 import {
@@ -18,7 +17,6 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
-  FlatList,
 } from 'react-native';
 import {
   Heart,
@@ -29,15 +27,15 @@ import {
   Share,
   Bed,
   Bath,
+  Building2,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { api } from '@/config/api';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
-import type { FeedProperty, FeedProject, FeedItem } from '@/app/features/types';
+import type { FeedProject } from '@/app/features/types';
 import { analytics } from '@/services/analytics';
-import ProjectReelCard from './ProjectReelCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
@@ -49,8 +47,8 @@ const REEL_HEIGHT = Math.min(
   SCREEN_HEIGHT * 0.9
 );
 
-// ---------- OptimizedImage (unchanged logic, used for blur BG) ----------
-const OptimizedImage = memo(
+// ---------- OptimizedImage (reused from PropertyReelCard) ----------
+const OptimizedImage = React.memo(
   ({
     uri,
     style,
@@ -119,18 +117,18 @@ const OptimizedImage = memo(
 );
 OptimizedImage.displayName = 'OptimizedImage';
 
-// ---------- Main Reel Card Component ----------
-function PropertyReelCard({
-  property,
-  onViewProperty,
+// ---------- Main Project Reel Card Component ----------
+function ProjectReelCard({
+  project,
+  onViewProject,
   source,
   onFavoriteMetaUpdate,
 }: {
-  property: FeedProperty;
-  onViewProperty?: () => void;
+  project: FeedProject;
+  onViewProject?: () => void;
   source?: string;
   onFavoriteMetaUpdate?: (
-    propertyId: number | string,
+    projectId: number | string,
     meta: { favorites_count?: number | null; is_favourite?: boolean | null }
   ) => void;
 }) {
@@ -146,9 +144,9 @@ function PropertyReelCard({
     return null;
   }, []);
 
-  const [isLiked, setIsLiked] = useState(property?.is_favourite || false);
+  const [isLiked, setIsLiked] = useState(project?.is_favourite || false);
   const [favoriteCount, setFavoriteCount] = useState<number>(
-    getFavoriteCountValue(property?.favorites_count) ?? 0
+    getFavoriteCountValue(project?.favorites_count) ?? 0
   );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -161,25 +159,26 @@ function PropertyReelCard({
   const touchStartX = useRef<number>(0);
   const { getOrCreateThread } = useChat();
   const { isAuthenticated } = useUser();
-  useEffect(() => {
-    setIsLiked(property?.is_favourite || false);
-  }, [property?.is_favourite]);
 
   useEffect(() => {
-    const parsedCount = getFavoriteCountValue(property?.favorites_count);
+    setIsLiked(project?.is_favourite || false);
+  }, [project?.is_favourite]);
+
+  useEffect(() => {
+    const parsedCount = getFavoriteCountValue(project?.favorites_count);
     if (parsedCount !== null) {
       setFavoriteCount(parsedCount);
     }
-  }, [property?.favorites_count, getFavoriteCountValue]);
+  }, [project?.favorites_count, getFavoriteCountValue]);
 
   useEffect(() => {
-    if (!property?.id) return;
+    if (!project?.id) return;
 
     let isMounted = true;
 
     const fetchFavoriteMeta = async () => {
       try {
-        const details = await api.properties.getById(property.id);
+        const details = await api.projects.getById(project.id);
         if (!isMounted) return;
 
         const fetchedCount = getFavoriteCountValue(details?.favorites_count);
@@ -189,7 +188,7 @@ function PropertyReelCard({
         if (typeof details?.is_favourite === 'boolean') {
           setIsLiked(details.is_favourite);
         }
-        onFavoriteMetaUpdate?.(property.id, {
+        onFavoriteMetaUpdate?.(project.id, {
           favorites_count: fetchedCount ?? details?.favorites_count ?? null,
           is_favourite:
             typeof details?.is_favourite === 'boolean'
@@ -198,7 +197,7 @@ function PropertyReelCard({
         });
       } catch (error) {
         console.warn(
-          'PropertyReelCard: Failed to refresh favorite metadata',
+          'ProjectReelCard: Failed to refresh favorite metadata',
           error
         );
       }
@@ -208,7 +207,7 @@ function PropertyReelCard({
     return () => {
       isMounted = false;
     };
-  }, [property?.id, getFavoriteCountValue]);
+  }, [project?.id, getFavoriteCountValue]);
 
   useEffect(() => {
     setShowHeartAnimation(false);
@@ -217,9 +216,9 @@ function PropertyReelCard({
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ x: 0, animated: false });
     }
-  }, [property?.id]);
+  }, [project?.id]);
 
-  const owner = useMemo(() => property?.owner ?? {}, [property?.owner]);
+  const owner = useMemo(() => project?.owner ?? {}, [project?.owner]);
   const ownerIdValue = owner?.id ?? null;
   const ownerId = useMemo(() => {
     if (ownerIdValue === null || ownerIdValue === undefined) return NaN;
@@ -242,7 +241,7 @@ function PropertyReelCard({
 
   const handleAgentProfilePress = useCallback(() => {
     if (!ownerUsername) {
-      Alert.alert('Unavailable', 'Agent profile is currently unavailable.');
+      Alert.alert('Unavailable', 'Developer profile is currently unavailable.');
       return;
     }
 
@@ -253,16 +252,20 @@ function PropertyReelCard({
   }, [ownerUsername, router]);
 
   const images = useMemo(() => {
-    if (!property) return [getValidUrl()];
-    if (property.images && property.images.length > 0) {
-      return property.images
+    if (!project) return [getValidUrl()];
+    if (project.images && project.images.length > 0) {
+      return project.images
         .map((img: any) =>
           typeof img === 'string' ? getValidUrl(img) : getValidUrl(img.image)
         )
         .filter(Boolean);
     }
+    // Fallback to main_image if no images array
+    if (project.main_image) {
+      return [getValidUrl(project.main_image)];
+    }
     return [getValidUrl()];
-  }, [property, getValidUrl]);
+  }, [project, getValidUrl]);
 
   const handleScroll = useCallback((event: any) => {
     const index = Math.round(
@@ -281,41 +284,95 @@ function PropertyReelCard({
     []
   );
 
-  const parseNumericValue = useCallback(
-    (value: number | string | null | undefined): number | null => {
-      if (value === null || value === undefined) return null;
-      const numeric = typeof value === 'string' ? parseFloat(value) : value;
-      return Number.isFinite(numeric) ? numeric : null;
+  const formatPriceRange = useCallback(
+    (min?: number, max?: number, isRent: boolean = false) => {
+      if (min === undefined && max === undefined) return null;
+      if (min === max) {
+        return `${formatPrice(min!)}${isRent ? '/mo' : ''}`;
+      }
+      if (min && max) {
+        return `${formatPrice(min)} - ${formatPrice(max)}${isRent ? '/mo' : ''}`;
+      }
+      if (min) {
+        return `From ${formatPrice(min)}${isRent ? '/mo' : ''}`;
+      }
+      if (max) {
+        return `Up to ${formatPrice(max)}${isRent ? '/mo' : ''}`;
+      }
+      return null;
+    },
+    [formatPrice]
+  );
+
+  const formatRange = useCallback(
+    (min?: number, max?: number, unit: string = '', showDecimals: boolean = false) => {
+      if (min === undefined && max === undefined) return null;
+      const formatValue = (val: number) => {
+        if (showDecimals) {
+          const rounded = Math.round(val * 10) / 10;
+          return rounded % 1 === 0
+            ? rounded.toLocaleString()
+            : rounded.toLocaleString(undefined, {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              });
+        } else {
+          return Math.round(val).toLocaleString();
+        }
+      };
+      if (min !== undefined && max !== undefined && min === max) {
+        return `${formatValue(min)}${unit}`;
+      }
+      if (min !== undefined && max !== undefined) {
+        return `${formatValue(min)}${unit} - ${formatValue(max)}${unit}`;
+      }
+      if (min !== undefined) {
+        return `From ${formatValue(min)}${unit}`;
+      }
+      if (max !== undefined) {
+        return `Up to ${formatValue(max)}${unit}`;
+      }
+      return null;
     },
     []
   );
 
-  const bedroomsValue = useMemo(
-    () => (property ? parseNumericValue(property.bedrooms) : null),
-    [property, parseNumericValue]
-  );
-  const bathroomsValue = useMemo(
-    () => (property ? parseNumericValue(property.bathrooms) : null),
-    [property, parseNumericValue]
-  );
-  const areaValue = useMemo(
-    () => (property ? parseNumericValue(property.area) : null),
-    [property, parseNumericValue]
-  );
+  // Determine listing type (sale or rent) based on available ranges
+  const listingType = useMemo(() => {
+    if (project.sale_price_min !== undefined || project.sale_price_max !== undefined) {
+      return 'sale';
+    }
+    if (project.rent_price_min !== undefined || project.rent_price_max !== undefined) {
+      return 'rent';
+    }
+    return 'sale'; // Default to sale
+  }, [project]);
 
-  const formatBathrooms = useCallback((value: number | null) => {
-    if (value === null) return null;
-    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
-  }, []);
+  // Get ranges based on listing type
+  const bedroomsMin = listingType === 'sale' ? project.sale_bedrooms_min : project.rent_bedrooms_min;
+  const bedroomsMax = listingType === 'sale' ? project.sale_bedrooms_max : project.rent_bedrooms_max;
+  const bathroomsMin = listingType === 'sale' ? project.sale_bathrooms_min : project.rent_bathrooms_min;
+  const bathroomsMax = listingType === 'sale' ? project.sale_bathrooms_max : project.rent_bathrooms_max;
+  const areaMin = listingType === 'sale' ? project.sale_area_min : project.rent_area_min;
+  const areaMax = listingType === 'sale' ? project.sale_area_max : project.rent_area_max;
+  const priceMin = listingType === 'sale' ? project.sale_price_min : project.rent_price_min;
+  const priceMax = listingType === 'sale' ? project.sale_price_max : project.rent_price_max;
+
+  const bedroomsRange = formatRange(bedroomsMin, bedroomsMax, '', false);
+  const bathroomsRange = formatRange(bathroomsMin, bathroomsMax, '', true);
+  const areaRange = formatRange(areaMin, areaMax, ' m²', false);
+  const priceRange = formatPriceRange(priceMin, priceMax, listingType === 'rent');
 
   const handleViewPress = useCallback(() => {
-    if (onViewProperty) {
-      onViewProperty();
-    } else if (property?.id) {
+    if (onViewProject) {
+      onViewProject();
+    } else if (project?.id) {
+      // Use URL from API if available, otherwise use ID-based route
+      const projectUrl = project.url || `/project/${project.id}`;
       const queryParams = source ? `?source=${source}` : '';
-      router.push(`/property/${property.id}${queryParams}`);
+      router.push(`${projectUrl}${queryParams}`);
     }
-  }, [onViewProperty, property?.id, source, router]);
+  }, [onViewProject, project?.id, project?.url, source, router]);
 
   const handleTitlePress = useCallback(() => {
     handleViewPress();
@@ -351,17 +408,17 @@ function PropertyReelCard({
   }, [heartScale, heartOpacity]);
 
   const handleFavorite = useCallback(async () => {
-    if (!property?.id) {
+    if (!project?.id) {
       console.warn(
-        'PropertyReelCard: handleFavorite called without a property id'
+        'ProjectReelCard: handleFavorite called without a project id'
       );
       return;
     }
 
-    const propertyId = property.id;
+    const projectId = project.id;
 
     try {
-      const response = await api.properties.toggleFavorite(propertyId);
+      const response = await api.projects.toggleFavorite(projectId);
       const nextLiked =
         typeof response?.is_favourite === 'boolean' ? response.is_favourite : !isLiked;
 
@@ -378,7 +435,7 @@ function PropertyReelCard({
       });
 
       try {
-        const details = await api.properties.getById(propertyId);
+        const details = await api.projects.getById(projectId);
         const refreshedCount = getFavoriteCountValue(details?.favorites_count);
         if (refreshedCount !== null) {
           setFavoriteCount(refreshedCount);
@@ -386,7 +443,7 @@ function PropertyReelCard({
         if (typeof details?.is_favourite === 'boolean') {
           setIsLiked(details.is_favourite);
         }
-        onFavoriteMetaUpdate?.(propertyId, {
+        onFavoriteMetaUpdate?.(projectId, {
           favorites_count: refreshedCount ?? details?.favorites_count ?? null,
           is_favourite:
             typeof details?.is_favourite === 'boolean'
@@ -395,7 +452,7 @@ function PropertyReelCard({
         });
       } catch (fetchError) {
         console.warn(
-          'PropertyReelCard: Failed to refresh favorites_count after toggle',
+          'ProjectReelCard: Failed to refresh favorites_count after toggle',
           fetchError
         );
       }
@@ -403,7 +460,7 @@ function PropertyReelCard({
       console.error('Failed to toggle favorite:', e);
       Alert.alert('Error', 'Failed to update favorite. Please try again.');
     }
-  }, [property?.id, isLiked]);
+  }, [project?.id, isLiked, getFavoriteCountValue, onFavoriteMetaUpdate]);
 
   // Tap / double-tap handler
   const handleTouchStart = useCallback((event: any) => {
@@ -445,15 +502,15 @@ function PropertyReelCard({
     if (!isAuthenticated) {
       Alert.alert(
         'Sign In Required',
-        'Please sign in to start a chat with the agent.'
+        'Please sign in to start a chat with the developer.'
       );
       router.push('/(tabs)/profile');
       return;
     }
 
-    const propertyId = property?.id ? Number(property.id) : null;
-    if (!ownerId || Number.isNaN(ownerId) || !propertyId || Number.isNaN(propertyId)) {
-      Alert.alert('Unavailable', 'Could not identify the agent for this property.');
+    const projectId = project?.id ? Number(project.id) : null;
+    if (!ownerId || Number.isNaN(ownerId) || !projectId || Number.isNaN(projectId)) {
+      Alert.alert('Unavailable', 'Could not identify the developer for this project.');
       return;
     }
 
@@ -461,13 +518,13 @@ function PropertyReelCard({
       setIsChatLoading(true);
       const threadId = await getOrCreateThread(
         ownerId,
-        propertyId,
-        property?.title
+        projectId,
+        project?.name
       );
 
-      // Track chat conversion using centralized analytics service
+      // Track chat conversion
       analytics.trackPropertyContact({
-        propertyId,
+        propertyId: projectId,
         contactMethod: 'chat',
       });
 
@@ -482,8 +539,8 @@ function PropertyReelCard({
     isChatLoading,
     isAuthenticated,
     ownerId,
-    property?.id,
-    property?.title,
+    project?.id,
+    project?.name,
     getOrCreateThread,
     router,
   ]);
@@ -501,20 +558,20 @@ function PropertyReelCard({
     }
   }, []);
 
-  if (!property) return null;
+  if (!project) return null;
 
   // Tag line (top-left)
-  const propertyType = (() => {
-    if (!property?.property_type) return 'PROPERTY';
-    if (property.property_type.toLowerCase() === 'residential_building') {
-      return 'RESIDENTIAL';
-    }
-    return property.property_type.toUpperCase();
-  })();
-  const country = property.country || 'Unknown';
-  const statusLabel =
-    property.property_status === 'for_sale' ? 'For Sale' : 'For Rent';
-  const tagLine = `${propertyType} · ${country} · ${statusLabel}`;
+  const projectType = 'PROJECT';
+  const country = project.country || 'Unknown';
+  const statusLabels: Record<string, string> = {
+    planning: 'Planning',
+    construction: 'Under Construction',
+    completed: 'Completed',
+    available: 'Available',
+  };
+  const statusLabel = statusLabels[project.status] || project.status;
+  const listingStatusLabel = listingType === 'sale' ? 'For Sale' : 'For Rent';
+  const tagLine = `${projectType} · ${country} · ${listingStatusLabel}`;
 
   return (
     <View style={styles.safeContainer}>
@@ -525,7 +582,7 @@ function PropertyReelCard({
         onStartShouldSetResponder={() => false}
         onMoveShouldSetResponder={() => false}
       >
-        {/* IMAGE CAROUSEL – fixed 9:16-ish frame, blur + contain */}
+        {/* IMAGE CAROUSEL */}
         <ScrollView
           ref={scrollViewRef}
           horizontal
@@ -540,18 +597,13 @@ function PropertyReelCard({
         >
           {images.map((uri: string, index: number) => (
             <View key={`image-${index}`} style={styles.imageWrapper}>
-              {/* Blurred BG */}
               <OptimizedImage
                 uri={uri}
                 style={StyleSheet.absoluteFillObject}
                 containerStyle={StyleSheet.absoluteFillObject}
                 blurRadius={25}
               />
-
-              {/* Dark overlay to boost contrast */}
               <View style={styles.imageOverlay} />
-
-              {/* Foreground 9:16 frame – full image visible (contain) */}
               <View style={styles.imageFrame}>
                 <Image
                   source={{ uri }}
@@ -563,7 +615,6 @@ function PropertyReelCard({
           ))}
         </ScrollView>
 
-        {/* Gradient from bottom for text legibility */}
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
           style={styles.bottomGradient}
@@ -599,9 +650,8 @@ function PropertyReelCard({
           </Animated.View>
         )}
 
-        {/* RIGHT-SIDE ACTION COLUMN: Heart → Chat → Share → Agent → View */}
+        {/* RIGHT-SIDE ACTION COLUMN */}
         <View style={styles.sideActions}>
-          {/* Heart + count */}
           <TouchableOpacity
             style={styles.iconCircle}
             onPress={handleFavorite}
@@ -616,7 +666,6 @@ function PropertyReelCard({
           </TouchableOpacity>
           <Text style={styles.likeCount}>{favoriteCount}</Text>
 
-          {/* Chat */}
           <TouchableOpacity
             style={styles.iconCircle}
             onPress={handleChat}
@@ -630,7 +679,6 @@ function PropertyReelCard({
             )}
           </TouchableOpacity>
 
-          {/* Share */}
           <TouchableOpacity
             style={styles.iconCircle}
             onPress={handleShare}
@@ -639,7 +687,6 @@ function PropertyReelCard({
             <Share size={28} color="#fff" strokeWidth={2} />
           </TouchableOpacity>
 
-          {/* Agent */}
           <TouchableOpacity
             style={styles.iconCircle}
             onPress={handleAgentProfilePress}
@@ -648,7 +695,6 @@ function PropertyReelCard({
             <UserCircle size={28} color="#fff" strokeWidth={2} />
           </TouchableOpacity>
 
-          {/* View */}
           <TouchableOpacity
             style={styles.viewCircle}
             onPress={handleViewPress}
@@ -674,51 +720,54 @@ function PropertyReelCard({
             activeOpacity={0.7}
           >
             <Text style={styles.title} numberOfLines={2}>
-              {property.title || 'Untitled Property'}
+              {project.name || 'Untitled Project'}
             </Text>
           </TouchableOpacity>
 
-          {/* Price row */}
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatPrice(property.price)}</Text>
-            <Text style={styles.priceLabel}>
-              {property.property_status === 'for_sale'
-                ? 'Purchase Price'
-                : '/month'}
-            </Text>
-          </View>
+          {/* Price range row */}
+          {priceRange && (
+            <View style={styles.priceRow}>
+              <Text style={styles.price}>{priceRange}</Text>
+              <Text style={styles.priceLabel}>
+                {listingType === 'sale' ? 'Price Range' : 'Rent Range'}
+              </Text>
+            </View>
+          )}
 
           {/* Location */}
           <View style={styles.locationRow}>
             <MapPin size={16} color="#10b981" />
             <Text style={styles.locationText} numberOfLines={1}>
-              {property.location || 'Unknown Location'}
+              {project.location || 'Unknown Location'}
             </Text>
           </View>
 
-          {/* Stats row */}
+          {/* Stats row - ranges */}
           <View style={styles.statsRow}>
-            {bedroomsValue !== null && (
+            {bedroomsRange && (
               <View style={styles.statPill}>
                 <Bed size={14} color="#fff" />
-                <Text style={styles.statText}>
-                  {bedroomsValue.toString()}
-                </Text>
+                <Text style={styles.statText}>{bedroomsRange}</Text>
               </View>
             )}
-            {formatBathrooms(bathroomsValue) && (
+            {bathroomsRange && (
               <View style={styles.statPill}>
                 <Bath size={14} color="#fff" />
-                <Text style={styles.statText}>
-                  {formatBathrooms(bathroomsValue)}
-                </Text>
+                <Text style={styles.statText}>{bathroomsRange}</Text>
               </View>
             )}
-            {areaValue !== null && (
+            {areaRange && (
               <View style={styles.statPill}>
                 <Square size={14} color="#fff" />
+                <Text style={styles.statText}>{areaRange}</Text>
+              </View>
+            )}
+            {/* Units available */}
+            {project.total_units > 0 && (
+              <View style={styles.statPill}>
+                <Building2 size={14} color="#fff" />
                 <Text style={styles.statText}>
-                  {areaValue.toLocaleString()} m²
+                  {project.available_units}/{project.total_units}
                 </Text>
               </View>
             )}
@@ -729,277 +778,9 @@ function PropertyReelCard({
   );
 }
 
-// Type guard to check if item is a property
-function isProperty(item: FeedItem): item is FeedProperty {
-  return (item as any)._type === 'property' || 'property_type' in item;
-}
-
-// ---------- Feed Container Component ----------
-export default function PropertyReelsView() {
-  const [properties, setProperties] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const { isAuthenticated } = useUser();
-  const flatListRef = useRef<FlatList>(null);
-
-  const handleFavoriteMetaUpdate = useCallback(
-    (
-      itemId: number | string,
-      meta: { favorites_count?: number | null; is_favourite?: boolean | null }
-    ) => {
-      setProperties(prev =>
-        prev.map(item => {
-          if (!item || item.id !== itemId) return item;
-
-          if (isProperty(item)) {
-            const updates: Partial<FeedProperty> = {};
-            if (meta.favorites_count !== undefined && meta.favorites_count !== null) {
-              updates.favorites_count = meta.favorites_count;
-            }
-            if (typeof meta.is_favourite === 'boolean') {
-              updates.is_favourite = meta.is_favourite;
-            }
-            if (Object.keys(updates).length === 0) {
-              return item;
-            }
-            return { ...item, ...updates };
-          } else {
-            // Project updates
-            if (Object.keys(meta).length === 0) {
-              return item;
-            }
-            return {
-              ...item,
-              ...(meta.favorites_count !== undefined && meta.favorites_count !== null
-                ? { favorites_count: meta.favorites_count }
-                : {}),
-              ...(typeof meta.is_favourite === 'boolean'
-                ? { is_favourite: meta.is_favourite }
-                : {}),
-            };
-          }
-        })
-      );
-    },
-    []
-  );
-
-  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false) => {
-    if (!isAuthenticated) {
-      setError('Please sign in to view your personalized feed.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-
-      const response = await api.feed.list({ page: pageNum, page_size: 5 });
-      
-      if (append) {
-        setProperties(prev => [...prev, ...response.results]);
-      } else {
-        setProperties(response.results);
-      }
-
-      setHasNextPage(response.next !== null);
-    } catch (err: any) {
-      console.error('Failed to fetch feed:', err);
-      setError(err?.response?.data?.detail || 'Failed to load feed. Please try again.');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    fetchFeed(1, false);
-  }, [fetchFeed]);
-
-  const loadMore = useCallback(() => {
-    if (!loadingMore && hasNextPage) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchFeed(nextPage, true);
-    }
-  }, [page, loadingMore, hasNextPage, fetchFeed]);
-
-  const renderItem = useCallback(({ item }: { item: FeedItem }) => {
-    return (
-      <View style={styles.reelItem}>
-        {isProperty(item) ? (
-          <PropertyReelCard
-            property={item}
-            source="feed"
-            onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
-          />
-        ) : (
-          <ProjectReelCard
-            project={item}
-            source="feed"
-            onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
-          />
-        )}
-      </View>
-    );
-  }, [handleFavoriteMetaUpdate]);
-
-  const keyExtractor = useCallback((item: FeedItem) => {
-    const type = isProperty(item) ? 'property' : 'project';
-    return `${type}-${item.id?.toString() || Math.random()}`;
-  }, []);
-
-  const getItemLayout = useCallback(
-    (_: any, index: number) => ({
-      length: SCREEN_HEIGHT,
-      offset: SCREEN_HEIGHT * index,
-      index,
-    }),
-    []
-  );
-
-  if (loading && properties.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#10b981" />
-        <Text style={styles.loadingText}>Loading your feed...</Text>
-      </View>
-    );
-  }
-
-  if (error && properties.length === 0) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => fetchFeed(1, false)}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (properties.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No properties found</Text>
-        <Text style={styles.emptySubtext}>Check back later for new listings</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.feedContainer}>
-      <FlatList
-        ref={flatListRef}
-        data={properties}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        getItemLayout={getItemLayout}
-        pagingEnabled
-        snapToInterval={SCREEN_HEIGHT}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        showsVerticalScrollIndicator={false}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={styles.footerLoader}>
-              <ActivityIndicator size="small" color="#10b981" />
-            </View>
-          ) : null
-        }
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        initialNumToRender={2}
-        snapToOffsets={properties.map((_, index) => SCREEN_HEIGHT * index)}
-      />
-    </View>
-  );
-}
-
 const ICON_CIRCLE_SIZE = 40;
 
 const styles = StyleSheet.create({
-  feedContainer: {
-    height: SCREEN_HEIGHT,
-    width: SCREEN_WIDTH,
-    backgroundColor: '#000',
-    overflow: 'hidden',
-  },
-  reelItem: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    overflow: 'hidden',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-  },
-  loadingText: {
-    color: '#fff',
-    marginTop: 16,
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    padding: 20,
-  },
-  errorText: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#10b981',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    padding: 20,
-  },
-  emptyText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    color: '#9ca3af',
-    fontSize: 14,
-  },
-  footerLoader: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
   safeContainer: {
     height: SCREEN_HEIGHT,
     width: SCREEN_WIDTH,
@@ -1046,8 +827,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: SCREEN_HEIGHT * 0.45,
   },
-
-  // Loading / error overlay for OptimizedImage
   imageLoadingOverlay: {
     backgroundColor: '#111827',
     justifyContent: 'center',
@@ -1064,8 +843,6 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 12,
   },
-
-  // Top bar
   topBar: {
     position: 'absolute',
     top: SCREEN_HEIGHT * 0.05,
@@ -1105,8 +882,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-
-  // Heart animation
   heartAnimation: {
     position: 'absolute',
     top: '50%',
@@ -1117,8 +892,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Right-side actions
   sideActions: {
     position: 'absolute',
     right: 16,
@@ -1155,13 +928,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-
-  // Bottom caption info
   bottomInfo: {
     position: 'absolute',
     bottom: 72,
     left: 16,
-    right: 92, // leave space for right actions
+    right: 92,
     zIndex: 15,
   },
   agentName: {
@@ -1223,3 +994,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+export default ProjectReelCard;
+

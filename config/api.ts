@@ -4,7 +4,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import type { FeedProperty, PublicProfileData, PublicProfileResponse } from '@/app/features/types';
-import { normalizePropertyData } from '@/app/features/types';
+import { normalizePropertyData, normalizeProjectData } from '@/app/features/types';
 
 /**
  * Mobile API client for PropertPro backend.
@@ -395,10 +395,25 @@ export const api = {
       apiGet('properties/api_admin/properties').then(res => res.data),
   },
 
-  // Feed endpoints (personalized property feed)
+  // Project-related endpoints
+  projects: {
+    /**
+     * Get project by ID
+     */
+    getById: (id: number | string, config?: AxiosRequestConfig) =>
+      apiGet(`projects/${id}`, config).then(res => res.data),
+
+    /**
+     * Toggle favorite status for a project ID
+     */
+    toggleFavorite: (pid: number | string) =>
+      apiPost(`projects/${pid}/favourite`).then(res => res.data),
+  },
+
+  // Feed endpoints (personalized property and project feed)
   feed: {
     /**
-     * Get personalized property feed
+     * Get personalized feed (properties and projects)
      * Returns paginated feed with match_score and slot_type
      * Requires authentication
      */
@@ -407,7 +422,7 @@ export const api = {
         count?: number;
         next?: string | null;
         previous?: string | null;
-        results?: FeedProperty[];
+        results?: any[];
       }>('feed/properties', { params });
 
       const payload = response.data;
@@ -418,13 +433,26 @@ export const api = {
         ? (payload as any)
         : [];
 
-      const results: FeedProperty[] = rawResults.map(item => {
-        const normalized = normalizePropertyData(item);
-        return {
-          ...normalized,
-          match_score: typeof item?.match_score === 'number' ? item.match_score : null,
-          slot_type: item?.slot_type ?? null,
-        };
+      const results = rawResults.map(item => {
+        // Check if it's a project or property using _type discriminator
+        if (item?._type === 'project') {
+          const normalized = normalizeProjectData(item);
+          return {
+            ...normalized,
+            _type: 'project' as const,
+            match_score: typeof item?.match_score === 'number' ? item.match_score : null,
+            slot_type: item?.slot_type ?? null,
+          };
+        } else {
+          // Property
+          const normalized = normalizePropertyData(item);
+          return {
+            ...normalized,
+            _type: 'property' as const,
+            match_score: typeof item?.match_score === 'number' ? item.match_score : null,
+            slot_type: item?.slot_type ?? null,
+          };
+        }
       });
 
       return {
