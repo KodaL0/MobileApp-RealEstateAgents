@@ -395,21 +395,51 @@ export const api = {
       apiGet('properties/api_admin/properties').then(res => res.data),
   },
 
-  // Project-related endpoints
+  // Unified listing endpoints (works for both properties and projects)
+  listings: {
+    /**
+     * Get a listing by ID and type
+     * Uses _type discriminator to route to correct endpoint
+     * @param id - Listing ID
+     * @param type - 'property' | 'project' (from _type field)
+     */
+    getById: (id: number | string, type: 'property' | 'project', config?: AxiosRequestConfig) => {
+      if (type === 'project') {
+        return apiGet(`dev/v1/projects/${id}/public_detail`, config).then(res => res.data);
+      } else {
+        return apiGet(`properties/${id}`, config).then(res => res.data);
+      }
+    },
+
+    /**
+     * Toggle favorite status for a listing (property or project)
+     * @param id - Listing ID
+     * @param type - 'property' | 'project' (from _type field)
+     */
+    toggleFavorite: (id: number | string, type: 'property' | 'project') => {
+      if (type === 'project') {
+        // Backend endpoint accepts project_id in body
+        return apiPost(`properties/0/favourite`, { project_id: id }).then(res => res.data);
+      } else {
+        // Property uses URL param
+        return apiPost(`properties/${id}/favourite`).then(res => res.data);
+      }
+    },
+  },
+
+  // Project-related endpoints (deprecated - use listings.getById instead)
   projects: {
     /**
-     * Get project by ID (public detail endpoint)
-     * Uses dev/v1 API for project details
+     * @deprecated Use api.listings.getById(id, 'project') instead
      */
     getById: (id: number | string, config?: AxiosRequestConfig) =>
       apiGet(`dev/v1/projects/${id}/public_detail`, config).then(res => res.data),
 
     /**
-     * Toggle favorite status for a project ID
-     * Note: Backend expects project_id in request body, not URL param
+     * @deprecated Use api.listings.toggleFavorite(id, 'project') instead
      */
     toggleFavorite: (pid: number | string) =>
-      apiPost(`properties/${pid}/favourite`, { project_id: pid }).then(res => res.data),
+      apiPost(`properties/0/favourite`, { project_id: pid }).then(res => res.data),
   },
 
   // Feed endpoints (personalized property and project feed)

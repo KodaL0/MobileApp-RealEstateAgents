@@ -242,7 +242,8 @@ function PropertyReelCard({
 
     const fetchFavoriteMeta = async () => {
       try {
-        const details = await api.properties.getById(property.id);
+        // Use unified listings endpoint with _type discriminator
+        const details = await api.listings.getById(property.id, 'property');
         if (!isMounted) return;
 
         const fetchedCount = getFavoriteCountValue(details?.favorites_count);
@@ -411,7 +412,8 @@ function PropertyReelCard({
   // Favorite handler with API integration and success message
   const handleFavorite = useCallback(async () => {
     try {
-      const response = await api.properties.toggleFavorite(property.id);
+      // Use unified listings endpoint with _type discriminator
+      const response = await api.listings.toggleFavorite(property.id, 'property');
       setIsLiked(response.is_favourite || false);
       
       // Optimistic update
@@ -427,7 +429,8 @@ function PropertyReelCard({
       // Refetch property details to get accurate favorites_count
       // (toggle API doesn't return favorites_count)
       try {
-        const details = await api.properties.getById(property.id);
+        // Use unified listings endpoint with _type discriminator
+        const details = await api.listings.getById(property.id, 'property');
         const refreshedCount = getFavoriteCountValue(details?.favorites_count);
         if (refreshedCount !== null) {
           setFavoriteCount(refreshedCount);

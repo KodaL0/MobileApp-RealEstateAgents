@@ -178,7 +178,8 @@ function ProjectReelCard({
 
     const fetchFavoriteMeta = async () => {
       try {
-        const details = await api.projects.getById(project.id);
+        // Use unified listings endpoint with _type discriminator
+        const details = await api.listings.getById(project.id, 'project');
         if (!isMounted) return;
 
         const fetchedCount = getFavoriteCountValue(details?.favorites_count);
@@ -418,7 +419,8 @@ function ProjectReelCard({
     const projectId = project.id;
 
     try {
-      const response = await api.projects.toggleFavorite(projectId);
+      // Use unified listings endpoint with _type discriminator
+      const response = await api.listings.toggleFavorite(projectId, 'project');
       const nextLiked =
         typeof response?.is_favourite === 'boolean' ? response.is_favourite : !isLiked;
 
@@ -435,7 +437,7 @@ function ProjectReelCard({
       });
 
       try {
-        const details = await api.projects.getById(projectId);
+        const details = await api.listings.getById(projectId, 'project');
         const refreshedCount = getFavoriteCountValue(details?.favorites_count);
         if (refreshedCount !== null) {
           setFavoriteCount(refreshedCount);
