@@ -731,7 +731,11 @@ function PropertyReelCard({
 
 // Type guard to check if item is a property
 function isProperty(item: FeedItem): item is FeedProperty {
-  return (item as any)._type === 'property' || 'property_type' in item;
+  // Check _type discriminator first (most reliable)
+  if ((item as any)._type === 'property') return true;
+  if ((item as any)._type === 'project') return false;
+  // Fallback: check for property_type field (properties have it, projects don't)
+  return 'property_type' in item && !('property_types' in item && Array.isArray((item as any).property_types));
 }
 
 // ---------- Feed Container Component ----------

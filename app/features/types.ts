@@ -138,29 +138,60 @@ export interface FeedProject extends Project {
 export type FeedItem = FeedProperty | FeedProject;
 
 // Utility function to normalize project data from API
-export const normalizeProjectData = (project: any): Project => ({
-  ...project,
-  sale_bedrooms_min: typeof project.sale_bedrooms_min === 'string' ? parseInt(project.sale_bedrooms_min, 10) : project.sale_bedrooms_min,
-  sale_bedrooms_max: typeof project.sale_bedrooms_max === 'string' ? parseInt(project.sale_bedrooms_max, 10) : project.sale_bedrooms_max,
-  sale_bathrooms_min: typeof project.sale_bathrooms_min === 'string' ? parseFloat(project.sale_bathrooms_min) : project.sale_bathrooms_min,
-  sale_bathrooms_max: typeof project.sale_bathrooms_max === 'string' ? parseFloat(project.sale_bathrooms_max) : project.sale_bathrooms_max,
-  sale_area_min: typeof project.sale_area_min === 'string' ? parseFloat(project.sale_area_min) : project.sale_area_min,
-  sale_area_max: typeof project.sale_area_max === 'string' ? parseFloat(project.sale_area_max) : project.sale_area_max,
-  sale_price_min: typeof project.sale_price_min === 'string' ? parseFloat(project.sale_price_min) : project.sale_price_min,
-  sale_price_max: typeof project.sale_price_max === 'string' ? parseFloat(project.sale_price_max) : project.sale_price_max,
-  rent_bedrooms_min: typeof project.rent_bedrooms_min === 'string' ? parseInt(project.rent_bedrooms_min, 10) : project.rent_bedrooms_min,
-  rent_bedrooms_max: typeof project.rent_bedrooms_max === 'string' ? parseInt(project.rent_bedrooms_max, 10) : project.rent_bedrooms_max,
-  rent_bathrooms_min: typeof project.rent_bathrooms_min === 'string' ? parseFloat(project.rent_bathrooms_min) : project.rent_bathrooms_min,
-  rent_bathrooms_max: typeof project.rent_bathrooms_max === 'string' ? parseFloat(project.rent_bathrooms_max) : project.rent_bathrooms_max,
-  rent_area_min: typeof project.rent_area_min === 'string' ? parseFloat(project.rent_area_min) : project.rent_area_min,
-  rent_area_max: typeof project.rent_area_max === 'string' ? parseFloat(project.rent_area_max) : project.rent_area_max,
-  rent_price_min: typeof project.rent_price_min === 'string' ? parseFloat(project.rent_price_min) : project.rent_price_min,
-  rent_price_max: typeof project.rent_price_max === 'string' ? parseFloat(project.rent_price_max) : project.rent_price_max,
-  total_units: typeof project.total_units === 'string' ? parseInt(project.total_units, 10) : project.total_units,
-  available_units: typeof project.available_units === 'string' ? parseInt(project.available_units, 10) : project.available_units,
-  latitude: typeof project.latitude === 'string' ? parseFloat(project.latitude) : project.latitude,
-  longitude: typeof project.longitude === 'string' ? parseFloat(project.longitude) : project.longitude,
-});
+export const normalizeProjectData = (project: any): Project => {
+  // Normalize images array - handle both ProjectFeedSerializer format and raw API format
+  let normalizedImages: ProjectImage[] = [];
+  if (project.images && Array.isArray(project.images)) {
+    normalizedImages = project.images.map((img: any) => {
+      if (typeof img === 'string') {
+        return {
+          image: img,
+          is_primary: false,
+          display_order: 0,
+        };
+      }
+      return {
+        image: img.image || img.file || '',
+        is_primary: img.is_primary || false,
+        display_order: img.display_order ?? 0,
+        created_at: img.created_at || img.uploaded_at,
+      };
+    });
+  }
+
+  return {
+    ...project,
+    // Ensure _type is set
+    _type: 'project',
+    // Normalize images
+    images: normalizedImages,
+    // Normalize numeric fields
+    sale_bedrooms_min: typeof project.sale_bedrooms_min === 'string' ? parseInt(project.sale_bedrooms_min, 10) : project.sale_bedrooms_min,
+    sale_bedrooms_max: typeof project.sale_bedrooms_max === 'string' ? parseInt(project.sale_bedrooms_max, 10) : project.sale_bedrooms_max,
+    sale_bathrooms_min: typeof project.sale_bathrooms_min === 'string' ? parseFloat(project.sale_bathrooms_min) : project.sale_bathrooms_min,
+    sale_bathrooms_max: typeof project.sale_bathrooms_max === 'string' ? parseFloat(project.sale_bathrooms_max) : project.sale_bathrooms_max,
+    sale_area_min: typeof project.sale_area_min === 'string' ? parseFloat(project.sale_area_min) : project.sale_area_min,
+    sale_area_max: typeof project.sale_area_max === 'string' ? parseFloat(project.sale_area_max) : project.sale_area_max,
+    sale_price_min: typeof project.sale_price_min === 'string' ? parseFloat(project.sale_price_min) : project.sale_price_min,
+    sale_price_max: typeof project.sale_price_max === 'string' ? parseFloat(project.sale_price_max) : project.sale_price_max,
+    rent_bedrooms_min: typeof project.rent_bedrooms_min === 'string' ? parseInt(project.rent_bedrooms_min, 10) : project.rent_bedrooms_min,
+    rent_bedrooms_max: typeof project.rent_bedrooms_max === 'string' ? parseInt(project.rent_bedrooms_max, 10) : project.rent_bedrooms_max,
+    rent_bathrooms_min: typeof project.rent_bathrooms_min === 'string' ? parseFloat(project.rent_bathrooms_min) : project.rent_bathrooms_min,
+    rent_bathrooms_max: typeof project.rent_bathrooms_max === 'string' ? parseFloat(project.rent_bathrooms_max) : project.rent_bathrooms_max,
+    rent_area_min: typeof project.rent_area_min === 'string' ? parseFloat(project.rent_area_min) : project.rent_area_min,
+    rent_area_max: typeof project.rent_area_max === 'string' ? parseFloat(project.rent_area_max) : project.rent_area_max,
+    rent_price_min: typeof project.rent_price_min === 'string' ? parseFloat(project.rent_price_min) : project.rent_price_min,
+    rent_price_max: typeof project.rent_price_max === 'string' ? parseFloat(project.rent_price_max) : project.rent_price_max,
+    total_units: typeof project.total_units === 'string' ? parseInt(project.total_units, 10) : (project.total_units ?? 0),
+    available_units: typeof project.available_units === 'string' ? parseInt(project.available_units, 10) : (project.available_units ?? 0),
+    latitude: typeof project.latitude === 'string' ? parseFloat(project.latitude) : project.latitude,
+    longitude: typeof project.longitude === 'string' ? parseFloat(project.longitude) : project.longitude,
+    // Ensure arrays are arrays
+    property_types: Array.isArray(project.property_types) ? project.property_types : [],
+    amenities: Array.isArray(project.amenities) ? project.amenities : [],
+    features: Array.isArray(project.features) ? project.features : [],
+  };
+};
 
 // Utility function to normalize a single property object from API
 export const normalizePropertyData = (property: any): Property => ({

@@ -398,16 +398,18 @@ export const api = {
   // Project-related endpoints
   projects: {
     /**
-     * Get project by ID
+     * Get project by ID (public detail endpoint)
+     * Uses dev/v1 API for project details
      */
     getById: (id: number | string, config?: AxiosRequestConfig) =>
-      apiGet(`projects/${id}`, config).then(res => res.data),
+      apiGet(`dev/v1/projects/${id}/public_detail`, config).then(res => res.data),
 
     /**
      * Toggle favorite status for a project ID
+     * Note: Backend expects project_id in request body, not URL param
      */
     toggleFavorite: (pid: number | string) =>
-      apiPost(`projects/${pid}/favourite`).then(res => res.data),
+      apiPost(`properties/${pid}/favourite`, { project_id: pid }).then(res => res.data),
   },
 
   // Feed endpoints (personalized property and project feed)
@@ -435,7 +437,11 @@ export const api = {
 
       const results = rawResults.map(item => {
         // Check if it's a project or property using _type discriminator
-        if (item?._type === 'project') {
+        // Fallback: check for property_type field (properties have it, projects have property_types array)
+        const isProject = item?._type === 'project' || 
+          (!item?._type && 'property_types' in item && Array.isArray(item.property_types) && !('property_type' in item));
+        
+        if (isProject) {
           const normalized = normalizeProjectData(item);
           return {
             ...normalized,
@@ -444,7 +450,7 @@ export const api = {
             slot_type: item?.slot_type ?? null,
           };
         } else {
-          // Property
+          // Property (default)
           const normalized = normalizePropertyData(item);
           return {
             ...normalized,
