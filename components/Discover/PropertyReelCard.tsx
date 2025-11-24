@@ -4,26 +4,14 @@ import {
   Text,
   StyleSheet,
   Dimensions,
-  Image,
   TouchableOpacity,
-  ScrollView,
-  Platform,
-  ActivityIndicator,
-  Animated,
 } from 'react-native';
 import {
-  Heart,
   MapPin,
   Square,
-  ArrowUpCircle,
-  Layers,
-  UserCircle,
-  MessageCircle,
-  Share,
   Bed,
   Bath,
 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { api } from '@/config/api';
@@ -32,151 +20,10 @@ import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
 import type { FeedProperty } from '@/app/features/types';
 import { analytics } from '@/services/analytics';
+import { BaseReelCard } from './BaseReelCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
-
-// Calculate consistent image dimensions
-const IMAGE_PADDING = 48;
-const IMAGE_WIDTH = SCREEN_WIDTH - IMAGE_PADDING;
-const IMAGE_ASPECT_RATIO = 16 / 9;
-const IMAGE_MAX_HEIGHT = SCREEN_HEIGHT * 0.68;
-const IMAGE_HEIGHT = Math.min(
-  IMAGE_WIDTH / IMAGE_ASPECT_RATIO,
-  IMAGE_MAX_HEIGHT
-);
-
-// Memoized image component for performance with consistent sizing
-const OptimizedImage = memo(({ 
-  uri, 
-  style, 
-  blurRadius = 0,
-  onError,
-  containerStyle
-}: { 
-  uri: string; 
-  style: any; 
-  blurRadius?: number;
-  onError?: () => void;
-  containerStyle?: any;
-}) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
-  
-  const handleError = useCallback(() => {
-    setImageError(true);
-    setImageLoading(false);
-    onError?.();
-  }, [onError]);
-
-  const handleLoad = useCallback(() => {
-    setImageLoading(false);
-  }, []);
-
-  const imageUri = imageError
-    ? 'https://via.placeholder.com/800x600?text=No+Image'
-    : uri;
-
-  return (
-    <View style={containerStyle || style}>
-      {/* Loading placeholder */}
-      {imageLoading && !imageError && (
-        <View style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: '#111827',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1,
-          }
-        ]}>
-          <ActivityIndicator size="large" color="#6b7280" />
-        </View>
-      )}
-      
-      {/* Error placeholder */}
-      {imageError && (
-        <View style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: '#111827',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1,
-          }
-        ]}>
-          <Text style={{ color: '#6b7280', fontSize: 12 }}>Image unavailable</Text>
-        </View>
-      )}
-      
-      <Image
-        source={{ uri: imageUri }}
-        style={[
-          StyleSheet.absoluteFillObject,
-          { width: '100%', height: '100%' },
-          imageLoading && { opacity: 0 }
-        ]}
-        resizeMode="cover"
-        onError={handleError}
-        onLoad={handleLoad}
-        blurRadius={blurRadius}
-      />
-    </View>
-  );
-});
-
-OptimizedImage.displayName = 'OptimizedImage';
-
-// Memoized carousel indicator dots
-const CarouselDots = memo(({ 
-  count, 
-  currentIndex 
-}: { 
-  count: number; 
-  currentIndex: number;
-}) => {
-  if (count <= 1) return null;
-  
-  const dotContainerStyle = {
-    position: 'absolute' as const,
-    top: SCREEN_HEIGHT * 0.15,
-    left: 0,
-    right: 0,
-    flexDirection: 'row' as const,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    gap: 6,
-    zIndex: 5,
-  };
-  
-  const dotStyle = {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-  };
-  
-  const dotActiveStyle = {
-    width: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  };
-  
-  return (
-    <View style={dotContainerStyle}>
-      {Array.from({ length: count }).map((_, index) => (
-        <View
-          key={index}
-          style={[
-            dotStyle,
-            index === currentIndex && dotActiveStyle,
-          ]}
-        />
-      ))}
-    </View>
-  );
-});
-
-CarouselDots.displayName = 'CarouselDots';
 
 function PropertyReelCard({
   property,
@@ -208,17 +55,8 @@ function PropertyReelCard({
   const [favoriteCount, setFavoriteCount] = useState<number>(
     getFavoriteCountValue(property?.favorites_count) ?? 0
   );
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const heartScale = useRef(new Animated.Value(0)).current;
-  const heartOpacity = useRef(new Animated.Value(0)).current;
-  const lastTap = useRef<number>(0);
-  const touchStartY = useRef<number>(0);
-  const touchStartX = useRef<number>(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
   const { getOrCreateThread } = useChat();
   const { isAuthenticated } = useUser();
 
@@ -319,14 +157,8 @@ function PropertyReelCard({
     return [getValidUrl()];
   }, [property, getValidUrl]);
 
-  const handleScroll = useCallback((event: any) => {
-    const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-    setCurrentIndex(index);
-    scrollX.setValue(event.nativeEvent.contentOffset.x);
-  }, [scrollX]);
-
-  const handleImageError = useCallback((index: number) => {
-    setImageErrors(prev => new Set(prev).add(index));
+  const handleImageChange = useCallback((index: number) => {
+    setCurrentImageIndex(index);
   }, []);
 
   const formatPrice = useCallback((price: number) =>
@@ -379,36 +211,6 @@ function PropertyReelCard({
     handleViewPress();
   }, [handleViewPress]);
 
-  // Heart animation trigger
-  const triggerHeartAnimation = useCallback(() => {
-    setShowHeartAnimation(true);
-    heartScale.setValue(0);
-    heartOpacity.setValue(1);
-
-    // Native driver only works on iOS/Android, not on web
-    const useNative = Platform.OS !== 'web';
-
-    Animated.parallel([
-      Animated.spring(heartScale, {
-        toValue: 1.2,
-        friction: 3,
-        tension: 40,
-        useNativeDriver: useNative,
-      }),
-      Animated.sequence([
-        Animated.delay(200),
-        Animated.timing(heartOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: useNative,
-        }),
-      ]),
-    ]).start(() => {
-      setShowHeartAnimation(false);
-      heartScale.setValue(0);
-    });
-  }, [heartScale, heartOpacity]);
-
   // Favorite handler with API integration and success message
   const handleFavorite = useCallback(async () => {
     try {
@@ -460,42 +262,6 @@ function PropertyReelCard({
     }
   }, [property.id]);
 
-  // Handle touch start to detect taps vs swipes
-  const handleTouchStart = useCallback((event: any) => {
-    const touch = event.nativeEvent.touches[0];
-    if (touch) {
-      touchStartY.current = touch.pageY;
-      touchStartX.current = touch.pageX;
-    }
-  }, []);
-
-  // Handle touch end to detect taps vs swipes
-  const handleTouchEnd = useCallback((event: any) => {
-    const touch = event.nativeEvent.changedTouches?.[0];
-    if (!touch) return;
-
-    const deltaY = Math.abs(touch.pageY - touchStartY.current);
-    const deltaX = Math.abs(touch.pageX - touchStartX.current);
-    
-    // If significant movement (>15px), it's a swipe - don't handle as tap
-    if (deltaY > 15 || deltaX > 15) {
-      return;
-    }
-
-    // It's a tap, check for double tap
-    const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
-
-    if (lastTap.current && now - lastTap.current < DOUBLE_TAP_DELAY) {
-      // Double tap detected
-      if (!isLiked) {
-        handleFavorite();
-      }
-      triggerHeartAnimation();
-    } else {
-      lastTap.current = now;
-    }
-  }, [isLiked, handleFavorite, triggerHeartAnimation]);
 
   // Chat handler: open or create thread then navigate to chat
   const handleChat = useCallback(async () => {
@@ -556,239 +322,131 @@ function PropertyReelCard({
     return null;
   }
 
+  // Top bar content (tags)
+  const topBarContent = (
+    <View style={styles.tagsContainer}>
+      <View style={[styles.tag, styles.tagPrimary, { backgroundColor: '#111827' }]}>
+        <Text style={styles.tagText} numberOfLines={1}>
+          {property.property_type?.toUpperCase() || 'PROPERTY'}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.tag,
+          styles.tagSecondary,
+          { backgroundColor: getCountryColor(property.country || '') },
+        ]}
+      >
+        <Text style={styles.tagText} numberOfLines={1}>
+          {property.country || 'Unknown'}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.tag,
+          styles.tagStatus,
+          {
+            backgroundColor:
+              property.property_status === 'for_sale'
+                ? '#10b981'
+                : '#3b82f6',
+          },
+        ]}
+      >
+        <Text style={styles.tagText} numberOfLines={1}>
+          {property.property_status === 'for_sale'
+            ? 'For Sale'
+            : 'For Rent'}
+        </Text>
+      </View>
+      {images.length > 1 && (
+        <View style={styles.photoCounter}>
+          <Text style={styles.photoCounterText}>
+            {currentImageIndex + 1}/{images.length}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  // Bottom content
+  const bottomContent = (
+    <>
+      {/* Agent Name - Clickable */}
+      {agentName && (
+        <TouchableOpacity onPress={handleAgentProfilePress} activeOpacity={0.7}>
+          <Text style={styles.agentName}>{agentName}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Full Title - Clickable */}
+      <TouchableOpacity onPress={handleTitlePress} activeOpacity={0.7}>
+        <Text style={styles.title}>
+          {property.title || 'Untitled Property'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Price */}
+      <View style={styles.priceRow}>
+        <Text style={styles.price}>{formatPrice(property.price)}</Text>
+        <Text style={styles.priceLabel}>
+          {property.property_status === 'for_sale'
+            ? 'Purchase Price'
+            : '/month'}
+        </Text>
+      </View>
+
+      {/* Location */}
+      <View style={styles.locationRow}>
+        <MapPin size={16} color="#10b981" />
+        <Text style={styles.locationText} numberOfLines={1}>
+          {property.location || 'Unknown Location'}
+        </Text>
+      </View>
+
+      {/* Beds/Baths/Area in one line */}
+      <View style={styles.statsRow}>
+        {bedroomsValue !== null && (
+          <View style={styles.statPill}>
+            <Bed size={14} color="#fff" />
+            <Text style={styles.statText}>{bedroomsValue.toString()}</Text>
+          </View>
+        )}
+        {formatBathrooms(bathroomsValue) && (
+          <View style={styles.statPill}>
+            <Bath size={14} color="#fff" />
+            <Text style={styles.statText}>{formatBathrooms(bathroomsValue)}</Text>
+          </View>
+        )}
+        {areaValue !== null && (
+          <View style={styles.statPill}>
+            <Square size={14} color="#fff" />
+            <Text style={styles.statText}>
+              {areaValue.toLocaleString()} m²
+            </Text>
+          </View>
+        )}
+      </View>
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'bottom']}>
-      <View 
-        style={styles.container}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onStartShouldSetResponder={() => false}
-        onMoveShouldSetResponder={() => false}
-      >
-        {/* Horizontal image scroll with blurred background */}
-        <ScrollView
-          ref={scrollViewRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          style={styles.imageScroll}
-          decelerationRate="fast"
-          snapToInterval={SCREEN_WIDTH}
-          snapToAlignment="center"
-        >
-          {images.map((uri: string, index: number) => (
-            <View key={`image-${index}`} style={styles.imageWrapper}>
-              {/* Blurred background - only render if not first image or if current */}
-              {(index === 0 || index === currentIndex) && (
-                <OptimizedImage
-                  uri={uri}
-                  style={StyleSheet.absoluteFillObject}
-                  blurRadius={25}
-                  onError={() => handleImageError(index)}
-                  containerStyle={StyleSheet.absoluteFillObject}
-                />
-              )}
-
-              {/* Main image - consistent sizing with fixed aspect ratio */}
-              <View style={styles.image}>
-                <OptimizedImage
-                  uri={uri}
-                  style={StyleSheet.absoluteFillObject}
-                  onError={() => handleImageError(index)}
-                  containerStyle={StyleSheet.absoluteFillObject}
-                />
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-
-        {/* Enhanced carousel indicators */}
-        <CarouselDots count={images.length} currentIndex={currentIndex} />
-
-        {/* Heart animation overlay */}
-        {showHeartAnimation && (
-          <Animated.View
-            style={[
-              styles.heartAnimation,
-              {
-                opacity: heartOpacity,
-                transform: [{ scale: heartScale }],
-              },
-            ]}
-            pointerEvents="none"
-          >
-            <Heart size={80} color="#FF385C" fill="#FF385C" />
-          </Animated.View>
-        )}
-
-        {/* Gradient overlay */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.9)']}
-          style={styles.gradient}
-        />
-
-        {/* Enhanced Tags - better positioning and visual hierarchy */}
-        <View style={styles.tagsContainer}>
-          <View style={[styles.tag, styles.tagPrimary, { backgroundColor: '#111827' }]}>
-            <Text style={styles.tagText} numberOfLines={1}>
-              {property.property_type?.toUpperCase() || 'PROPERTY'}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.tag,
-              styles.tagSecondary,
-              { backgroundColor: getCountryColor(property.country || '') },
-            ]}
-          >
-            <Text style={styles.tagText} numberOfLines={1}>
-              {property.country || 'Unknown'}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.tag,
-              styles.tagStatus,
-              {
-                backgroundColor:
-                  property.property_status === 'for_sale'
-                    ? '#10b981'
-                    : '#3b82f6',
-              },
-            ]}
-          >
-            <Text style={styles.tagText} numberOfLines={1}>
-              {property.property_status === 'for_sale'
-                ? 'For Sale'
-                : 'For Rent'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Photo counter - integrated with tags */}
-        {images.length > 1 && (
-          <View style={styles.photoCounter}>
-            <Text style={styles.photoCounterText}>
-              {currentIndex + 1}/{images.length}
-            </Text>
-          </View>
-        )}
-
-        {/* Right side actions - moved lower */}
-        <View style={styles.sideActions}>
-          {/* Chat Button */}
-          <TouchableOpacity
-            style={[styles.chatButton, isChatLoading && styles.chatButtonDisabled]}
-            onPress={handleChat}
-            disabled={isChatLoading}
-          >
-            {isChatLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <MessageCircle size={32} color="#fff" strokeWidth={2.2} />
-            )}
-          </TouchableOpacity>
-
-          {/* Like */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleFavorite}
-          >
-            <Heart
-              size={32}
-              color="#fff"
-              fill={isLiked ? '#FF385C' : 'transparent'}
-              strokeWidth={2}
-            />
-            <Text style={styles.actionText}>{favoriteCount}</Text>
-          </TouchableOpacity>
-
-          {/* Share */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleShare}
-          >
-            <Share size={32} color="#fff" strokeWidth={2} />
-            <Text style={styles.actionText}>Share</Text>
-          </TouchableOpacity>
-
-          {/* Profile */}
-          <TouchableOpacity style={styles.actionButton} onPress={handleAgentProfilePress}>
-            <UserCircle size={32} color="#fff" strokeWidth={2} />
-            <Text style={styles.actionText}>Agent</Text>
-          </TouchableOpacity>
-
-          {/* View Property */}
-          <TouchableOpacity
-            style={styles.viewPropertyButton}
-            onPress={handleViewPress} // ✅ now redirects
-            activeOpacity={0.8}
-          >
-            <Text style={styles.viewPropertyText}>View</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom Info - Always visible */}
-        <View style={styles.bottomInfo}>
-          {/* Agent Name - Clickable */}
-          {agentName && (
-            <TouchableOpacity onPress={handleAgentProfilePress} activeOpacity={0.7}>
-              <Text style={styles.agentName}>{agentName}</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Full Title - Clickable */}
-          <TouchableOpacity onPress={handleTitlePress} activeOpacity={0.7}>
-            <Text style={styles.title}>
-              {property.title || 'Untitled Property'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Price */}
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatPrice(property.price)}</Text>
-            <Text style={styles.priceLabel}>
-              {property.property_status === 'for_sale'
-                ? 'Purchase Price'
-                : '/month'}
-            </Text>
-          </View>
-
-          {/* Location */}
-          <View style={styles.locationRow}>
-            <MapPin size={16} color="#10b981" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {property.location || 'Unknown Location'}
-            </Text>
-          </View>
-
-          {/* Beds/Baths/Area in one line */}
-          <View style={styles.statsRow}>
-            {bedroomsValue !== null && (
-              <View style={styles.statPill}>
-                <Bed size={14} color="#fff" />
-                <Text style={styles.statText}>{bedroomsValue.toString()}</Text>
-              </View>
-            )}
-            {formatBathrooms(bathroomsValue) && (
-              <View style={styles.statPill}>
-                <Bath size={14} color="#fff" />
-                <Text style={styles.statText}>{formatBathrooms(bathroomsValue)}</Text>
-              </View>
-            )}
-            {areaValue !== null && (
-              <View style={styles.statPill}>
-                <Square size={14} color="#fff" />
-                <Text style={styles.statText}>
-                  {areaValue.toLocaleString()} m²
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </View>
+      <BaseReelCard
+        images={images}
+        topBarContent={topBarContent}
+        bottomContent={bottomContent}
+        onFavorite={handleFavorite}
+        onChat={handleChat}
+        onShare={handleShare}
+        onAgentPress={handleAgentProfilePress}
+        onView={handleViewPress}
+        isLiked={isLiked}
+        favoriteCount={favoriteCount}
+        isChatLoading={isChatLoading}
+        onImageChange={handleImageChange}
+        baseUrl={BASE_URL}
+      />
     </SafeAreaView>
   );
 }
@@ -798,97 +456,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  container: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    position: 'relative',
-  },
-  imageScroll: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-  },
-  doubleTapOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 2,
-  },
-  heartAnimation: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -40,
-    marginTop: -40,
-    zIndex: 1000,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imageWrapper: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: SCREEN_HEIGHT * 0.08,
-    paddingBottom: SCREEN_HEIGHT * 0.12,
-    // Ensure consistent positioning regardless of image content
-    position: 'relative',
-    backgroundColor: '#000',
-  },
-  image: {
-    // Fixed dimensions for consistency - all images render at same size
-    width: IMAGE_WIDTH,
-    height: IMAGE_HEIGHT,
-    borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: '#111827',
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
-    // Ensure consistent positioning
-    alignSelf: 'center',
-  },
-  gradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.45,
-  },
-  photoCounter: {
-    position: 'absolute',
-    top: SCREEN_HEIGHT * 0.07,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 4,
-    zIndex: 5,
-  },
-  photoCounterText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
   tagsContainer: {
-    position: 'absolute',
-    top: SCREEN_HEIGHT * 0.07,
-    left: 16,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    maxWidth: SCREEN_WIDTH * 0.65,
-    zIndex: 5,
+    alignItems: 'center',
   },
   tag: {
     paddingHorizontal: 10,
@@ -915,54 +487,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  sideActions: {
-    position: 'absolute',
-    right: 16,
-    bottom: SCREEN_HEIGHT * 0.22,
-    alignItems: 'center',
-    gap: 22,
-    zIndex: 10,
-  },
-  chatButton: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 25,
-    padding: 6,
-    marginBottom: 10,
+  photoCounter: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 4,
+    elevation: 4,
+    marginLeft: 'auto',
   },
-  chatButtonDisabled: {
-    opacity: 0.6,
-  },
-  actionButton: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  actionText: {
+  photoCounterText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  viewPropertyButton: {
-    backgroundColor: '#10b981',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginTop: 4,
-  },
-  viewPropertyText: {
-    color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-  },
-  bottomInfo: {
-    position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.11,
-    left: 16,
-    right: 100,
-    zIndex: 10,
+    letterSpacing: 0.5,
   },
   agentName: {
     fontSize: 14,
