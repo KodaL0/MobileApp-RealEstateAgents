@@ -459,6 +459,18 @@ export const api = {
 
       const payload = response.data;
 
+      if (__DEV__) {
+        console.log('[Feed API] Raw response:', {
+          hasResults: !!(payload as any)?.results,
+          resultsLength: Array.isArray((payload as any)?.results) ? (payload as any).results.length : 0,
+          isArray: Array.isArray(payload),
+          payloadKeys: payload ? Object.keys(payload) : [],
+          firstItem: Array.isArray((payload as any)?.results) && (payload as any).results.length > 0 
+            ? (payload as any).results[0] 
+            : null,
+        });
+      }
+
       const rawResults: any[] = Array.isArray((payload as any)?.results)
         ? (payload as any).results
         : Array.isArray(payload)
@@ -467,9 +479,28 @@ export const api = {
 
       const results = rawResults.map(item => {
         // Check if it's a project or property using _type discriminator
-        // Fallback: check for property_type field (properties have it, projects have property_types array)
-        const isProject = item?._type === 'project' || 
-          (!item?._type && 'property_types' in item && Array.isArray(item.property_types) && !('property_type' in item));
+        // Backend should set _type: 'project' or _type: 'property'
+        // Fallback: check for property_types array (projects) vs property_type string (properties)
+        const hasProjectType = item?._type === 'project';
+        const hasPropertyType = item?._type === 'property';
+        
+        // Fallback detection: projects have property_types array, properties have property_type string
+        const hasPropertyTypesArray = 'property_types' in item && Array.isArray(item.property_types);
+        const hasPropertyTypeString = 'property_type' in item && typeof item.property_type === 'string';
+        
+        const isProject = hasProjectType || (!hasPropertyType && hasPropertyTypesArray && !hasPropertyTypeString);
+        
+        if (__DEV__) {
+          console.log('[Feed API] Item detection:', {
+            id: item?.id,
+            _type: item?._type,
+            hasProjectType,
+            hasPropertyType,
+            hasPropertyTypesArray,
+            hasPropertyTypeString,
+            isProject,
+          });
+        }
         
         if (isProject) {
           const normalized = normalizeProjectData(item);
@@ -490,6 +521,16 @@ export const api = {
           };
         }
       });
+      
+      if (__DEV__) {
+        const projectCount = results.filter(r => r._type === 'project').length;
+        const propertyCount = results.filter(r => r._type === 'property').length;
+        console.log('[Feed API] Normalized results:', {
+          total: results.length,
+          projects: projectCount,
+          properties: propertyCount,
+        });
+      }
 
       return {
         results,

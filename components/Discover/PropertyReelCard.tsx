@@ -324,109 +324,109 @@ function PropertyReelCard({
 
   // Top bar content (tags)
   const topBarContent = (
-    <View style={styles.tagsContainer}>
-      <View style={[styles.tag, styles.tagPrimary, { backgroundColor: '#111827' }]}>
-        <Text style={styles.tagText} numberOfLines={1}>
-          {property.property_type?.toUpperCase() || 'PROPERTY'}
-        </Text>
-      </View>
-      <View
-        style={[
-          styles.tag,
-          styles.tagSecondary,
-          { backgroundColor: getCountryColor(property.country || '') },
-        ]}
-      >
-        <Text style={styles.tagText} numberOfLines={1}>
-          {property.country || 'Unknown'}
-        </Text>
-      </View>
-      <View
-        style={[
-          styles.tag,
-          styles.tagStatus,
-          {
-            backgroundColor:
-              property.property_status === 'for_sale'
-                ? '#10b981'
-                : '#3b82f6',
-          },
-        ]}
-      >
-        <Text style={styles.tagText} numberOfLines={1}>
-          {property.property_status === 'for_sale'
-            ? 'For Sale'
-            : 'For Rent'}
-        </Text>
-      </View>
-      {images.length > 1 && (
-        <View style={styles.photoCounter}>
-          <Text style={styles.photoCounterText}>
+        <View style={styles.tagsContainer}>
+          <View style={[styles.tag, styles.tagPrimary, { backgroundColor: '#111827' }]}>
+            <Text style={styles.tagText} numberOfLines={1}>
+              {property.property_type?.toUpperCase() || 'PROPERTY'}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.tag,
+              styles.tagSecondary,
+              { backgroundColor: getCountryColor(property.country || '') },
+            ]}
+          >
+            <Text style={styles.tagText} numberOfLines={1}>
+              {property.country || 'Unknown'}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.tag,
+              styles.tagStatus,
+              {
+                backgroundColor:
+                  property.property_status === 'for_sale'
+                    ? '#10b981'
+                    : '#3b82f6',
+              },
+            ]}
+          >
+            <Text style={styles.tagText} numberOfLines={1}>
+              {property.property_status === 'for_sale'
+                ? 'For Sale'
+                : 'For Rent'}
+            </Text>
+          </View>
+        {images.length > 1 && (
+          <View style={styles.photoCounter}>
+            <Text style={styles.photoCounterText}>
             {currentImageIndex + 1}/{images.length}
-          </Text>
+            </Text>
+          </View>
+        )}
         </View>
-      )}
-    </View>
   );
 
   // Bottom content
   const bottomContent = (
     <>
-      {/* Agent Name - Clickable */}
-      {agentName && (
-        <TouchableOpacity onPress={handleAgentProfilePress} activeOpacity={0.7}>
-          <Text style={styles.agentName}>{agentName}</Text>
-        </TouchableOpacity>
-      )}
+          {/* Agent Name - Clickable */}
+          {agentName && (
+            <TouchableOpacity onPress={handleAgentProfilePress} activeOpacity={0.7}>
+              <Text style={styles.agentName}>{agentName}</Text>
+            </TouchableOpacity>
+          )}
 
-      {/* Full Title - Clickable */}
-      <TouchableOpacity onPress={handleTitlePress} activeOpacity={0.7}>
-        <Text style={styles.title}>
-          {property.title || 'Untitled Property'}
-        </Text>
-      </TouchableOpacity>
+          {/* Full Title - Clickable */}
+          <TouchableOpacity onPress={handleTitlePress} activeOpacity={0.7}>
+            <Text style={styles.title}>
+              {property.title || 'Untitled Property'}
+            </Text>
+          </TouchableOpacity>
 
-      {/* Price */}
-      <View style={styles.priceRow}>
-        <Text style={styles.price}>{formatPrice(property.price)}</Text>
-        <Text style={styles.priceLabel}>
-          {property.property_status === 'for_sale'
-            ? 'Purchase Price'
-            : '/month'}
-        </Text>
-      </View>
-
-      {/* Location */}
-      <View style={styles.locationRow}>
-        <MapPin size={16} color="#10b981" />
-        <Text style={styles.locationText} numberOfLines={1}>
-          {property.location || 'Unknown Location'}
-        </Text>
-      </View>
-
-      {/* Beds/Baths/Area in one line */}
-      <View style={styles.statsRow}>
-        {bedroomsValue !== null && (
-          <View style={styles.statPill}>
-            <Bed size={14} color="#fff" />
-            <Text style={styles.statText}>{bedroomsValue.toString()}</Text>
-          </View>
-        )}
-        {formatBathrooms(bathroomsValue) && (
-          <View style={styles.statPill}>
-            <Bath size={14} color="#fff" />
-            <Text style={styles.statText}>{formatBathrooms(bathroomsValue)}</Text>
-          </View>
-        )}
-        {areaValue !== null && (
-          <View style={styles.statPill}>
-            <Square size={14} color="#fff" />
-            <Text style={styles.statText}>
-              {areaValue.toLocaleString()} m²
+          {/* Price */}
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(property.price)}</Text>
+            <Text style={styles.priceLabel}>
+              {property.property_status === 'for_sale'
+                ? 'Purchase Price'
+                : '/month'}
             </Text>
           </View>
-        )}
-      </View>
+
+          {/* Location */}
+          <View style={styles.locationRow}>
+            <MapPin size={16} color="#10b981" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {property.location || 'Unknown Location'}
+            </Text>
+          </View>
+
+          {/* Beds/Baths/Area in one line */}
+          <View style={styles.statsRow}>
+            {bedroomsValue !== null && (
+              <View style={styles.statPill}>
+                <Bed size={14} color="#fff" />
+                <Text style={styles.statText}>{bedroomsValue.toString()}</Text>
+              </View>
+            )}
+            {formatBathrooms(bathroomsValue) && (
+              <View style={styles.statPill}>
+                <Bath size={14} color="#fff" />
+                <Text style={styles.statText}>{formatBathrooms(bathroomsValue)}</Text>
+              </View>
+            )}
+            {areaValue !== null && (
+              <View style={styles.statPill}>
+                <Square size={14} color="#fff" />
+                <Text style={styles.statText}>
+                  {areaValue.toLocaleString()} m²
+                </Text>
+              </View>
+            )}
+          </View>
     </>
   );
 

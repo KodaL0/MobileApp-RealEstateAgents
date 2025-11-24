@@ -759,14 +759,14 @@ export default function PropertyReelsView() {
           if (!item || item.id !== itemId) return item;
 
           if (isProperty(item)) {
-            const updates: Partial<FeedProperty> = {};
-            if (meta.favorites_count !== undefined && meta.favorites_count !== null) {
-              updates.favorites_count = meta.favorites_count;
-            }
-            if (typeof meta.is_favourite === 'boolean') {
-              updates.is_favourite = meta.is_favourite;
-            }
-            if (Object.keys(updates).length === 0) {
+          const updates: Partial<FeedProperty> = {};
+          if (meta.favorites_count !== undefined && meta.favorites_count !== null) {
+            updates.favorites_count = meta.favorites_count;
+          }
+          if (typeof meta.is_favourite === 'boolean') {
+            updates.is_favourite = meta.is_favourite;
+          }
+          if (Object.keys(updates).length === 0) {
               return item;
             }
             return { ...item, ...updates };
@@ -774,8 +774,8 @@ export default function PropertyReelsView() {
             // Project updates
             if (Object.keys(meta).length === 0) {
               return item;
-            }
-            return {
+          }
+          return {
               ...item,
               ...(meta.favorites_count !== undefined && meta.favorites_count !== null
                 ? { favorites_count: meta.favorites_count }
@@ -783,7 +783,7 @@ export default function PropertyReelsView() {
               ...(typeof meta.is_favourite === 'boolean'
                 ? { is_favourite: meta.is_favourite }
                 : {}),
-            };
+          };
           }
         })
       );
@@ -840,11 +840,11 @@ export default function PropertyReelsView() {
     return (
       <View style={styles.reelItem}>
         {isProperty(item) ? (
-          <PropertyReelCard
-            property={item}
-            source="feed"
-            onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
-          />
+        <PropertyReelCard
+          property={item}
+          source="feed"
+          onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
+        />
         ) : (
           <ProjectReelCard
             project={item}
