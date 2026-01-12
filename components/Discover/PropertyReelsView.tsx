@@ -913,12 +913,20 @@ export default function PropertyReelsView() {
       const itemsToPreload = properties.slice(0, 3);
       for (const item of itemsToPreload) {
         if (isProperty(item) && item.images && item.images.length > 0) {
-          const imageUrl = item.images[0];
-          const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
-          // Preload image
-          Image.prefetch(fullUrl).catch(() => {
-            // Silently fail - image will load normally
-          });
+          const firstImage = item.images[0];
+          // Handle both string URLs and object with image property (same logic as PropertyReelCard)
+          const imageUrl = typeof firstImage === 'string' 
+            ? firstImage 
+            : (typeof firstImage === 'object' && firstImage !== null ? firstImage.image : null);
+          
+          // Ensure it's a string before calling startsWith
+          if (typeof imageUrl === 'string' && imageUrl) {
+            const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
+            // Preload image
+            Image.prefetch(fullUrl).catch(() => {
+              // Silently fail - image will load normally
+            });
+          }
         }
       }
     };
