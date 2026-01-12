@@ -1041,30 +1041,30 @@ export default function PropertyReelsView() {
     return `${type}-${item.id?.toString() || Math.random()}`;
   }, []);
 
-  // Define viewability callbacks at component level (not inline)
-  const handleViewableItemsChanged = useCallback(
-    ({ viewableItems }: any) => {
-      // Only process if not currently appending items
-      if (isAppendingRef.current || !viewableItems || viewableItems.length === 0) {
-        return;
-      }
-      
-      const currentItem = viewableItems[0];
-      if (currentItem?.index !== undefined && typeof currentItem.index === 'number') {
-        checkAndPrefetchNextPage(currentItem.index);
-      }
-    },
-    [checkAndPrefetchNextPage]
-  );
+  // Store the prefetch function in a ref for stable callback
+  const checkAndPrefetchNextPageRef = useRef(checkAndPrefetchNextPage);
+  useEffect(() => {
+    checkAndPrefetchNextPageRef.current = checkAndPrefetchNextPage;
+  }, [checkAndPrefetchNextPage]);
 
-  const viewabilityConfig = useMemo(
-    () => ({
-      itemVisiblePercentThreshold: 50,
-      minimumViewTime: 300,
-      waitForInteraction: false,
-    }),
-    []
-  );
+  // Define stable viewability callback (doesn't change between renders)
+  const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    // Only process if not currently appending items
+    if (isAppendingRef.current || !viewableItems || viewableItems.length === 0) {
+      return;
+    }
+    
+    const currentItem = viewableItems[0];
+    if (currentItem?.index !== undefined && typeof currentItem.index === 'number') {
+      checkAndPrefetchNextPageRef.current(currentItem.index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 300,
+    waitForInteraction: false,
+  }).current;
 
   const getItemLayout = useCallback(
     (_: any, index: number) => ({
