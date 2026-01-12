@@ -1,6 +1,6 @@
-// app/screens/SearchScreen.tsx (or wherever your screen lives)
+// app/screens/SearchScreen.tsx
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,7 @@ import {
   Filter as FilterIcon,
 } from 'lucide-react-native';
 import PropertyCard from '@/components/property/PropertyCard';
-import { api } from '../../config/api'; // adjust if needed
+import { api } from '../../config/api';
 
 type FilterOption = 'All' | 'Buy' | 'Rent' | 'Commercial';
 
@@ -30,110 +30,157 @@ export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<FilterOption>('All');
-  const [showResults, setShowResults] = useState(true);
+  
+  // Track if user has performed a search
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Data state:
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Pagination if desired:
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10; // or whatever
+  
+  // Infinite scroll state
+  const [nextPage, setNextPage] = useState<number | null>(1);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 20; // Increased for better infinite scroll experience
 
-  // (Optional) total count/pages for pagination controls:
+  // Total count for display
   const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const filters: FilterOption[] = ['All', 'Buy', 'Rent', 'Commercial'];
 
-  // Build query params depending on searchQuery, currentPage, etc.
-  const buildQueryParams = useCallback(() => {
+  // Build query params - optimized to use 'search' parameter
+  const buildQueryParams = useCallback((page: number = 1) => {
     const qp: Record<string, any> = {
       page_size: PAGE_SIZE,
-      page: currentPage,
+      page: page,
     };
+    
+    // Priority 1: Use 'search' instead of 'location' for broader matching
+    // 'search' matches: title, description, location
+    // 'location' only matches: location field
     if (searchQuery.trim()) {
-      // your backend might accept a `search` or `location` param:
-      // for simplicity, assume `location` or `search`
-      qp.location = searchQuery.trim();
+      qp.search = searchQuery.trim();
     }
-    // If you have additional filters (minPrice, bedrooms, etc.), include here.
+    
+    // Priority 2: Property type (if not already filtered by endpoint)
+    if (selectedFilter === 'Commercial') {
+      qp.property_type = 'commercial';
+    }
+    
+    // Phase 2: Additional filters will be added here
+    // if (filters.priceMin) qp.price_min = filters.priceMin;
+    // if (filters.priceMax) qp.price_max = filters.priceMax;
+    // if (filters.bedrooms) qp.bedrooms = filters.bedrooms;
+    // if (filters.bathrooms) qp.bathrooms = filters.bathrooms;
+    // if (filters.propertyType) qp.property_type = filters.propertyType;
+    // if (filters.amenities?.length) qp.amenities = filters.amenities.join(',');
+    
     return qp;
-  }, [searchQuery, currentPage]);
+  }, [searchQuery, selectedFilter]);
 
-  // Fetch function:
-  const fetchListings = useCallback(async () => {
-    // If filter is "All", you might decide: fetch both Buy and Rent, or fetch only featured? 
-    // For simplicity, here if "All" we fetch first Buy page. You can adjust as needed.
-    setLoading(true);
-    setError(null);
+  // Fetch function - supports both initial search and loading more
+  const fetchListings = useCallback(async (page: number = 1, append: boolean = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setError(null);
+    }
 
-    const qp = buildQueryParams();
+    const qp = buildQueryParams(page);
     try {
       let respData;
       if (selectedFilter === 'Buy') {
         const paginated = await api.properties.buy(qp);
-        // paginated: { results: [...], count, next, previous }
         respData = paginated;
       } else if (selectedFilter === 'Rent') {
         const paginated = await api.properties.rent(qp);
         respData = paginated;
       } else if (selectedFilter === 'Commercial') {
-        // If you have a commercial endpoint, call it here:
-        // e.g. api.properties.list({ property_type: 'commercial', ...qp })
-        // Fallback: use a general list endpoint with filter param:
         const paginatedRaw = await api.properties.list({ property_type: 'commercial', ...qp });
-        // Note: your web’s list endpoint returns array or { results, count }?
-        // Adjust here to match shape:
         respData = {
           results: Array.isArray(paginatedRaw) ? paginatedRaw : paginatedRaw.results || [],
           count: paginatedRaw.count ?? (Array.isArray(paginatedRaw) ? paginatedRaw.length : 0),
+          next: paginatedRaw.next ?? null,
         };
       } else {
-        // 'All': you could combine buy + rent, or just fetch featured or all properties.
-        // For demonstration, fetch all properties via list endpoint:
-        const paginatedRaw = await api.properties.list(buildQueryParams());
+        const paginatedRaw = await api.properties.list(buildQueryParams(page));
         respData = {
           results: Array.isArray(paginatedRaw) ? paginatedRaw : paginatedRaw.results || [],
           count: paginatedRaw.count ?? (Array.isArray(paginatedRaw) ? paginatedRaw.length : 0),
+          next: paginatedRaw.next ?? null,
         };
       }
 
       const items: any[] = respData.results || [];
-      setListings(items);
-      const cnt = respData.count ?? items.length;
+      
+      if (append) {
+        // Append to existing listings
+        setListings(prev => [...prev, ...items]);
+      } else {
+        // Replace listings for new search
+        setListings(items);
+        setHasSearched(true);
+      }
+
+      const cnt = respData.count ?? (append ? totalCount : items.length);
       setTotalCount(cnt);
-      setTotalPages(Math.max(1, Math.ceil(cnt / PAGE_SIZE)));
+      
+      // Determine if there are more pages
+      const hasNext = respData.next !== null && respData.next !== undefined;
+      setHasMore(hasNext);
+      
+      if (hasNext) {
+        setNextPage(page + 1);
+      } else {
+        setNextPage(null);
+      }
     } catch (e: any) {
       console.error('Error fetching listings:', e);
-      setError('Failed to load properties. Please try again.');
-      setListings([]);
-      setTotalCount(0);
-      setTotalPages(1);
+      if (!append) {
+        setError('Failed to load properties. Please try again.');
+        setListings([]);
+        setTotalCount(0);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [selectedFilter, buildQueryParams]);
+  }, [selectedFilter, buildQueryParams, totalCount]);
 
-  // Trigger fetch when filter/search/page changes:
-  useEffect(() => {
-    // reset to page 1 when filter or search changes:
-    setCurrentPage(1);
-  }, [selectedFilter, searchQuery]);
+  // Handle search button press - new search
+  const handleSearch = useCallback(() => {
+    setNextPage(1);
+    setHasMore(false);
+    fetchListings(1, false);
+  }, [fetchListings]);
 
-  useEffect(() => {
-    fetchListings();
-  }, [fetchListings, currentPage]);
+  // Handle filter change - reset state and prompt new search
+  const handleFilterChange = useCallback((filter: FilterOption) => {
+    setSelectedFilter(filter);
+    setNextPage(1);
+    setHasMore(false);
+    // Clear results when filter changes to guide user to search again
+    if (hasSearched) {
+      setListings([]);
+      setTotalCount(0);
+      setHasSearched(false);
+      setError(null);
+    }
+  }, [hasSearched]);
 
-  // Render item for FlatList:
+  // Load more items for infinite scroll
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore && nextPage && hasSearched) {
+      fetchListings(nextPage, true);
+    }
+  }, [loadingMore, hasMore, nextPage, hasSearched, fetchListings]);
+
+  // Render item for FlatList
   const renderItem = ({ item }: { item: any }) => {
-    // `item` should be in shape your PropertyCard expects:
-    // If your backend returns fields with different names, you may need to normalize here.
-    // E.g., item.images might be array of objects {image: "url"}; PropertyCard expects property.images[0] = url string.
-    // You can do a quick normalization inline or wrap in a helper.
-    // For brevity, assume item.images is array of URL strings OR array of objects { image: string }:
-
-    // Quick normalization example:
+    // Image normalization
     let imagesArr: string[] = [];
     if (Array.isArray(item.images)) {
       imagesArr = item.images.map((img: any) => {
@@ -144,9 +191,10 @@ export default function SearchScreen() {
             : `https://api.propertpro.com${img.image}`;
         }
         return '';
-      }).filter(uri => uri);
+      }).filter((uri: any) => uri);
     }
-    // Prepare a “property” object shape:
+    
+    // Prepare property object for PropertyCard
     const propForCard = {
       id: item.id,
       images: imagesArr,
@@ -159,57 +207,61 @@ export default function SearchScreen() {
       location: item.location || '',
       bedrooms: Number(item.bedrooms) || 0,
       bathrooms: Number(item.bathrooms) || 0,
-      size: item.area, // Use raw area from backend
+      size: item.area,
       propertyType: item.property_type || '',
-      // plus any other fields your mobile card uses
     };
 
     return <PropertyCard property={propForCard} />;
   };
 
-  // Pagination controls (simple previous/next buttons)
+  // Footer for infinite scroll loading indicator
   const renderFooter = () => {
-    if (loading) return null;
-    if (totalPages <= 1) return null;
+    if (!loadingMore) return null;
     return (
-      <View style={styles.paginationContainer}>
-        <TouchableOpacity
-          onPress={() => {
-            if (currentPage > 1) setCurrentPage(p => p - 1);
-          }}
-          disabled={currentPage === 1}
-          style={[
-            styles.pageButton,
-            currentPage === 1 && styles.pageButtonDisabled,
-          ]}
-        >
-          <Text style={styles.pageButtonText}>{'< Prev'}</Text>
-        </TouchableOpacity>
-        <Text style={styles.pageInfo}>
-          {currentPage} / {totalPages}
-        </Text>
-        <TouchableOpacity
-          onPress={() => {
-            if (currentPage < totalPages) setCurrentPage(p => p + 1);
-          }}
-          disabled={currentPage === totalPages}
-          style={[
-            styles.pageButton,
-            currentPage === totalPages && styles.pageButtonDisabled,
-          ]}
-        >
-          <Text style={styles.pageButtonText}>{'Next >'}</Text>
-        </TouchableOpacity>
+      <View style={styles.loadMoreContainer}>
+        <ActivityIndicator size="small" color="#0F3460" />
+        <Text style={styles.loadMoreText}>Loading more properties...</Text>
       </View>
     );
   };
+
+  // Guidance component shown when user hasn't searched
+  const renderSearchGuidance = () => (
+    <View style={styles.guidanceContainer}>
+      <View style={styles.guidanceIconContainer}>
+        <SearchIcon size={48} color="#0F3460" />
+      </View>
+      <Text style={styles.guidanceTitle}>Find Your Perfect Property</Text>
+      <Text style={styles.guidanceText}>
+        Use the filters and search to find exactly what you're looking for. Your search results will load as you scroll.
+      </Text>
+      <View style={styles.guidanceTips}>
+        <View style={styles.tipItem}>
+          <View style={styles.tipBullet} />
+          <Text style={styles.tipText}>Select a filter: All, Buy, Rent, or Commercial</Text>
+        </View>
+        <View style={styles.tipItem}>
+          <View style={styles.tipBullet} />
+          <Text style={styles.tipText}>Enter a location or property name (optional)</Text>
+        </View>
+        <View style={styles.tipItem}>
+          <View style={styles.tipBullet} />
+          <Text style={styles.tipText}>Tap the Search button to see results</Text>
+        </View>
+        <View style={styles.tipItem}>
+          <View style={styles.tipBullet} />
+          <Text style={styles.tipText}>Scroll down to load more properties</Text>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <StatusBar style="dark" />
 
       <FlatList
-        data={showResults ? listings : []}
+        data={hasSearched ? listings : []}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
@@ -217,36 +269,16 @@ export default function SearchScreen() {
           paddingBottom: insets.bottom + 10,
           paddingHorizontal: 16,
         }}
-
-        // 1. HEADER: title, search bar, filters
+        // Infinite scroll
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        // HEADER: filters first, then search bar, then search button
         ListHeaderComponent={() => (
           <>
-            {/* Search bar */}
-            <View style={styles.searchContainer}>
-              <View style={styles.searchBar}>
-                <SearchIcon size={20} color="#666" style={styles.searchIcon} />
-                <TextInput
-                  placeholder="Search by location, property name..."
-                  style={styles.searchInput}
-                  placeholderTextColor="#999"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  onFocus={() => setShowResults(false)}
-                  onBlur={() => setShowResults(true)}
-                />
-                {searchQuery ? (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <X size={20} color="#666" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-              <TouchableOpacity style={styles.filterButton}>
-                <FilterIcon size={22} color="#0F3460" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Filter pills */}
+            {/* Filter pills - prioritized at the top */}
             <View style={styles.filtersContainer}>
+              <Text style={styles.filtersLabel}>Filter by Type</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {filters.map((filter) => (
                   <TouchableOpacity
@@ -255,7 +287,7 @@ export default function SearchScreen() {
                       styles.filterPill,
                       selectedFilter === filter && styles.filterPillActive,
                     ]}
-                    onPress={() => setSelectedFilter(filter)}
+                    onPress={() => handleFilterChange(filter)}
                   >
                     <Text
                       style={[
@@ -270,56 +302,122 @@ export default function SearchScreen() {
               </ScrollView>
             </View>
 
+            {/* Search bar with search button */}
+            <View style={styles.searchContainer}>
+              <View style={styles.searchBar}>
+                <SearchIcon size={20} color="#666" style={styles.searchIcon} />
+                <TextInput
+                  placeholder="Search by location, property name..."
+                  style={styles.searchInput}
+                  placeholderTextColor="#999"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onSubmitEditing={handleSearch}
+                  returnKeyType="search"
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <X size={20} color="#666" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <TouchableOpacity 
+                style={styles.filterButton}
+                onPress={() => {
+                  // TODO: Phase 2 - Open advanced filters modal (price, bedrooms, etc.)
+                }}
+              >
+                <FilterIcon size={22} color="#0F3460" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search button */}
+            <TouchableOpacity
+              style={[
+                styles.searchButton,
+                loading && styles.searchButtonDisabled,
+              ]}
+              onPress={handleSearch}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <SearchIcon size={20} color="#fff" style={styles.searchButtonIcon} />
+                  <Text style={styles.searchButtonText}>Search</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             {error && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity onPress={handleSearch} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Try Again</Text>
+                </TouchableOpacity>
               </View>
             )}
 
-            <View style={styles.resultsHeader}>
-              <Text style={styles.resultsCount}>
-                {showResults ? `${totalCount} properties found` : 'Search suggestions'}
-              </Text>
-              {loading && (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator size="small" color="#0F3460" />
-                  <Text style={styles.loadingText}>Loading...</Text>
-                </View>
-              )}
-            </View>
+            {hasSearched && (
+              <View style={styles.resultsHeader}>
+                <Text style={styles.resultsCount}>
+                  {totalCount > 0 ? `${totalCount} ${totalCount === 1 ? 'property' : 'properties'} found` : 'No results'}
+                </Text>
+                {loading && !loadingMore && (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator size="small" color="#0F3460" />
+                    <Text style={styles.loadingText}>Searching...</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </>
         )}
 
-        // 2. EMPTY: either popular suggestions or “no results”
-        ListEmptyComponent={() =>
-          !showResults ? (
-            <View style={styles.suggestions}>
-              <Text style={styles.suggestionsTitle}>Popular Searches</Text>
-              {[
-                'New York Real Estate',
-                'Apartments in San Francisco',
-                'Houses for rent in Miami',
-                'Luxury condos in Los Angeles',
-              ].map((text, i) => (
-                <TouchableOpacity key={i} style={styles.suggestionItem}>
-                  <SearchIcon size={16} color="#666" />
-                  <Text style={styles.suggestionText}>{text}</Text>
+        // EMPTY: guidance or no results
+        ListEmptyComponent={() => {
+          if (!hasSearched) {
+            return renderSearchGuidance();
+          }
+          if (loading && !loadingMore) {
+            return (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0F3460" />
+                <Text style={styles.loadingText}>Searching properties...</Text>
+              </View>
+            );
+          }
+          if (listings.length === 0 && !loading) {
+            return (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyTitle}>No properties found</Text>
+                <Text style={styles.emptyText}>
+                  Try adjusting your search criteria or filters.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.clearSearchButton}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSelectedFilter('All');
+                    setHasSearched(false);
+                    setListings([]);
+                    setTotalCount(0);
+                    setNextPage(1);
+                    setHasMore(false);
+                    setError(null);
+                  }}
+                >
+                  <Text style={styles.clearSearchText}>Clear Search</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          ) : !loading && listings.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No properties found.</Text>
-            </View>
-          ) : null
-        }
+              </View>
+            );
+          }
+          return null;
+        }}
 
-        // 3. FOOTER: pagination controls
-        ListFooterComponent={renderFooter}
-
-        // 4. HEADER/FOOTER spacing
+        // HEADER spacing
         ListHeaderComponentStyle={{ marginBottom: 16 }}
-        ListFooterComponentStyle={{ marginTop: 16 }}
       />
     </SafeAreaView>
   );
@@ -330,17 +428,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
+  filtersContainer: {
     marginBottom: 16,
+    paddingTop: 8,
   },
-  title: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 24,
+  filtersLabel: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
     color: '#0F3460',
+    marginBottom: 12,
+  },
+  filterPill: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#F5F7FA',
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  filterPillActive: {
+    backgroundColor: '#0F3460',
+  },
+  filterText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: '#666',
+  },
+  filterTextActive: {
+    color: '#FFF',
   },
   searchContainer: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 12,
     alignItems: 'center',
   },
   searchBar: {
@@ -371,50 +489,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  filtersContainer: {
-    marginBottom: 16,
-  },
-  filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#F5F7FA',
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  filterPillActive: {
-    backgroundColor: '#0F3460',
-  },
-  filterText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#666',
-  },
-  filterTextActive: {
-    color: '#FFF',
-  },
-  suggestions: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-  },
-  suggestionsTitle: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: '#0F3460',
-    marginBottom: 16,
-  },
-  suggestionItem: {
+  searchButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    justifyContent: 'center',
+    backgroundColor: '#0F3460',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 16,
   },
-  suggestionText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#333',
-    marginLeft: 12,
+  searchButtonDisabled: {
+    opacity: 0.6,
+  },
+  searchButtonIcon: {
+    marginRight: 8,
+  },
+  searchButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: '#fff',
   },
   resultsHeader: {
     flexDirection: 'row',
@@ -436,7 +529,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  // error
   errorContainer: {
     padding: 16,
     backgroundColor: '#fee2e2',
@@ -446,43 +538,111 @@ const styles = StyleSheet.create({
   errorText: {
     fontFamily: 'Poppins-Medium',
     color: '#b91c1c',
+    marginBottom: 8,
+  },
+  retryButton: {
+    marginTop: 8,
   },
   retryText: {
-    marginTop: 8,
     color: '#0F3460',
     fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+  },
+  loadMoreContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    marginTop: 8,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: '#666',
+  },
+  guidanceContainer: {
+    padding: 32,
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  guidanceIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F5F7FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  guidanceTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 24,
+    color: '#0F3460',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  guidanceText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  guidanceTips: {
+    width: '100%',
+    alignItems: 'flex-start',
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    width: '100%',
+  },
+  tipBullet: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0F3460',
+    marginRight: 12,
+  },
+  tipText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+    marginTop: 40,
   },
   emptyContainer: {
-    padding: 16,
+    padding: 32,
     alignItems: 'center',
+    marginTop: 40,
+  },
+  emptyTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: '#0F3460',
+    marginBottom: 8,
   },
   emptyText: {
     fontFamily: 'Poppins-Regular',
+    fontSize: 14,
     color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
   },
-  paginationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+  clearSearchButton: {
+    paddingHorizontal: 24,
     paddingVertical: 12,
-  },
-  pageButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
     backgroundColor: '#F5F7FA',
-    marginHorizontal: 8,
+    borderRadius: 8,
   },
-  pageButtonDisabled: {
-    opacity: 0.5,
-  },
-  pageButtonText: {
+  clearSearchText: {
     fontFamily: 'Poppins-Medium',
+    fontSize: 14,
     color: '#0F3460',
   },
-  pageInfo: {
-    fontFamily: 'Poppins-Regular',
-    color: '#666',
-  },
 });
-
