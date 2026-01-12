@@ -139,13 +139,6 @@ export default function ProfileScreen() {
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.membershipCard}>
-          <View>
-            <Text style={styles.memberType}>{user.is_premium ? 'Premium Member' : 'Free Member'}</Text>
-            {!user.is_premium && <Text style={styles.membershipText}>Upgrade to access premium features</Text>}
-          </View>
-          {!user.is_premium && <TouchableOpacity style={styles.upgradeButton}><Text style={styles.upgradeButtonText}>Upgrade</Text></TouchableOpacity>}
-        </View>
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
             <TouchableOpacity key={index} style={styles.menuItem} onPress={() => handleMenuItemPress(item.label)}>
@@ -205,11 +198,6 @@ const styles = StyleSheet.create({
   profileEmail: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#666' },
   editButton: { backgroundColor: '#fff', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
   editButtonText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: '#0F3460' },
-  membershipCard: { backgroundColor: '#0F3460', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  memberType: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#fff', marginBottom: 4 },
-  membershipText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#ccc' },
-  upgradeButton: { backgroundColor: '#FF6B6B', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
-  upgradeButtonText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: '#fff' },
   menuContainer: { marginBottom: 24 },
   menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   menuItemLeft: { flexDirection: 'row', alignItems: 'center' },
