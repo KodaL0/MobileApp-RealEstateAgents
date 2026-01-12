@@ -2,7 +2,7 @@
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import { StyleSheet, Platform, Dimensions } from 'react-native';
-import { Home, Search, MapPin, MessageSquare, User } from 'lucide-react-native';
+import { Home, Search, MessageSquare, User } from 'lucide-react-native';
 import { getLastChatRoute } from '../features/chat/navigationState';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -54,13 +54,6 @@ export default function TabLayout() {
         options={{ 
           title: IS_SMALL_SCREEN ? '' : 'Search', 
           tabBarIcon: ({ color, size }) => <Search color={color} size={size} /> 
-        }}
-      />
-      <Tabs.Screen
-        name="map"
-        options={{ 
-          title: IS_SMALL_SCREEN ? '' : 'Map', 
-          tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} /> 
         }}
       />
       <Tabs.Screen
