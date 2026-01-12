@@ -20,6 +20,7 @@ import {
   Alert,
   FlatList,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Heart,
   MapPin,
@@ -41,6 +42,8 @@ import ProjectReelCard from './ProjectReelCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
+const FEED_CACHE_KEY = '@feed_cache_v1';
+const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
 // 9:16 vertical frame – clamped so it doesn't exceed the screen
 const REEL_ASPECT_RATIO = 16 / 9;
@@ -757,13 +760,15 @@ function isProperty(item: FeedItem): item is FeedProperty {
 // ---------- Feed Container Component ----------
 export default function PropertyReelsView() {
   const [properties, setProperties] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start as false - show cache first
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { isAuthenticated } = useUser();
   const flatListRef = useRef<FlatList>(null);
+  const hasMountedRef = useRef(false);
 
   const handleFavoriteMetaUpdate = useCallback(
     (
@@ -807,7 +812,45 @@ export default function PropertyReelsView() {
     []
   );
 
-  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false) => {
+  // Load cached feed immediately
+  const loadCachedFeed = useCallback(async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem(FEED_CACHE_KEY);
+      if (cachedData) {
+        const { items, timestamp, page: cachedPage } = JSON.parse(cachedData);
+        const age = Date.now() - timestamp;
+        
+        // Show cached data regardless of age (stale-while-revalidate)
+        if (items && items.length > 0) {
+          setProperties(items);
+          setPage(cachedPage || 1);
+          console.log(`Loaded ${items.length} items from cache (age: ${Math.round(age / 1000)}s)`);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load cached feed:', error);
+    }
+    return false;
+  }, []);
+
+  // Save feed to cache
+  const cacheFeed = useCallback(async (items: FeedItem[], pageNum: number) => {
+    try {
+      await AsyncStorage.setItem(
+        FEED_CACHE_KEY,
+        JSON.stringify({
+          items,
+          timestamp: Date.now(),
+          page: pageNum,
+        })
+      );
+    } catch (error) {
+      console.warn('Failed to cache feed:', error);
+    }
+  }, []);
+
+  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false, silent: boolean = false) => {
     if (!isAuthenticated) {
       setError('Please sign in to view your personalized feed.');
       setLoading(false);
@@ -817,7 +860,7 @@ export default function PropertyReelsView() {
     try {
       if (append) {
         setLoadingMore(true);
-      } else {
+      } else if (!silent) {
         setLoading(true);
       }
       setError(null);
@@ -829,25 +872,51 @@ export default function PropertyReelsView() {
           // Avoid duplicates when appending
           const existingIds = new Set(prev.map(item => item.id));
           const newItems = response.results.filter(item => !existingIds.has(item.id));
-          return [...prev, ...newItems];
+          const updated = [...prev, ...newItems];
+          // Only cache first page
+          if (pageNum === 1) {
+            cacheFeed(updated, pageNum);
+          }
+          return updated;
         });
       } else {
         setProperties(response.results);
+        // Cache first page load
+        if (pageNum === 1) {
+          cacheFeed(response.results, pageNum);
+        }
       }
 
       setHasNextPage(response.next !== null);
     } catch (err: any) {
       console.error('Failed to fetch feed:', err);
-      setError(err?.response?.data?.detail || 'Failed to load feed. Please try again.');
+      if (!silent) {
+        setError(err?.response?.data?.detail || 'Failed to load feed. Please try again.');
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setIsRefreshing(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, cacheFeed]);
 
+  // Initialize feed with cache-first strategy
   useEffect(() => {
-    fetchFeed(1, false);
-  }, [fetchFeed]);
+    if (hasMountedRef.current) return;
+    hasMountedRef.current = true;
+
+    const initializeFeed = async () => {
+      // 1. Load cached data immediately (stale-while-revalidate)
+      const hasCache = await loadCachedFeed();
+      
+      // 2. Fetch fresh data in background (silent if we have cache)
+      if (isAuthenticated) {
+        fetchFeed(1, false, hasCache);
+      }
+    };
+
+    initializeFeed();
+  }, [isAuthenticated, loadCachedFeed, fetchFeed]);
 
   const loadMore = useCallback(() => {
     if (!loadingMore && hasNextPage) {
@@ -924,16 +993,8 @@ export default function PropertyReelsView() {
     []
   );
 
-  if (loading && properties.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#10b981" />
-        <Text style={styles.loadingText}>Loading your personalized feed...</Text>
-      </View>
-    );
-  }
-
-  if (error && properties.length === 0) {
+  // Show error only if we have no cached data
+  if (error && properties.length === 0 && !loading) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
@@ -947,7 +1008,16 @@ export default function PropertyReelsView() {
     );
   }
 
+  // Show skeleton loader only on initial load with no cache
   if (properties.length === 0) {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={styles.loadingText}>Loading your personalized feed...</Text>
+        </View>
+      );
+    }
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No properties found</Text>
@@ -981,6 +1051,12 @@ export default function PropertyReelsView() {
             </View>
           ) : null
         }
+        refreshing={isRefreshing}
+        onRefresh={() => {
+          setIsRefreshing(true);
+          setPage(1);
+          fetchFeed(1, false, false);
+        }}
         removeClippedSubviews={Platform.OS === 'android'}
         maxToRenderPerBatch={3}
         windowSize={5}

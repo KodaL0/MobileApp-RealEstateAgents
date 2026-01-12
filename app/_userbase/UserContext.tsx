@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { fetchUser as apiFetchUser, logout as apiLogout } from './middleware';
+import { prefetchFeed, clearFeedCache } from '@/services/feedPrefetch';
 
 
 export type User = {
@@ -157,6 +158,9 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       console.log('UserContext: Setting user and isAuthenticated to true');
       setUser(userData);
       setIsAuthenticated(true);
+      
+      // Prefetch feed in background for instant display later
+      prefetchFeed().catch(err => console.warn('Feed prefetch failed:', err));
     } catch (e: any) {
       // Clear auth on 401
       if (e?.response?.status === 401) {
@@ -185,6 +189,9 @@ export const UserProvider = ({ children }: UserProviderProps) => {
       // Set user state
       setUser(userData);
       setIsAuthenticated(true);
+      
+      // Prefetch feed in background for instant display
+      prefetchFeed().catch(err => console.warn('Feed prefetch failed:', err));
     } catch (error: any) {
       console.error('Login error:', error);
       throw error;
@@ -195,6 +202,9 @@ export const UserProvider = ({ children }: UserProviderProps) => {
     try {
       // Call backend logout endpoint
       await apiLogout();
+      
+      // Clear feed cache on logout
+      await clearFeedCache();
     } catch (error) {
       console.error('Backend logout failed (will still clear local storage):', error);
     } finally {
