@@ -868,7 +868,7 @@ export default function PropertyReelsView() {
   const prefetchNextPage = useCallback(() => {
     if (!isPrefetching && hasNextPage && !loadingMore && !loading) {
       const nextPage = page + 1;
-      fetchFeed(nextPage, false, true);
+      fetchFeed(nextPage, true, true); // append=true for prefetch
     }
   }, [page, hasNextPage, isPrefetching, loadingMore, loading, fetchFeed]);
 
@@ -876,13 +876,14 @@ export default function PropertyReelsView() {
     if (!loadingMore && hasNextPage && !isPrefetching) {
       const nextPage = page + 1;
       setPage(nextPage);
-      // If prefetch already loaded this page, just update state
-      const prefetchedItems = properties.filter((_, idx) => idx >= page * 5);
-      if (prefetchedItems.length >= 5) {
-        // Items already prefetched, just update page
-        setHasNextPage(prefetchedItems.length === 5);
+      
+      // Check if items for this page are already loaded (by prefetch)
+      const expectedItemCount = nextPage * 5;
+      if (properties.length >= expectedItemCount) {
+        // Items already prefetched, no need to fetch again
+        console.log('Using prefetched items for page', nextPage);
       } else {
-        // Fetch normally
+        // Fetch the next page
         fetchFeed(nextPage, true);
       }
     }
