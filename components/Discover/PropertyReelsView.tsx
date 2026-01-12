@@ -550,6 +550,9 @@ const PropertyReelCard = memo(function PropertyReelCard({
           decelerationRate="fast"
           snapToInterval={SCREEN_WIDTH}
           snapToAlignment="center"
+          directionalLockEnabled={true}
+          alwaysBounceVertical={false}
+          nestedScrollEnabled={true}
         >
           {images.map((uri: string, index: number) => (
             <View key={`image-${index}`} style={styles.imageWrapper}>
@@ -872,9 +875,6 @@ export default function PropertyReelsView() {
       const response = await api.feed.list({ page: pageNum, page_size: 10 });
       
       if (append) {
-        // Set appending flag to prevent scroll interference
-        isAppendingRef.current = true;
-        
         setProperties(prev => {
           // Avoid duplicates when appending
           const existingIds = new Set(prev.map(item => item.id));
@@ -888,13 +888,13 @@ export default function PropertyReelsView() {
             cacheFeed(updated, pageNum);
           }
           
-          // Clear appending flag after a short delay to allow render
-          setTimeout(() => {
-            isAppendingRef.current = false;
-          }, 300);
-          
           return updated;
         });
+        
+        // Brief lock to let render complete, then clear
+        setTimeout(() => {
+          isAppendingRef.current = false;
+        }, 100);
       } else {
         setProperties(response.results);
         // Cache first page load
@@ -945,10 +945,10 @@ export default function PropertyReelsView() {
       
       setPage(nextPage);
       fetchFeed(nextPage, true).finally(() => {
+        // Shorter cooldown to prevent UI freeze
         setTimeout(() => {
           isLoadingNextPageRef.current = false;
-          isAppendingRef.current = false;
-        }, 500); // Debounce to prevent rapid successive loads
+        }, 200);
       });
     }
   }, [page, loadingMore, hasNextPage, fetchFeed]);
@@ -1124,7 +1124,6 @@ export default function PropertyReelsView() {
         scrollEventThrottle={16}
         overScrollMode="never"
         bounces={false}
-        scrollEnabled={!isAppendingRef.current}
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footerLoader}>
