@@ -761,7 +761,6 @@ function isProperty(item: FeedItem): item is FeedProperty {
 export default function PropertyReelsView() {
   const [properties, setProperties] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true); // Track first load
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(true);
@@ -817,7 +816,7 @@ export default function PropertyReelsView() {
     []
   );
 
-  // Load cached feed immediately
+  // Load cached feed immediately (synchronously if possible)
   const loadCachedFeed = useCallback(async () => {
     try {
       const cachedData = await AsyncStorage.getItem(FEED_CACHE_KEY);
@@ -829,8 +828,7 @@ export default function PropertyReelsView() {
         if (items && items.length > 0) {
           setProperties(items);
           setPage(cachedPage || 1);
-          setIsInitializing(false); // Cache loaded successfully
-          console.log(`Loaded ${items.length} items from cache (age: ${Math.round(age / 1000)}s)`);
+          console.log(`✅ Loaded ${items.length} items from cache (age: ${Math.round(age / 1000)}s)`);
           return true;
         }
       }
@@ -860,7 +858,6 @@ export default function PropertyReelsView() {
     if (!isAuthenticated) {
       setError('Please sign in to view your personalized feed.');
       setLoading(false);
-      setIsInitializing(false);
       return;
     }
 
@@ -907,13 +904,11 @@ export default function PropertyReelsView() {
       }
 
       setHasNextPage(response.next !== null);
-      setIsInitializing(false); // Initialization complete
     } catch (err: any) {
       console.error('Failed to fetch feed:', err);
       if (!silent) {
         setError(err?.response?.data?.detail || 'Failed to load feed. Please try again.');
       }
-      setIsInitializing(false); // Initialization complete even on error
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -1075,36 +1070,32 @@ export default function PropertyReelsView() {
     []
   );
 
-  // Show loading screen during initial load (before cache or first fetch completes)
-  if (isInitializing) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#10b981" />
-        <Text style={styles.loadingText}>Loading your personalized feed...</Text>
-      </View>
-    );
-  }
-
-  // Show error only if we have no cached data and initialization is complete
-  if (error && properties.length === 0) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            setIsInitializing(true);
-            fetchFeed(1, false);
-          }}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // Show empty state only after initialization is complete and no items loaded
+  // Only show error/empty states if we have no content to display
   if (properties.length === 0) {
+    if (loading) {
+      // Show minimal loading indicator only if actively loading with no cache
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#10b981" />
+        </View>
+      );
+    }
+    
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => fetchFeed(1, false)}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
+    // Empty state (no content and no error)
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No properties found</Text>
@@ -1178,11 +1169,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000',
-  },
-  loadingText: {
-    color: '#fff',
-    marginTop: 16,
-    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
