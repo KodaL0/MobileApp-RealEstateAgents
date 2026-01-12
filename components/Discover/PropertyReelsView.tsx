@@ -888,6 +888,22 @@ export default function PropertyReelsView() {
     }
   }, [page, loadingMore, hasNextPage, isPrefetching, properties, fetchFeed]);
 
+  // Track scroll position for prefetching
+  const handleScroll = useCallback((event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+    
+    // Prefetch when user is 60% through current content
+    const scrollableDistance = contentHeight - layoutHeight;
+    if (scrollableDistance > 0) {
+      const scrollPercentage = offsetY / scrollableDistance;
+      if (scrollPercentage > 0.6 && hasNextPage && !isPrefetching && !loadingMore) {
+        prefetchNextPage();
+      }
+    }
+  }, [hasNextPage, isPrefetching, loadingMore, prefetchNextPage]);
+
   // Preload images for upcoming items
   useEffect(() => {
     if (properties.length === 0) return;
@@ -910,7 +926,7 @@ export default function PropertyReelsView() {
     preloadImages();
   }, [properties]);
 
-  const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
+  const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     // Memoize the item to prevent unnecessary re-renders
     return (
       <View style={styles.reelItem}>
@@ -976,19 +992,6 @@ export default function PropertyReelsView() {
       </View>
     );
   }
-
-  // Track scroll position for prefetching
-  const handleScroll = useCallback((event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    const contentHeight = event.nativeEvent.contentSize.height;
-    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
-    
-    // Prefetch when user is 60% through current content
-    const scrollPercentage = offsetY / (contentHeight - layoutHeight);
-    if (scrollPercentage > 0.6 && hasNextPage && !isPrefetching && !loadingMore) {
-      prefetchNextPage();
-    }
-  }, [hasNextPage, isPrefetching, loadingMore, prefetchNextPage]);
 
   return (
     <View style={styles.feedContainer}>
