@@ -259,7 +259,6 @@ export default function SearchEventForm({
   const [priceMax, setPriceMax] = useState<number | undefined>(
     initialValues?.price_max
   );
-  const [sort, setSort] = useState<SortOption>(initialValues?.sort || 'recommended');
 
   const filters: FilterOption[] = ['All', 'Buy', 'Rent'];
   const propertyTypes: PropertyType[] = ['apartment', 'house', 'villa', 'land'];
@@ -267,13 +266,6 @@ export default function SearchEventForm({
   const bathroomOptions = [1, 2, 3, 4, 5];
   const areaOptions = [50, 100, 150, 200, 300, 500];
   const priceOptions = [50000, 100000, 200000, 300000, 500000, 1000000];
-  const sortOptions: { value: SortOption; label: string }[] = [
-    { value: 'recommended', label: 'Recommended' },
-    { value: 'price-asc', label: 'Price: Low to High' },
-    { value: 'price-desc', label: 'Price: High to Low' },
-    { value: 'newest', label: 'Newest First' },
-    { value: 'oldest', label: 'Oldest First' },
-  ];
 
   const handleSubmit = useCallback(() => {
     const params: SearchEventParams = {
@@ -285,11 +277,10 @@ export default function SearchEventForm({
       ...(areaMax && { area_max: areaMax }),
       ...(priceMin && { price_min: priceMin }),
       ...(priceMax && { price_max: priceMax }),
-      ...(sort && sort !== 'recommended' && { sort }),
     };
 
     onSubmit(params);
-  }, [filter, propertyType, bedrooms, bathrooms, areaMin, areaMax, priceMin, priceMax, sort, onSubmit]);
+  }, [filter, propertyType, bedrooms, bathrooms, areaMin, areaMax, priceMin, priceMax, onSubmit]);
 
   const activeFilterCount = [
     propertyType,
@@ -299,7 +290,6 @@ export default function SearchEventForm({
     areaMax,
     priceMin,
     priceMax,
-    sort !== 'recommended' ? sort : null,
   ].filter(Boolean).length;
 
   return (
@@ -466,31 +456,6 @@ export default function SearchEventForm({
                 ]}
               >
                 €{(price / 1000).toFixed(0)}k+
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Sort */}
-      <View style={styles.section}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {sortOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.filterPill,
-                sort === option.value && styles.filterPillActive,
-              ]}
-              onPress={() => setSort(option.value)}
-            >
-              <Text
-                style={[
-                  styles.filterText,
-                  sort === option.value && styles.filterTextActive,
-                ]}
-              >
-                {option.label}
               </Text>
             </TouchableOpacity>
           ))}
