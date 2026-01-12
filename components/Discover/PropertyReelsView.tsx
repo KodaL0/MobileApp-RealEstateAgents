@@ -20,7 +20,6 @@ import {
   Alert,
   FlatList,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Heart,
   MapPin,
@@ -42,8 +41,6 @@ import ProjectReelCard from './ProjectReelCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_URL = 'https://propertprodjango.onrender.com';
-const FEED_CACHE_KEY = '@feed_cache_v1';
-const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
 // 9:16 vertical frame – clamped so it doesn't exceed the screen
 const REEL_ASPECT_RATIO = 16 / 9;
@@ -819,43 +816,6 @@ export default function PropertyReelsView() {
     []
   );
 
-  // Load cached feed immediately (synchronously if possible)
-  const loadCachedFeed = useCallback(async () => {
-    try {
-      const cachedData = await AsyncStorage.getItem(FEED_CACHE_KEY);
-      if (cachedData) {
-        const { items, timestamp, page: cachedPage } = JSON.parse(cachedData);
-        const age = Date.now() - timestamp;
-        
-        // Show cached data regardless of age (stale-while-revalidate)
-        if (items && items.length > 0) {
-          setProperties(items);
-          setPage(cachedPage || 1);
-          console.log(`✅ Loaded ${items.length} items from cache (age: ${Math.round(age / 1000)}s)`);
-          return true;
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load cached feed:', error);
-    }
-    return false;
-  }, []);
-
-  // Save feed to cache
-  const cacheFeed = useCallback(async (items: FeedItem[], pageNum: number) => {
-    try {
-      await AsyncStorage.setItem(
-        FEED_CACHE_KEY,
-        JSON.stringify({
-          items,
-          timestamp: Date.now(),
-          page: pageNum,
-        })
-      );
-    } catch (error) {
-      console.warn('Failed to cache feed:', error);
-    }
-  }, []);
 
   const fetchFeed = useCallback(async (pageNum: number, append: boolean = false, silent: boolean = false): Promise<void> => {
     if (!isAuthenticated) {
@@ -883,11 +843,6 @@ export default function PropertyReelsView() {
           
           console.log(`✅ Page ${pageNum} loaded: ${newItems.length} new items (total: ${updated.length})`);
           
-          // Only cache first page
-          if (pageNum === 1) {
-            cacheFeed(updated, pageNum);
-          }
-          
           return updated;
         });
         
@@ -897,10 +852,7 @@ export default function PropertyReelsView() {
         }, 100);
       } else {
         setProperties(response.results);
-        // Cache first page load
-        if (pageNum === 1) {
-          cacheFeed(response.results, pageNum);
-        }
+        console.log(`✅ Feed loaded: ${response.results.length} items`);
       }
 
       setHasNextPage(response.next !== null);
@@ -914,25 +866,17 @@ export default function PropertyReelsView() {
       setLoadingMore(false);
       setIsRefreshing(false);
     }
-  }, [isAuthenticated, cacheFeed]);
+  }, [isAuthenticated]);
 
-  // Initialize feed with cache-first strategy
+  // Initialize feed - always fetch fresh from backend
   useEffect(() => {
     if (hasMountedRef.current) return;
     hasMountedRef.current = true;
 
-    const initializeFeed = async () => {
-      // 1. Load cached data immediately (stale-while-revalidate)
-      const hasCache = await loadCachedFeed();
-      
-      // 2. Fetch fresh data in background (silent if we have cache)
-      if (isAuthenticated) {
-        fetchFeed(1, false, hasCache);
-      }
-    };
-
-    initializeFeed();
-  }, [isAuthenticated, loadCachedFeed, fetchFeed]);
+    if (isAuthenticated) {
+      fetchFeed(1, false, false);
+    }
+  }, [isAuthenticated, fetchFeed]);
 
   const loadMore = useCallback(() => {
     // Prevent multiple simultaneous loads
