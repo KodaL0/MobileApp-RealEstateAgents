@@ -108,8 +108,7 @@ const OptimizedImage = memo(
         <Image
           source={{ 
             uri: imageUri,
-            cache: 'force-cache',
-            priority: 'high'
+            cache: 'force-cache'
           }}
           style={[StyleSheet.absoluteFillObject, style]}
           resizeMode="cover"
@@ -567,8 +566,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
                 <Image
                   source={{ 
                     uri,
-                    cache: 'force-cache',
-                    priority: 'high'
+                    cache: 'force-cache'
                   }}
                   style={styles.image}
                   resizeMode="contain"
