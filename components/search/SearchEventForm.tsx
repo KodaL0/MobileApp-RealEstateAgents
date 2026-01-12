@@ -7,14 +7,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ScrollView,
 } from 'react-native';
 import {
   Search as SearchIcon,
-  X,
-  Filter as FilterIcon,
-  ChevronDown,
 } from 'lucide-react-native';
 
 // ============================================================================
@@ -242,37 +238,35 @@ export default function SearchEventForm({
   showAdvancedFilters = false,
 }: SearchEventFormProps) {
   const [filter, setFilter] = useState<FilterOption>(initialValues?.filter || 'All');
-  const [search, setSearch] = useState(initialValues?.search || '');
-  const [location, setLocation] = useState(initialValues?.location || '');
-  const [country, setCountry] = useState(initialValues?.country || '');
-  const [showAdvanced, setShowAdvanced] = useState(showAdvancedFilters);
-
-  // Advanced filters
   const [propertyType, setPropertyType] = useState<PropertyType | undefined>(
     initialValues?.property_type
   );
-  const [bedrooms, setBedrooms] = useState<string>(
-    initialValues?.bedrooms?.toString() || ''
+  const [bedrooms, setBedrooms] = useState<number | undefined>(
+    initialValues?.bedrooms
   );
-  const [bathrooms, setBathrooms] = useState<string>(
-    initialValues?.bathrooms?.toString() || ''
+  const [bathrooms, setBathrooms] = useState<number | undefined>(
+    initialValues?.bathrooms
   );
-  const [areaMin, setAreaMin] = useState<string>(
-    initialValues?.area_min?.toString() || ''
+  const [areaMin, setAreaMin] = useState<number | undefined>(
+    initialValues?.area_min
   );
-  const [areaMax, setAreaMax] = useState<string>(
-    initialValues?.area_max?.toString() || ''
+  const [areaMax, setAreaMax] = useState<number | undefined>(
+    initialValues?.area_max
   );
-  const [priceMin, setPriceMin] = useState<string>(
-    initialValues?.price_min?.toString() || ''
+  const [priceMin, setPriceMin] = useState<number | undefined>(
+    initialValues?.price_min
   );
-  const [priceMax, setPriceMax] = useState<string>(
-    initialValues?.price_max?.toString() || ''
+  const [priceMax, setPriceMax] = useState<number | undefined>(
+    initialValues?.price_max
   );
   const [sort, setSort] = useState<SortOption>(initialValues?.sort || 'recommended');
 
   const filters: FilterOption[] = ['All', 'Buy', 'Rent'];
   const propertyTypes: PropertyType[] = ['apartment', 'house', 'villa', 'land'];
+  const bedroomOptions = [1, 2, 3, 4, 5, 6];
+  const bathroomOptions = [1, 2, 3, 4, 5];
+  const areaOptions = [50, 100, 150, 200, 300, 500];
+  const priceOptions = [50000, 100000, 200000, 300000, 500000, 1000000];
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: 'recommended', label: 'Recommended' },
     { value: 'price-asc', label: 'Price: Low to High' },
@@ -284,26 +278,20 @@ export default function SearchEventForm({
   const handleSubmit = useCallback(() => {
     const params: SearchEventParams = {
       filter,
-      ...(search.trim() && { search: search.trim() }),
-      ...(location.trim() && { location: location.trim() }),
-      ...(country.trim() && { country: country.trim() }),
       ...(propertyType && { property_type: propertyType }),
-      ...(bedrooms && { bedrooms: parseInt(bedrooms, 10) }),
-      ...(bathrooms && { bathrooms: parseFloat(bathrooms) }),
-      ...(areaMin && { area_min: parseInt(areaMin, 10) }),
-      ...(areaMax && { area_max: parseInt(areaMax, 10) }),
-      ...(priceMin && { price_min: parseInt(priceMin, 10) }),
-      ...(priceMax && { price_max: parseInt(priceMax, 10) }),
+      ...(bedrooms && { bedrooms }),
+      ...(bathrooms && { bathrooms }),
+      ...(areaMin && { area_min: areaMin }),
+      ...(areaMax && { area_max: areaMax }),
+      ...(priceMin && { price_min: priceMin }),
+      ...(priceMax && { price_max: priceMax }),
       ...(sort && sort !== 'recommended' && { sort }),
     };
 
     onSubmit(params);
-  }, [filter, search, location, country, propertyType, bedrooms, bathrooms, areaMin, areaMax, priceMin, priceMax, sort, onSubmit]);
+  }, [filter, propertyType, bedrooms, bathrooms, areaMin, areaMax, priceMin, priceMax, sort, onSubmit]);
 
   const activeFilterCount = [
-    search.trim(),
-    location.trim(),
-    country.trim(),
     propertyType,
     bedrooms,
     bathrooms,
@@ -333,193 +321,181 @@ export default function SearchEventForm({
         </ScrollView>
       </View>
 
-      {/* Search Input */}
+      {/* Property Type */}
       <View style={styles.section}>
-        <View style={styles.searchBar}>
-          <SearchIcon size={20} color="#666" style={styles.searchIcon} />
-          <TextInput
-            placeholder="Search by location, property name..."
-            style={styles.searchInput}
-            placeholderTextColor="#999"
-            value={search}
-            onChangeText={setSearch}
-            onSubmitEditing={handleSubmit}
-            returnKeyType="search"
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <X size={20} color="#666" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {propertyTypes.map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.filterPill,
+                propertyType === type && styles.filterPillActive,
+              ]}
+              onPress={() => setPropertyType(propertyType === type ? undefined : type)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  propertyType === type && styles.filterTextActive,
+                ]}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Location & Country Inputs */}
-      <View style={styles.row}>
-        <View style={[styles.section, styles.halfWidth]}>
-          <TextInput
-            placeholder="Location"
-            style={styles.input}
-            placeholderTextColor="#999"
-            value={location}
-            onChangeText={setLocation}
-          />
-        </View>
-        <View style={[styles.section, styles.halfWidth]}>
-          <TextInput
-            placeholder="Country"
-            style={styles.input}
-            placeholderTextColor="#999"
-            value={country}
-            onChangeText={setCountry}
-          />
-        </View>
+      {/* Bedrooms */}
+      <View style={styles.section}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {bedroomOptions.map((count) => (
+            <TouchableOpacity
+              key={count}
+              style={[
+                styles.filterPill,
+                bedrooms === count && styles.filterPillActive,
+              ]}
+              onPress={() => setBedrooms(bedrooms === count ? undefined : count)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  bedrooms === count && styles.filterTextActive,
+                ]}
+              >
+                {count}+ Bed
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Advanced Filters Toggle */}
-      <TouchableOpacity
-        style={styles.advancedToggle}
-        onPress={() => setShowAdvanced(!showAdvanced)}
-      >
-        <View style={styles.advancedToggleContent}>
-          <FilterIcon size={20} color="#0F3460" />
-          <Text style={styles.advancedToggleText}>
-            Advanced Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
-          </Text>
-        </View>
-        <ChevronDown
-          size={20}
-          color="#0F3460"
-          style={[styles.chevron, showAdvanced && styles.chevronRotated]}
-        />
-      </TouchableOpacity>
+      {/* Bathrooms */}
+      <View style={styles.section}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {bathroomOptions.map((count) => (
+            <TouchableOpacity
+              key={count}
+              style={[
+                styles.filterPill,
+                bathrooms === count && styles.filterPillActive,
+              ]}
+              onPress={() => setBathrooms(bathrooms === count ? undefined : count)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  bathrooms === count && styles.filterTextActive,
+                ]}
+              >
+                {count}+ Bath
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-      {/* Advanced Filters */}
-      {showAdvanced && (
-        <View style={styles.advancedSection}>
-          {/* Property Type */}
-          <View style={styles.section}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {propertyTypes.map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.filterPill,
-                    propertyType === type && styles.filterPillActive,
-                  ]}
-                  onPress={() => setPropertyType(propertyType === type ? undefined : type)}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      propertyType === type && styles.filterTextActive,
-                    ]}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+      {/* Area Range */}
+      <View style={styles.section}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {areaOptions.map((area) => (
+            <TouchableOpacity
+              key={area}
+              style={[
+                styles.filterPill,
+                (areaMin === area || areaMax === area) && styles.filterPillActive,
+              ]}
+              onPress={() => {
+                if (areaMin === area) {
+                  setAreaMin(undefined);
+                } else if (areaMax === area) {
+                  setAreaMax(undefined);
+                } else if (!areaMin) {
+                  setAreaMin(area);
+                } else if (!areaMax && area > areaMin) {
+                  setAreaMax(area);
+                } else {
+                  setAreaMin(area);
+                  setAreaMax(undefined);
+                }
+              }}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  (areaMin === area || areaMax === area) && styles.filterTextActive,
+                ]}
+              >
+                {area}m²+
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-          {/* Bedrooms & Bathrooms */}
-          <View style={styles.row}>
-            <View style={[styles.section, styles.halfWidth]}>
-              <TextInput
-                placeholder="Bedrooms (min)"
-                style={styles.input}
-                placeholderTextColor="#999"
-                value={bedrooms}
-                onChangeText={setBedrooms}
-                keyboardType="number-pad"
-              />
-            </View>
-            <View style={[styles.section, styles.halfWidth]}>
-              <TextInput
-                placeholder="Bathrooms (min)"
-                style={styles.input}
-                placeholderTextColor="#999"
-                value={bathrooms}
-                onChangeText={setBathrooms}
-                keyboardType="decimal-pad"
-              />
-            </View>
-          </View>
+      {/* Price Range */}
+      <View style={styles.section}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {priceOptions.map((price) => (
+            <TouchableOpacity
+              key={price}
+              style={[
+                styles.filterPill,
+                (priceMin === price || priceMax === price) && styles.filterPillActive,
+              ]}
+              onPress={() => {
+                if (priceMin === price) {
+                  setPriceMin(undefined);
+                } else if (priceMax === price) {
+                  setPriceMax(undefined);
+                } else if (!priceMin) {
+                  setPriceMin(price);
+                } else if (!priceMax && price > priceMin) {
+                  setPriceMax(price);
+                } else {
+                  setPriceMin(price);
+                  setPriceMax(undefined);
+                }
+              }}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  (priceMin === price || priceMax === price) && styles.filterTextActive,
+                ]}
+              >
+                €{(price / 1000).toFixed(0)}k+
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-          {/* Area Range */}
-          <View style={styles.row}>
-            <View style={[styles.section, styles.halfWidth]}>
-              <TextInput
-                placeholder="Min Area (m²)"
-                style={styles.input}
-                placeholderTextColor="#999"
-                value={areaMin}
-                onChangeText={setAreaMin}
-                keyboardType="number-pad"
-              />
-            </View>
-            <View style={[styles.section, styles.halfWidth]}>
-              <TextInput
-                placeholder="Max Area (m²)"
-                style={styles.input}
-                placeholderTextColor="#999"
-                value={areaMax}
-                onChangeText={setAreaMax}
-                keyboardType="number-pad"
-              />
-            </View>
-          </View>
-
-          {/* Price Range */}
-          <View style={styles.row}>
-            <View style={[styles.section, styles.halfWidth]}>
-              <TextInput
-                placeholder="Min Price (€)"
-                style={styles.input}
-                placeholderTextColor="#999"
-                value={priceMin}
-                onChangeText={setPriceMin}
-                keyboardType="number-pad"
-              />
-            </View>
-            <View style={[styles.section, styles.halfWidth]}>
-              <TextInput
-                placeholder="Max Price (€)"
-                style={styles.input}
-                placeholderTextColor="#999"
-                value={priceMax}
-                onChangeText={setPriceMax}
-                keyboardType="number-pad"
-              />
-            </View>
-          </View>
-
-          {/* Sort */}
-          <View style={styles.section}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {sortOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.filterPill,
-                    sort === option.value && styles.filterPillActive,
-                  ]}
-                  onPress={() => setSort(option.value)}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      sort === option.value && styles.filterTextActive,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      )}
+      {/* Sort */}
+      <View style={styles.section}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {sortOptions.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.filterPill,
+                sort === option.value && styles.filterPillActive,
+              ]}
+              onPress={() => setSort(option.value)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  sort === option.value && styles.filterTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Submit Button */}
       <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
@@ -554,69 +530,6 @@ const styles = StyleSheet.create({
   },
   filterTextActive: {
     color: '#FFF',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 50,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#333',
-  },
-  input: {
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 50,
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#333',
-  },
-  advancedToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#F5F7FA',
-    marginBottom: 20,
-  },
-  advancedToggleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  advancedToggleText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: '#0F3460',
-  },
-  chevron: {
-    transform: [{ rotate: '0deg' }],
-  },
-  chevronRotated: {
-    transform: [{ rotate: '180deg' }],
-  },
-  advancedSection: {
-    marginBottom: 20,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidth: {
-    flex: 1,
   },
   submitButton: {
     flexDirection: 'row',
