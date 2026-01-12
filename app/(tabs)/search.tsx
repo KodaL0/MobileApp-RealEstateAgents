@@ -1,13 +1,12 @@
 // app/screens/SearchResearchScreen.tsx
-// Research/Configuration screen - user configures search before performing it
+// Research/Configuration screen - uses SearchEventForm component
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ScrollView,
 } from 'react-native';
 import {
@@ -16,31 +15,21 @@ import {
 } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import {
-  Search as SearchIcon,
-  X,
-  Filter as FilterIcon,
-  ArrowLeft,
-} from 'lucide-react-native';
-
-type FilterOption = 'All' | 'Buy' | 'Rent';
+import { ArrowLeft, Search as SearchIcon } from 'lucide-react-native';
+import SearchEventForm, {
+  SearchEventParams,
+  buildSearchEventUrlParams,
+} from '@/components/search/SearchEventForm';
 
 export default function SearchResearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState<FilterOption>('All');
 
-  const filters: FilterOption[] = ['All', 'Buy', 'Rent'];
-
-  const handleSearch = () => {
-    // Navigate to results screen with search params
-    // Search event will be tracked automatically when API is called on results screen
-    const params = new URLSearchParams({
-      filter: selectedFilter,
-      search: searchQuery.trim(),
-    }).toString();
-    router.push(`/(tabs)/search-results?${params}` as any);
+  const handleSearchSubmit = (params: SearchEventParams) => {
+    // Build URL params from search event params
+    const urlParams = buildSearchEventUrlParams(params);
+    // Navigate to results screen - search event will be tracked automatically when API is called
+    router.push(`/(tabs)/search-results?${urlParams}` as any);
   };
 
   return (
@@ -77,69 +66,8 @@ export default function SearchResearchScreen() {
           </Text>
         </View>
 
-        {/* Filter pills - prioritized at the top */}
-        <View style={styles.filtersContainer}>
-          <Text style={styles.filtersLabel}>Filter by Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {filters.map((filter) => (
-              <TouchableOpacity
-                key={filter}
-                style={[
-                  styles.filterPill,
-                  selectedFilter === filter && styles.filterPillActive,
-                ]}
-                onPress={() => setSelectedFilter(filter)}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    selectedFilter === filter && styles.filterTextActive,
-                  ]}
-                >
-                  {filter}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Search bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <SearchIcon size={20} color="#666" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Search by location, property name..."
-              style={styles.searchInput}
-              placeholderTextColor="#999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={20} color="#666" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => {
-              // TODO: Phase 2 - Open advanced filters modal (price, bedrooms, etc.)
-            }}
-          >
-            <FilterIcon size={22} color="#0F3460" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Search button */}
-        <TouchableOpacity
-          style={styles.searchButton}
-          onPress={handleSearch}
-        >
-          <SearchIcon size={20} color="#fff" style={styles.searchButtonIcon} />
-          <Text style={styles.searchButtonText}>Search</Text>
-        </TouchableOpacity>
+        {/* Search Event Form */}
+        <SearchEventForm onSubmit={handleSearchSubmit} />
 
         {/* Tips section */}
         <View style={styles.tipsContainer}>
@@ -160,7 +88,7 @@ export default function SearchResearchScreen() {
             <View style={styles.tipItem}>
               <View style={styles.tipBullet} />
               <Text style={styles.tipText}>
-                Use the advanced filters button for price, bedrooms, and more
+                Use advanced filters for price, bedrooms, bathrooms, and more
               </Text>
             </View>
           </View>
@@ -229,87 +157,11 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     paddingHorizontal: 16,
   },
-  filtersContainer: {
-    marginBottom: 24,
-  },
-  filtersLabel: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: '#0F3460',
-    marginBottom: 12,
-  },
-  filterPill: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#F5F7FA',
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  filterPillActive: {
-    backgroundColor: '#0F3460',
-  },
-  filterText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#666',
-  },
-  filterTextActive: {
-    color: '#FFF',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 50,
-    marginRight: 8,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#333',
-  },
-  filterButton: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0F3460',
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginBottom: 32,
-  },
-  searchButtonIcon: {
-    marginRight: 8,
-  },
-  searchButtonText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: '#fff',
-  },
   tipsContainer: {
     backgroundColor: '#F5F7FA',
     borderRadius: 12,
     padding: 20,
+    marginTop: 24,
   },
   tipsTitle: {
     fontFamily: 'Poppins-SemiBold',

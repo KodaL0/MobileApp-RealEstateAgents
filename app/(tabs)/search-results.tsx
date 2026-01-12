@@ -1,7 +1,7 @@
 // app/screens/SearchResultsScreen.tsx
 // Search results screen - displays results and tracks search events
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,16 +19,29 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import PropertyCard from '@/components/property/PropertyCard';
 import { api } from '../../config/api';
+import {
+  parseSearchEventUrlParams,
+  buildSearchQueryParams,
+  SearchEventParams,
+} from '@/components/search/SearchEventForm';
 
-type FilterOption = 'All' | 'Buy' | 'Rent';
+const PAGE_SIZE = 20;
 
 export default function SearchResultsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
-  
-  const selectedFilter = ((params.filter as string) as FilterOption) || 'All';
-  const searchQuery = (params.search as string) || '';
+
+  // Parse URL params to SearchEventParams using exported function
+  const searchParams: SearchEventParams = useMemo(() => {
+    const urlParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        urlParams.set(key, Array.isArray(value) ? value[0] : value);
+      }
+    });
+    return parseSearchEventUrlParams(urlParams);
+  }, [params]);
 
   // Data state:
   const [listings, setListings] = useState<any[]>([]);
@@ -39,33 +52,17 @@ export default function SearchResultsScreen() {
   // Infinite scroll state
   const [nextPage, setNextPage] = useState<number | null>(1);
   const [hasMore, setHasMore] = useState(false);
-  const PAGE_SIZE = 20;
 
   // Total count for display
   const [totalCount, setTotalCount] = useState(0);
 
-  // Build query params - optimized to use 'search' parameter
-  const buildQueryParams = useCallback((page: number = 1) => {
-    const qp: Record<string, any> = {
-      page_size: PAGE_SIZE,
-      page: page,
-    };
-    
-    // Use 'search' parameter for broader matching (title, description, location)
-    if (searchQuery.trim()) {
-      qp.search = searchQuery.trim();
-    }
-    
-    // Phase 2: Additional filters will be added here
-    // if (filters.priceMin) qp.price_min = filters.priceMin;
-    // if (filters.priceMax) qp.price_max = filters.priceMax;
-    // if (filters.bedrooms) qp.bedrooms = filters.bedrooms;
-    // if (filters.bathrooms) qp.bathrooms = filters.bathrooms;
-    // if (filters.propertyType) qp.property_type = filters.propertyType;
-    // if (filters.amenities?.length) qp.amenities = filters.amenities.join(',');
-    
-    return qp;
-  }, [searchQuery]);
+  // Build query params using exported function
+  const buildQueryParams = useCallback(
+    (page: number = 1) => {
+      return buildSearchQueryParams(searchParams, page, PAGE_SIZE);
+    },
+    [searchParams]
+  );
 
   // Fetch function - supports both initial search and loading more
   // This API call automatically tracks search events on the backend
@@ -80,10 +77,10 @@ export default function SearchResultsScreen() {
     const qp = buildQueryParams(page);
     try {
       let respData;
-      if (selectedFilter === 'Buy') {
+      if (searchParams.filter === 'Buy') {
         const paginated = await api.properties.buy(qp);
         respData = paginated;
-      } else if (selectedFilter === 'Rent') {
+      } else if (searchParams.filter === 'Rent') {
         const paginated = await api.properties.rent(qp);
         respData = paginated;
       } else {
@@ -128,14 +125,15 @@ export default function SearchResultsScreen() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [selectedFilter, buildQueryParams, totalCount]);
+  }, [searchParams, buildQueryParams, totalCount]);
 
   // Load initial results on mount (this triggers search event tracking)
   useEffect(() => {
     setNextPage(1);
     setHasMore(false);
     fetchListings(1, false);
-  }, [selectedFilter, searchQuery]); // Re-fetch if params change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.filter, searchParams.search, searchParams.property_type, searchParams.bedrooms, searchParams.bathrooms, searchParams.price_min, searchParams.price_max]); // Re-fetch if params change
 
   // Load more items for infinite scroll
   const loadMore = useCallback(() => {
@@ -205,9 +203,9 @@ export default function SearchResultsScreen() {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Search Results</Text>
-          {searchQuery && (
+          {searchParams.search && (
             <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {searchQuery}
+              {searchParams.search}
             </Text>
           )}
         </View>
@@ -245,9 +243,16 @@ export default function SearchResultsScreen() {
                   <Text style={styles.resultsCount}>
                     {totalCount > 0 ? `${totalCount} ${totalCount === 1 ? 'property' : 'properties'} found` : 'No results'}
                   </Text>
-                  {selectedFilter !== 'All' && (
+                  {searchParams.filter !== 'All' && (
                     <View style={styles.filterBadge}>
-                      <Text style={styles.filterBadgeText}>{selectedFilter}</Text>
+                      <Text style={styles.filterBadgeText}>{searchParams.filter}</Text>
+                    </View>
+                  )}
+                  {searchParams.property_type && (
+                    <View style={styles.filterBadge}>
+                      <Text style={styles.filterBadgeText}>
+                        {searchParams.property_type.charAt(0).toUpperCase() + searchParams.property_type.slice(1)}
+                      </Text>
                     </View>
                   )}
                 </View>
