@@ -1041,6 +1041,31 @@ export default function PropertyReelsView() {
     return `${type}-${item.id?.toString() || Math.random()}`;
   }, []);
 
+  // Define viewability callbacks at component level (not inline)
+  const handleViewableItemsChanged = useCallback(
+    ({ viewableItems }: any) => {
+      // Only process if not currently appending items
+      if (isAppendingRef.current || !viewableItems || viewableItems.length === 0) {
+        return;
+      }
+      
+      const currentItem = viewableItems[0];
+      if (currentItem?.index !== undefined && typeof currentItem.index === 'number') {
+        checkAndPrefetchNextPage(currentItem.index);
+      }
+    },
+    [checkAndPrefetchNextPage]
+  );
+
+  const viewabilityConfig = useMemo(
+    () => ({
+      itemVisiblePercentThreshold: 50,
+      minimumViewTime: 300,
+      waitForInteraction: false,
+    }),
+    []
+  );
+
   const getItemLayout = useCallback(
     (_: any, index: number) => ({
       length: SCREEN_HEIGHT,
@@ -1103,28 +1128,8 @@ export default function PropertyReelsView() {
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        onViewableItemsChanged={useCallback(
-          ({ viewableItems }: any) => {
-            // Only process if not currently appending items
-            if (isAppendingRef.current || !viewableItems || viewableItems.length === 0) {
-              return;
-            }
-            
-            const currentItem = viewableItems[0];
-            if (currentItem?.index !== undefined && typeof currentItem.index === 'number') {
-              checkAndPrefetchNextPage(currentItem.index);
-            }
-          },
-          [checkAndPrefetchNextPage]
-        )}
-        viewabilityConfig={useMemo(
-          () => ({
-            itemVisiblePercentThreshold: 50,
-            minimumViewTime: 300, // Increased to 300ms to reduce false triggers
-            waitForInteraction: false,
-          }),
-          []
-        )}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         scrollEventThrottle={16}
         overScrollMode="never"
         bounces={false}
