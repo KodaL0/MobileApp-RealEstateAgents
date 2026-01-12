@@ -766,9 +766,13 @@ export default function PropertyReelsView() {
   const [hasNextPage, setHasNextPage] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const { isAuthenticated } = useUser();
   const flatListRef = useRef<FlatList>(null);
   const hasMountedRef = useRef(false);
+  const isLoadingNextPageRef = useRef(false);
+  const lastViewableCheckRef = useRef(0);
+  const isAppendingRef = useRef(false);
 
   const handleFavoriteMetaUpdate = useCallback(
     (
@@ -850,7 +854,7 @@ export default function PropertyReelsView() {
     }
   }, []);
 
-  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false, silent: boolean = false) => {
+  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false, silent: boolean = false): Promise<void> => {
     if (!isAuthenticated) {
       setError('Please sign in to view your personalized feed.');
       setLoading(false);
@@ -868,15 +872,27 @@ export default function PropertyReelsView() {
       const response = await api.feed.list({ page: pageNum, page_size: 10 });
       
       if (append) {
+        // Set appending flag to prevent scroll interference
+        isAppendingRef.current = true;
+        
         setProperties(prev => {
           // Avoid duplicates when appending
           const existingIds = new Set(prev.map(item => item.id));
           const newItems = response.results.filter(item => !existingIds.has(item.id));
           const updated = [...prev, ...newItems];
+          
+          console.log(`✅ Page ${pageNum} loaded: ${newItems.length} new items (total: ${updated.length})`);
+          
           // Only cache first page
           if (pageNum === 1) {
             cacheFeed(updated, pageNum);
           }
+          
+          // Clear appending flag after a short delay to allow render
+          setTimeout(() => {
+            isAppendingRef.current = false;
+          }, 300);
+          
           return updated;
         });
       } else {
@@ -919,12 +935,48 @@ export default function PropertyReelsView() {
   }, [isAuthenticated, loadCachedFeed, fetchFeed]);
 
   const loadMore = useCallback(() => {
-    if (!loadingMore && hasNextPage) {
+    // Prevent multiple simultaneous loads
+    if (!loadingMore && hasNextPage && !isLoadingNextPageRef.current && !isAppendingRef.current) {
+      isLoadingNextPageRef.current = true;
+      isAppendingRef.current = true;
       const nextPage = page + 1;
+      
+      console.log(`📄 Loading page ${nextPage}...`);
+      
       setPage(nextPage);
-      fetchFeed(nextPage, true);
+      fetchFeed(nextPage, true).finally(() => {
+        setTimeout(() => {
+          isLoadingNextPageRef.current = false;
+          isAppendingRef.current = false;
+        }, 500); // Debounce to prevent rapid successive loads
+      });
     }
   }, [page, loadingMore, hasNextPage, fetchFeed]);
+
+  // Smart prefetch: Load next page when user is 5 items away from the end
+  // Throttled to prevent excessive calls during scrolling
+  const checkAndPrefetchNextPage = useCallback((index: number) => {
+    const now = Date.now();
+    
+    // Throttle: Only check once per second
+    if (now - lastViewableCheckRef.current < 1000) {
+      return;
+    }
+    lastViewableCheckRef.current = now;
+    
+    // Don't update index if we're appending items (prevents scroll jumps)
+    if (!isAppendingRef.current) {
+      setCurrentIndex(index);
+    }
+    
+    const itemsRemaining = properties.length - index;
+    const shouldPrefetch = itemsRemaining <= 5; // Start loading when 5 items left
+    
+    if (shouldPrefetch && hasNextPage && !loadingMore && !isLoadingNextPageRef.current && !isAppendingRef.current) {
+      console.log(`⚡ Prefetching at item ${index + 1}/${properties.length} (${itemsRemaining} remaining)`);
+      loadMore();
+    }
+  }, [properties.length, hasNextPage, loadingMore, loadMore]);
 
 
   // Aggressive image preloading for smoother transitions
@@ -958,7 +1010,7 @@ export default function PropertyReelsView() {
     preloadImages();
   }, [properties]);
 
-  const renderItem = useCallback(({ item }: { item: FeedItem }) => {
+  const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
     // Memoize the item to prevent unnecessary re-renders
     return (
       <View style={styles.reelItem}>
@@ -1040,10 +1092,33 @@ export default function PropertyReelsView() {
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
-        onEndReachedThreshold={0.8}
+        onEndReachedThreshold={0.5}
+        onViewableItemsChanged={useCallback(
+          ({ viewableItems }: any) => {
+            // Only process if not currently appending items
+            if (isAppendingRef.current || !viewableItems || viewableItems.length === 0) {
+              return;
+            }
+            
+            const currentItem = viewableItems[0];
+            if (currentItem?.index !== undefined && typeof currentItem.index === 'number') {
+              checkAndPrefetchNextPage(currentItem.index);
+            }
+          },
+          [checkAndPrefetchNextPage]
+        )}
+        viewabilityConfig={useMemo(
+          () => ({
+            itemVisiblePercentThreshold: 50,
+            minimumViewTime: 300, // Increased to 300ms to reduce false triggers
+            waitForInteraction: false,
+          }),
+          []
+        )}
         scrollEventThrottle={16}
         overScrollMode="never"
         bounces={false}
+        scrollEnabled={!isAppendingRef.current}
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footerLoader}>
@@ -1058,15 +1133,12 @@ export default function PropertyReelsView() {
           fetchFeed(1, false, false);
         }}
         removeClippedSubviews={Platform.OS === 'android'}
-        maxToRenderPerBatch={3}
+        maxToRenderPerBatch={2}
         windowSize={5}
-        initialNumToRender={3}
+        initialNumToRender={2}
         updateCellsBatchingPeriod={100}
-        snapToOffsets={properties.map((_, index) => SCREEN_HEIGHT * index)}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-        }}
         disableIntervalMomentum={true}
+        nestedScrollEnabled={false}
       />
     </View>
   );
