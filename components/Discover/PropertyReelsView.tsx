@@ -106,12 +106,17 @@ const OptimizedImage = memo(
         )}
 
         <Image
-          source={{ uri: imageUri }}
+          source={{ 
+            uri: imageUri,
+            cache: 'force-cache',
+            priority: 'high'
+          }}
           style={[StyleSheet.absoluteFillObject, style]}
           resizeMode="cover"
           onError={handleError}
           onLoad={handleLoad}
           blurRadius={blurRadius}
+          fadeDuration={0}
         />
       </View>
     );
@@ -182,30 +187,26 @@ const PropertyReelCard = memo(function PropertyReelCard({
     }
 
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
 
     const fetchFavoriteMeta = async () => {
       try {
-        // Debounce to avoid rapid successive calls
-        timeoutId = setTimeout(async () => {
-          const details = await api.properties.getById(property.id);
-          if (!isMounted) return;
+        const details = await api.properties.getById(property.id);
+        if (!isMounted) return;
 
-          const fetchedCount = getFavoriteCountValue(details?.favorites_count);
-          if (fetchedCount !== null) {
-            setFavoriteCount(fetchedCount);
-          }
-          if (typeof details?.is_favourite === 'boolean') {
-            setIsLiked(details.is_favourite);
-          }
-          onFavoriteMetaUpdate?.(property.id, {
-            favorites_count: fetchedCount ?? details?.favorites_count ?? null,
-            is_favourite:
-              typeof details?.is_favourite === 'boolean'
-                ? details.is_favourite
-                : null,
-          });
-        }, 300);
+        const fetchedCount = getFavoriteCountValue(details?.favorites_count);
+        if (fetchedCount !== null) {
+          setFavoriteCount(fetchedCount);
+        }
+        if (typeof details?.is_favourite === 'boolean') {
+          setIsLiked(details.is_favourite);
+        }
+        onFavoriteMetaUpdate?.(property.id, {
+          favorites_count: fetchedCount ?? details?.favorites_count ?? null,
+          is_favourite:
+            typeof details?.is_favourite === 'boolean'
+              ? details.is_favourite
+              : null,
+        });
       } catch (error) {
         console.warn(
           'PropertyReelCard: Failed to refresh favorite metadata',
@@ -217,7 +218,6 @@ const PropertyReelCard = memo(function PropertyReelCard({
     fetchFavoriteMeta();
     return () => {
       isMounted = false;
-      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [property?.id, property?.is_favourite, property?.favorites_count, getFavoriteCountValue, onFavoriteMetaUpdate]);
 
@@ -565,9 +565,14 @@ const PropertyReelCard = memo(function PropertyReelCard({
               {/* Foreground 9:16 frame – full image visible (contain) */}
               <View style={styles.imageFrame}>
                 <Image
-                  source={{ uri }}
+                  source={{ 
+                    uri,
+                    cache: 'force-cache',
+                    priority: 'high'
+                  }}
                   style={styles.image}
                   resizeMode="contain"
+                  fadeDuration={0}
                 />
               </View>
             </View>
@@ -819,7 +824,7 @@ export default function PropertyReelsView() {
       }
       setError(null);
 
-      const response = await api.feed.list({ page: pageNum, page_size: 5 });
+      const response = await api.feed.list({ page: pageNum, page_size: 10 });
       
       if (append) {
         setProperties(prev => {
@@ -855,31 +860,32 @@ export default function PropertyReelsView() {
   }, [page, loadingMore, hasNextPage, fetchFeed]);
 
 
-  // Preload images for upcoming items
+  // Aggressive image preloading for smoother transitions
   useEffect(() => {
     if (properties.length === 0) return;
 
-    // Preload images for next 2 items
     const preloadImages = async () => {
-      const itemsToPreload = properties.slice(0, 3);
-      for (const item of itemsToPreload) {
+      // Preload first 5 items for instant scrolling
+      const itemsToPreload = properties.slice(0, 5);
+      const preloadPromises = itemsToPreload.map(async (item) => {
         if (isProperty(item) && item.images && item.images.length > 0) {
-          const firstImage = item.images[0];
-          // Handle both string URLs and object with image property (same logic as PropertyReelCard)
-          const imageUrl = typeof firstImage === 'string' 
-            ? firstImage 
-            : (typeof firstImage === 'object' && firstImage !== null ? firstImage.image : null);
-          
-          // Ensure it's a string before calling startsWith
-          if (typeof imageUrl === 'string' && imageUrl) {
-            const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
-            // Preload image
-            Image.prefetch(fullUrl).catch(() => {
-              // Silently fail - image will load normally
-            });
-          }
+          // Preload all images for first few items
+          const imagesToLoad = item.images.slice(0, 3); // First 3 images per property
+          return Promise.all(
+            imagesToLoad.map((img: any) => {
+              const imageUrl = typeof img === 'string' ? img : img?.image;
+              if (typeof imageUrl === 'string' && imageUrl) {
+                const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
+                return Image.prefetch(fullUrl).catch(() => null);
+              }
+              return Promise.resolve();
+            })
+          );
         }
-      }
+        return Promise.resolve();
+      });
+
+      await Promise.all(preloadPromises);
     };
 
     preloadImages();
@@ -924,7 +930,7 @@ export default function PropertyReelsView() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#10b981" />
-        <Text style={styles.loadingText}>Loading your feed...</Text>
+        <Text style={styles.loadingText}>Loading your personalized feed...</Text>
       </View>
     );
   }
@@ -966,8 +972,10 @@ export default function PropertyReelsView() {
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
+        onEndReachedThreshold={0.8}
         scrollEventThrottle={16}
+        overScrollMode="never"
+        bounces={false}
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footerLoader}>
@@ -975,15 +983,16 @@ export default function PropertyReelsView() {
             </View>
           ) : null
         }
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={2}
-        windowSize={3}
-        initialNumToRender={2}
-        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS === 'android'}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={3}
+        updateCellsBatchingPeriod={100}
         snapToOffsets={properties.map((_, index) => SCREEN_HEIGHT * index)}
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
         }}
+        disableIntervalMomentum={true}
       />
     </View>
   );
