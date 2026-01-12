@@ -1,12 +1,11 @@
 // app/screens/SearchResearchScreen.tsx
 // Research/Configuration screen - uses SearchEventForm component
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
 } from 'react-native';
 import {
@@ -14,39 +13,38 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
-import { ArrowLeft, Search as SearchIcon } from 'lucide-react-native';
+import { Search as SearchIcon } from 'lucide-react-native';
 import SearchEventForm, {
   SearchEventParams,
-  buildSearchEventUrlParams,
 } from '@/components/search/SearchEventForm';
+import SearchResults from '@/components/search/SearchResults';
 
 export default function SearchResearchScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const [searchParams, setSearchParams] = useState<SearchEventParams | null>(null);
 
   const handleSearchSubmit = (params: SearchEventParams) => {
-    // Build URL params from search event params
-    const urlParams = buildSearchEventUrlParams(params);
-    // Navigate to results screen - search event will be tracked automatically when API is called
-    router.push(`/(tabs)/search-results?${urlParams}` as any);
+    // Set search params to show results inline
+    setSearchParams(params);
   };
+
+  const handleBackToSearch = () => {
+    setSearchParams(null);
+  };
+
+  // Show results if search has been submitted
+  if (searchParams) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <StatusBar style="dark" />
+        <SearchResults searchParams={searchParams} onBack={handleBackToSearch} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
-
-      {/* Subtle back button */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={24} color="#0F3460" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Search Properties</Text>
-        <View style={styles.backButtonPlaceholder} />
-      </View>
 
       <ScrollView
         contentContainerStyle={{
@@ -102,31 +100,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F7FA',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  backButtonPlaceholder: {
-    width: 40,
-  },
-  headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: '#0F3460',
-    flex: 1,
-    textAlign: 'center',
   },
   guidanceContainer: {
     paddingTop: 24,

@@ -244,6 +244,7 @@ export default function SearchEventForm({
   const [filter, setFilter] = useState<FilterOption>(initialValues?.filter || 'All');
   const [search, setSearch] = useState(initialValues?.search || '');
   const [location, setLocation] = useState(initialValues?.location || '');
+  const [country, setCountry] = useState(initialValues?.country || '');
   const [showAdvanced, setShowAdvanced] = useState(showAdvancedFilters);
 
   // Advanced filters
@@ -256,46 +257,67 @@ export default function SearchEventForm({
   const [bathrooms, setBathrooms] = useState<string>(
     initialValues?.bathrooms?.toString() || ''
   );
+  const [areaMin, setAreaMin] = useState<string>(
+    initialValues?.area_min?.toString() || ''
+  );
+  const [areaMax, setAreaMax] = useState<string>(
+    initialValues?.area_max?.toString() || ''
+  );
   const [priceMin, setPriceMin] = useState<string>(
     initialValues?.price_min?.toString() || ''
   );
   const [priceMax, setPriceMax] = useState<string>(
     initialValues?.price_max?.toString() || ''
   );
+  const [sort, setSort] = useState<SortOption>(initialValues?.sort || 'recommended');
 
   const filters: FilterOption[] = ['All', 'Buy', 'Rent'];
   const propertyTypes: PropertyType[] = ['apartment', 'house', 'villa', 'land'];
+  const sortOptions: { value: SortOption; label: string }[] = [
+    { value: 'recommended', label: 'Recommended' },
+    { value: 'price-asc', label: 'Price: Low to High' },
+    { value: 'price-desc', label: 'Price: High to Low' },
+    { value: 'newest', label: 'Newest First' },
+    { value: 'oldest', label: 'Oldest First' },
+  ];
 
   const handleSubmit = useCallback(() => {
     const params: SearchEventParams = {
       filter,
       ...(search.trim() && { search: search.trim() }),
       ...(location.trim() && { location: location.trim() }),
+      ...(country.trim() && { country: country.trim() }),
       ...(propertyType && { property_type: propertyType }),
       ...(bedrooms && { bedrooms: parseInt(bedrooms, 10) }),
       ...(bathrooms && { bathrooms: parseFloat(bathrooms) }),
+      ...(areaMin && { area_min: parseInt(areaMin, 10) }),
+      ...(areaMax && { area_max: parseInt(areaMax, 10) }),
       ...(priceMin && { price_min: parseInt(priceMin, 10) }),
       ...(priceMax && { price_max: parseInt(priceMax, 10) }),
+      ...(sort && sort !== 'recommended' && { sort }),
     };
 
     onSubmit(params);
-  }, [filter, search, location, propertyType, bedrooms, bathrooms, priceMin, priceMax, onSubmit]);
+  }, [filter, search, location, country, propertyType, bedrooms, bathrooms, areaMin, areaMax, priceMin, priceMax, sort, onSubmit]);
 
   const activeFilterCount = [
     search.trim(),
     location.trim(),
+    country.trim(),
     propertyType,
     bedrooms,
     bathrooms,
+    areaMin,
+    areaMax,
     priceMin,
     priceMax,
+    sort !== 'recommended' ? sort : null,
   ].filter(Boolean).length;
 
   return (
     <View style={styles.container}>
       {/* Filter Type Pills */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Filter by Type</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {filters.map((f) => (
             <TouchableOpacity
@@ -313,7 +335,6 @@ export default function SearchEventForm({
 
       {/* Search Input */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Search</Text>
         <View style={styles.searchBar}>
           <SearchIcon size={20} color="#666" style={styles.searchIcon} />
           <TextInput
@@ -333,16 +354,26 @@ export default function SearchEventForm({
         </View>
       </View>
 
-      {/* Location Input */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Location (Optional)</Text>
-        <TextInput
-          placeholder="City or region..."
-          style={styles.input}
-          placeholderTextColor="#999"
-          value={location}
-          onChangeText={setLocation}
-        />
+      {/* Location & Country Inputs */}
+      <View style={styles.row}>
+        <View style={[styles.section, styles.halfWidth]}>
+          <TextInput
+            placeholder="Location"
+            style={styles.input}
+            placeholderTextColor="#999"
+            value={location}
+            onChangeText={setLocation}
+          />
+        </View>
+        <View style={[styles.section, styles.halfWidth]}>
+          <TextInput
+            placeholder="Country"
+            style={styles.input}
+            placeholderTextColor="#999"
+            value={country}
+            onChangeText={setCountry}
+          />
+        </View>
       </View>
 
       {/* Advanced Filters Toggle */}
@@ -368,7 +399,6 @@ export default function SearchEventForm({
         <View style={styles.advancedSection}>
           {/* Property Type */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Property Type</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {propertyTypes.map((type) => (
                 <TouchableOpacity
@@ -395,9 +425,8 @@ export default function SearchEventForm({
           {/* Bedrooms & Bathrooms */}
           <View style={styles.row}>
             <View style={[styles.section, styles.halfWidth]}>
-              <Text style={styles.sectionLabel}>Bedrooms (min)</Text>
               <TextInput
-                placeholder="Any"
+                placeholder="Bedrooms (min)"
                 style={styles.input}
                 placeholderTextColor="#999"
                 value={bedrooms}
@@ -406,9 +435,8 @@ export default function SearchEventForm({
               />
             </View>
             <View style={[styles.section, styles.halfWidth]}>
-              <Text style={styles.sectionLabel}>Bathrooms (min)</Text>
               <TextInput
-                placeholder="Any"
+                placeholder="Bathrooms (min)"
                 style={styles.input}
                 placeholderTextColor="#999"
                 value={bathrooms}
@@ -418,12 +446,35 @@ export default function SearchEventForm({
             </View>
           </View>
 
+          {/* Area Range */}
+          <View style={styles.row}>
+            <View style={[styles.section, styles.halfWidth]}>
+              <TextInput
+                placeholder="Min Area (m²)"
+                style={styles.input}
+                placeholderTextColor="#999"
+                value={areaMin}
+                onChangeText={setAreaMin}
+                keyboardType="number-pad"
+              />
+            </View>
+            <View style={[styles.section, styles.halfWidth]}>
+              <TextInput
+                placeholder="Max Area (m²)"
+                style={styles.input}
+                placeholderTextColor="#999"
+                value={areaMax}
+                onChangeText={setAreaMax}
+                keyboardType="number-pad"
+              />
+            </View>
+          </View>
+
           {/* Price Range */}
           <View style={styles.row}>
             <View style={[styles.section, styles.halfWidth]}>
-              <Text style={styles.sectionLabel}>Min Price (€)</Text>
               <TextInput
-                placeholder="Any"
+                placeholder="Min Price (€)"
                 style={styles.input}
                 placeholderTextColor="#999"
                 value={priceMin}
@@ -432,9 +483,8 @@ export default function SearchEventForm({
               />
             </View>
             <View style={[styles.section, styles.halfWidth]}>
-              <Text style={styles.sectionLabel}>Max Price (€)</Text>
               <TextInput
-                placeholder="Any"
+                placeholder="Max Price (€)"
                 style={styles.input}
                 placeholderTextColor="#999"
                 value={priceMax}
@@ -442,6 +492,31 @@ export default function SearchEventForm({
                 keyboardType="number-pad"
               />
             </View>
+          </View>
+
+          {/* Sort */}
+          <View style={styles.section}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {sortOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.filterPill,
+                    sort === option.value && styles.filterPillActive,
+                  ]}
+                  onPress={() => setSort(option.value)}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      sort === option.value && styles.filterTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       )}
@@ -460,13 +535,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   section: {
-    marginBottom: 20,
-  },
-  sectionLabel: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
-    color: '#0F3460',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   filterPill: {
     paddingHorizontal: 20,

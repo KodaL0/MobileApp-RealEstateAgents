@@ -1,7 +1,7 @@
-// app/screens/SearchResultsScreen.tsx
-// Search results screen - displays results and tracks search events
+// components/search/SearchResults.tsx
+// Search results component - displays results and tracks search events
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,37 +11,27 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {
-  SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import PropertyCard from '@/components/property/PropertyCard';
 import { api } from '../../config/api';
 import {
-  parseSearchEventUrlParams,
   buildSearchQueryParams,
   SearchEventParams,
-} from '@/components/search/SearchEventForm';
+} from './SearchEventForm';
 
 const PAGE_SIZE = 20;
 
-export default function SearchResultsScreen() {
+export interface SearchResultsProps {
+  searchParams: SearchEventParams;
+  onBack?: () => void;
+}
+
+export default function SearchResults({ searchParams, onBack }: SearchResultsProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams();
-
-  // Parse URL params to SearchEventParams using exported function
-  const searchParams: SearchEventParams = useMemo(() => {
-    const urlParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value) {
-        urlParams.set(key, Array.isArray(value) ? value[0] : value);
-      }
-    });
-    return parseSearchEventUrlParams(urlParams);
-  }, [params]);
 
   // Data state:
   const [listings, setListings] = useState<any[]>([]);
@@ -133,7 +123,20 @@ export default function SearchResultsScreen() {
     setHasMore(false);
     fetchListings(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.filter, searchParams.search, searchParams.property_type, searchParams.bedrooms, searchParams.bathrooms, searchParams.price_min, searchParams.price_max]); // Re-fetch if params change
+  }, [
+    searchParams.filter,
+    searchParams.search,
+    searchParams.location,
+    searchParams.country,
+    searchParams.property_type,
+    searchParams.bedrooms,
+    searchParams.bathrooms,
+    searchParams.area_min,
+    searchParams.area_max,
+    searchParams.price_min,
+    searchParams.price_max,
+    searchParams.sort,
+  ]); // Re-fetch if any params change
 
   // Load more items for infinite scroll
   const loadMore = useCallback(() => {
@@ -190,27 +193,28 @@ export default function SearchResultsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
 
       {/* Header with back button */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={24} color="#0F3460" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Search Results</Text>
-          {searchParams.search && (
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {searchParams.search}
-            </Text>
-          )}
+      {onBack && (
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={onBack}
+          >
+            <ArrowLeft size={24} color="#0F3460" />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Search Results</Text>
+            {searchParams.search && (
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {searchParams.search}
+              </Text>
+            )}
+          </View>
+          <View style={styles.backButtonPlaceholder} />
         </View>
-        <View style={styles.backButtonPlaceholder} />
-      </View>
+      )}
 
       <FlatList
         data={listings}
@@ -278,12 +282,14 @@ export default function SearchResultsScreen() {
                 <Text style={styles.emptyText}>
                   Try adjusting your search criteria or filters.
                 </Text>
-                <TouchableOpacity 
-                  style={styles.backToSearchButton}
-                  onPress={() => router.back()}
-                >
-                  <Text style={styles.backToSearchText}>Modify Search</Text>
-                </TouchableOpacity>
+                {onBack && (
+                  <TouchableOpacity 
+                    style={styles.backToSearchButton}
+                    onPress={onBack}
+                  >
+                    <Text style={styles.backToSearchText}>Modify Search</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           }
@@ -293,12 +299,12 @@ export default function SearchResultsScreen() {
         // Header spacing
         ListHeaderComponentStyle={{ marginBottom: 16 }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: '#fff',
   },
