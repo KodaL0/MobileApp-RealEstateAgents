@@ -24,7 +24,7 @@ import {
 import PropertyCard from '@/components/property/PropertyCard';
 import { api } from '../../config/api';
 
-type FilterOption = 'All' | 'Buy' | 'Rent' | 'Commercial';
+type FilterOption = 'All' | 'Buy' | 'Rent';
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
@@ -48,7 +48,7 @@ export default function SearchScreen() {
   // Total count for display
   const [totalCount, setTotalCount] = useState(0);
 
-  const filters: FilterOption[] = ['All', 'Buy', 'Rent', 'Commercial'];
+  const filters: FilterOption[] = ['All', 'Buy', 'Rent'];
 
   // Build query params - optimized to use 'search' parameter
   const buildQueryParams = useCallback((page: number = 1) => {
@@ -62,11 +62,6 @@ export default function SearchScreen() {
     // 'location' only matches: location field
     if (searchQuery.trim()) {
       qp.search = searchQuery.trim();
-    }
-    
-    // Priority 2: Property type (if not already filtered by endpoint)
-    if (selectedFilter === 'Commercial') {
-      qp.property_type = 'commercial';
     }
     
     // Phase 2: Additional filters will be added here
@@ -98,13 +93,6 @@ export default function SearchScreen() {
       } else if (selectedFilter === 'Rent') {
         const paginated = await api.properties.rent(qp);
         respData = paginated;
-      } else if (selectedFilter === 'Commercial') {
-        const paginatedRaw = await api.properties.list({ property_type: 'commercial', ...qp });
-        respData = {
-          results: Array.isArray(paginatedRaw) ? paginatedRaw : paginatedRaw.results || [],
-          count: paginatedRaw.count ?? (Array.isArray(paginatedRaw) ? paginatedRaw.length : 0),
-          next: paginatedRaw.next ?? null,
-        };
       } else {
         const paginatedRaw = await api.properties.list(buildQueryParams(page));
         respData = {
@@ -238,7 +226,7 @@ export default function SearchScreen() {
       <View style={styles.guidanceTips}>
         <View style={styles.tipItem}>
           <View style={styles.tipBullet} />
-          <Text style={styles.tipText}>Select a filter: All, Buy, Rent, or Commercial</Text>
+          <Text style={styles.tipText}>Select a filter: All, Buy, or Rent</Text>
         </View>
         <View style={styles.tipItem}>
           <View style={styles.tipBullet} />
