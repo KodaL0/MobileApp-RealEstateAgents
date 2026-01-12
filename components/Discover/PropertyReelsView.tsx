@@ -120,7 +120,7 @@ const OptimizedImage = memo(
 OptimizedImage.displayName = 'OptimizedImage';
 
 // ---------- Main Reel Card Component ----------
-function PropertyReelCard({
+const PropertyReelCard = memo(function PropertyReelCard({
   property,
   onViewProperty,
   source,
@@ -172,30 +172,40 @@ function PropertyReelCard({
     }
   }, [property?.favorites_count, getFavoriteCountValue]);
 
+  // Only fetch favorite metadata if not already provided
   useEffect(() => {
     if (!property?.id) return;
+    
+    // Skip if we already have the data from feed
+    if (property.is_favourite !== undefined && property.favorites_count !== undefined) {
+      return;
+    }
 
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const fetchFavoriteMeta = async () => {
       try {
-        const details = await api.properties.getById(property.id);
-        if (!isMounted) return;
+        // Debounce to avoid rapid successive calls
+        timeoutId = setTimeout(async () => {
+          const details = await api.properties.getById(property.id);
+          if (!isMounted) return;
 
-        const fetchedCount = getFavoriteCountValue(details?.favorites_count);
-        if (fetchedCount !== null) {
-          setFavoriteCount(fetchedCount);
-        }
-        if (typeof details?.is_favourite === 'boolean') {
-          setIsLiked(details.is_favourite);
-        }
-        onFavoriteMetaUpdate?.(property.id, {
-          favorites_count: fetchedCount ?? details?.favorites_count ?? null,
-          is_favourite:
-            typeof details?.is_favourite === 'boolean'
-              ? details.is_favourite
-              : null,
-        });
+          const fetchedCount = getFavoriteCountValue(details?.favorites_count);
+          if (fetchedCount !== null) {
+            setFavoriteCount(fetchedCount);
+          }
+          if (typeof details?.is_favourite === 'boolean') {
+            setIsLiked(details.is_favourite);
+          }
+          onFavoriteMetaUpdate?.(property.id, {
+            favorites_count: fetchedCount ?? details?.favorites_count ?? null,
+            is_favourite:
+              typeof details?.is_favourite === 'boolean'
+                ? details.is_favourite
+                : null,
+          });
+        }, 300);
       } catch (error) {
         console.warn(
           'PropertyReelCard: Failed to refresh favorite metadata',
@@ -207,8 +217,9 @@ function PropertyReelCard({
     fetchFavoriteMeta();
     return () => {
       isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [property?.id, getFavoriteCountValue]);
+  }, [property?.id, property?.is_favourite, property?.favorites_count, getFavoriteCountValue, onFavoriteMetaUpdate]);
 
   useEffect(() => {
     setShowHeartAnimation(false);
@@ -727,7 +738,9 @@ function PropertyReelCard({
       </View>
     </View>
   );
-}
+});
+
+PropertyReelCard.displayName = 'PropertyReelCard';
 
 // Type guard to check if item is a property
 function isProperty(item: FeedItem): item is FeedProperty {
@@ -746,8 +759,10 @@ export default function PropertyReelsView() {
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isPrefetching, setIsPrefetching] = useState(false);
   const { isAuthenticated } = useUser();
   const flatListRef = useRef<FlatList>(null);
+  const prefetchPageRef = useRef<number | null>(null);
 
   const handleFavoriteMetaUpdate = useCallback(
     (
@@ -791,15 +806,23 @@ export default function PropertyReelsView() {
     []
   );
 
-  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false) => {
+  const fetchFeed = useCallback(async (pageNum: number, append: boolean = false, isPrefetch: boolean = false) => {
     if (!isAuthenticated) {
       setError('Please sign in to view your personalized feed.');
       setLoading(false);
       return;
     }
 
+    // Prevent duplicate prefetch requests
+    if (isPrefetch && prefetchPageRef.current === pageNum) {
+      return;
+    }
+
     try {
-      if (append) {
+      if (isPrefetch) {
+        setIsPrefetching(true);
+        prefetchPageRef.current = pageNum;
+      } else if (append) {
         setLoadingMore(true);
       } else {
         setLoading(true);
@@ -808,7 +831,16 @@ export default function PropertyReelsView() {
 
       const response = await api.feed.list({ page: pageNum, page_size: 5 });
       
-      if (append) {
+      if (isPrefetch) {
+        // Prefetch: silently add to list without showing loading state
+        setProperties(prev => {
+          // Check if items already exist to avoid duplicates
+          const existingIds = new Set(prev.map(item => item.id));
+          const newItems = response.results.filter(item => !existingIds.has(item.id));
+          return [...prev, ...newItems];
+        });
+        prefetchPageRef.current = null;
+      } else if (append) {
         setProperties(prev => [...prev, ...response.results]);
       } else {
         setProperties(response.results);
@@ -817,10 +849,14 @@ export default function PropertyReelsView() {
       setHasNextPage(response.next !== null);
     } catch (err: any) {
       console.error('Failed to fetch feed:', err);
-      setError(err?.response?.data?.detail || 'Failed to load feed. Please try again.');
+      if (!isPrefetch) {
+        setError(err?.response?.data?.detail || 'Failed to load feed. Please try again.');
+      }
+      prefetchPageRef.current = null;
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setIsPrefetching(false);
     }
   }, [isAuthenticated]);
 
@@ -828,15 +864,54 @@ export default function PropertyReelsView() {
     fetchFeed(1, false);
   }, [fetchFeed]);
 
+  // Prefetch next page when user is near the end
+  const prefetchNextPage = useCallback(() => {
+    if (!isPrefetching && hasNextPage && !loadingMore && !loading) {
+      const nextPage = page + 1;
+      fetchFeed(nextPage, false, true);
+    }
+  }, [page, hasNextPage, isPrefetching, loadingMore, loading, fetchFeed]);
+
   const loadMore = useCallback(() => {
-    if (!loadingMore && hasNextPage) {
+    if (!loadingMore && hasNextPage && !isPrefetching) {
       const nextPage = page + 1;
       setPage(nextPage);
-      fetchFeed(nextPage, true);
+      // If prefetch already loaded this page, just update state
+      const prefetchedItems = properties.filter((_, idx) => idx >= page * 5);
+      if (prefetchedItems.length >= 5) {
+        // Items already prefetched, just update page
+        setHasNextPage(prefetchedItems.length === 5);
+      } else {
+        // Fetch normally
+        fetchFeed(nextPage, true);
+      }
     }
-  }, [page, loadingMore, hasNextPage, fetchFeed]);
+  }, [page, loadingMore, hasNextPage, isPrefetching, properties, fetchFeed]);
 
-  const renderItem = useCallback(({ item }: { item: FeedItem }) => {
+  // Preload images for upcoming items
+  useEffect(() => {
+    if (properties.length === 0) return;
+
+    // Preload images for next 2 items
+    const preloadImages = async () => {
+      const itemsToPreload = properties.slice(0, 3);
+      for (const item of itemsToPreload) {
+        if (isProperty(item) && item.images && item.images.length > 0) {
+          const imageUrl = item.images[0];
+          const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
+          // Preload image
+          Image.prefetch(fullUrl).catch(() => {
+            // Silently fail - image will load normally
+          });
+        }
+      }
+    };
+
+    preloadImages();
+  }, [properties]);
+
+  const renderItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
+    // Memoize the item to prevent unnecessary re-renders
     return (
       <View style={styles.reelItem}>
         {isProperty(item) ? (
@@ -902,6 +977,19 @@ export default function PropertyReelsView() {
     );
   }
 
+  // Track scroll position for prefetching
+  const handleScroll = useCallback((event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+    
+    // Prefetch when user is 60% through current content
+    const scrollPercentage = offsetY / (contentHeight - layoutHeight);
+    if (scrollPercentage > 0.6 && hasNextPage && !isPrefetching && !loadingMore) {
+      prefetchNextPage();
+    }
+  }, [hasNextPage, isPrefetching, loadingMore, prefetchNextPage]);
+
   return (
     <View style={styles.feedContainer}>
       <FlatList
@@ -916,7 +1004,9 @@ export default function PropertyReelsView() {
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
+        onEndReachedThreshold={0.3}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footerLoader}>
@@ -924,11 +1014,15 @@ export default function PropertyReelsView() {
             </View>
           ) : null
         }
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={3}
-        windowSize={5}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={2}
+        windowSize={3}
         initialNumToRender={2}
+        updateCellsBatchingPeriod={50}
         snapToOffsets={properties.map((_, index) => SCREEN_HEIGHT * index)}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+        }}
       />
     </View>
   );
