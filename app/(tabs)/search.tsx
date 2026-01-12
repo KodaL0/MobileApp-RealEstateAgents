@@ -221,11 +221,6 @@ export default function SearchScreen() {
         // 1. HEADER: title, search bar, filters
         ListHeaderComponent={() => (
           <>
-            {/* Title */}
-            <View style={styles.header}>
-              <Text style={styles.title}>Find Properties</Text>
-            </View>
-
             {/* Search bar */}
             <View style={styles.searchContainer}>
               <View style={styles.searchBar}>
