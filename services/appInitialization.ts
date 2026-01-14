@@ -4,8 +4,8 @@
  */
 import { apiClient } from '@/config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearFeedCache, setFeedCache } from '@/data/feedCache';
 
-const FEED_CACHE_KEY = '@feed_cache_v1';
 const CHAT_CACHE_KEY = '@chat_threads_cache';
 const CHAT_MESSAGES_CACHE_KEY = '@chat_messages_cache';
 
@@ -22,18 +22,6 @@ export interface AppInitializationStatus {
   profile: InitializationResult;
   totalDuration: number;
   allSuccessful: boolean;
-}
-
-/**
- * Clear feed cache
- */
-async function clearFeedCache(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(FEED_CACHE_KEY);
-    console.log('Feed cache cleared');
-  } catch (error) {
-    console.warn('Failed to clear feed cache:', error);
-  }
 }
 
 /**
@@ -57,15 +45,11 @@ async function initializeFeed(): Promise<InitializationResult> {
     console.log(`✅ Feed initialized: ${response.data.results?.length || 0} items in ${duration}ms`);
     
     // Cache the results for instant display
-    await AsyncStorage.setItem(
-      FEED_CACHE_KEY,
-      JSON.stringify({
-        items: response.data.results || [],
-        timestamp: Date.now(),
-        page: 1,
-        next: response.data.next,
-      })
-    );
+    await setFeedCache({
+      items: response.data.results || [],
+      page: 1,
+      next: response.data.next,
+    });
 
     return {
       success: true,
@@ -281,26 +265,6 @@ export async function initializeAllTabs(): Promise<AppInitializationStatus> {
   }
 
   return status;
-}
-
-/**
- * Get cached feed data (if available)
- */
-export async function getCachedFeedData(): Promise<any | null> {
-  try {
-    const cached = await AsyncStorage.getItem(FEED_CACHE_KEY);
-    if (cached) {
-      const data = JSON.parse(cached);
-      // Check if cache is less than 5 minutes old
-      const age = Date.now() - data.timestamp;
-      if (age < 5 * 60 * 1000) {
-        return data;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to get cached feed:', error);
-  }
-  return null;
 }
 
 /**

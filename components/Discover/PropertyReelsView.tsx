@@ -33,7 +33,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { api } from '@/config/api';
-import { getCachedFeedData } from '@/services/appInitialization';
+import { getCachedFeedData } from '@/data/feedCache';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
 import type { FeedProperty, FeedProject, FeedItem } from '@/app/features/types';
