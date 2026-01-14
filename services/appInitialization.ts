@@ -1,0 +1,269 @@
+/**
+ * App Initialization Service
+ * Handles initialization of all tabs and critical data during splash screen
+ */
+import { apiClient } from '@/config/api';
+import { clearFeedCache } from './feedPrefetch';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const FEED_CACHE_KEY = '@feed_cache_v1';
+const CHAT_CACHE_KEY = '@chat_threads_cache';
+
+export interface InitializationResult {
+  success: boolean;
+  error?: string;
+  duration: number;
+}
+
+export interface AppInitializationStatus {
+  feed: InitializationResult;
+  chat: InitializationResult;
+  search: InitializationResult;
+  profile: InitializationResult;
+  totalDuration: number;
+  allSuccessful: boolean;
+}
+
+/**
+ * Initialize feed with new generation (force refresh)
+ * Clears cache and fetches fresh feed data
+ */
+async function initializeFeed(): Promise<InitializationResult> {
+  const startTime = Date.now();
+  
+  try {
+    // Clear existing cache to force new generation
+    await clearFeedCache();
+    console.log('📱 Feed cache cleared for new generation');
+
+    // Fetch fresh feed (first page)
+    const response = await apiClient.get('feed/properties/', {
+      params: { page: 1, page_size: 10 }
+    });
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Feed initialized: ${response.data.results?.length || 0} items in ${duration}ms`);
+    
+    // Cache the results for instant display
+    await AsyncStorage.setItem(
+      FEED_CACHE_KEY,
+      JSON.stringify({
+        items: response.data.results || [],
+        timestamp: Date.now(),
+        page: 1,
+        next: response.data.next,
+      })
+    );
+
+    return {
+      success: true,
+      duration,
+    };
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    console.warn('⚠️ Feed initialization failed:', error?.message);
+    
+    return {
+      success: false,
+      error: error?.response?.data?.detail || error?.message || 'Failed to load feed',
+      duration,
+    };
+  }
+}
+
+/**
+ * Initialize chat - fetch threads and prepare WebSocket
+ */
+async function initializeChat(): Promise<InitializationResult> {
+  const startTime = Date.now();
+  
+  try {
+    // Prefetch chat threads
+    const response = await apiClient.get('chat/');
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Chat initialized: ${response.data.length} threads in ${duration}ms`);
+    
+    // Cache threads for instant display
+    await AsyncStorage.setItem(
+      CHAT_CACHE_KEY,
+      JSON.stringify({
+        threads: response.data,
+        timestamp: Date.now(),
+      })
+    );
+
+    return {
+      success: true,
+      duration,
+    };
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    console.warn('⚠️ Chat initialization failed:', error?.message);
+    
+    // Chat initialization failure is not critical
+    return {
+      success: false,
+      error: error?.response?.data?.detail || error?.message || 'Failed to load chat',
+      duration,
+    };
+  }
+}
+
+/**
+ * Initialize search - lightweight, just marks as ready
+ */
+async function initializeSearch(): Promise<InitializationResult> {
+  const startTime = Date.now();
+  
+  try {
+    // Search doesn't need prefetching - it's form-based
+    // Just mark as initialized
+    const duration = Date.now() - startTime;
+    console.log(`✅ Search initialized in ${duration}ms`);
+
+    return {
+      success: true,
+      duration,
+    };
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    
+    return {
+      success: false,
+      error: error?.message || 'Failed to initialize search',
+      duration,
+    };
+  }
+}
+
+/**
+ * Initialize profile - user data already loaded in UserContext
+ */
+async function initializeProfile(): Promise<InitializationResult> {
+  const startTime = Date.now();
+  
+  try {
+    // Profile data is already loaded during auth check
+    // This can be extended for additional profile-related data
+    const duration = Date.now() - startTime;
+    console.log(`✅ Profile initialized in ${duration}ms`);
+
+    return {
+      success: true,
+      duration,
+    };
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    
+    return {
+      success: false,
+      error: error?.message || 'Failed to initialize profile',
+      duration,
+    };
+  }
+}
+
+/**
+ * Initialize all tabs in parallel
+ * This is called during splash screen after authentication
+ */
+export async function initializeAllTabs(): Promise<AppInitializationStatus> {
+  const overallStartTime = Date.now();
+
+  console.log('🚀 Starting app initialization...');
+
+  // Initialize all tabs in parallel for faster loading
+  const [feedResult, chatResult, searchResult, profileResult] = await Promise.allSettled([
+    initializeFeed(),
+    initializeChat(),
+    initializeSearch(),
+    initializeProfile(),
+  ]);
+
+  // Extract results
+  const feed: InitializationResult = 
+    feedResult.status === 'fulfilled' 
+      ? feedResult.value 
+      : { success: false, error: String(feedResult.reason), duration: 0 };
+
+  const chat: InitializationResult = 
+    chatResult.status === 'fulfilled' 
+      ? chatResult.value 
+      : { success: false, error: String(chatResult.reason), duration: 0 };
+
+  const search: InitializationResult = 
+    searchResult.status === 'fulfilled' 
+      ? searchResult.value 
+      : { success: false, error: String(searchResult.reason), duration: 0 };
+
+  const profile: InitializationResult = 
+    profileResult.status === 'fulfilled' 
+      ? profileResult.value 
+      : { success: false, error: String(profileResult.reason), duration: 0 };
+
+  const totalDuration = Date.now() - overallStartTime;
+  const allSuccessful = feed.success && chat.success && search.success && profile.success;
+
+  const status: AppInitializationStatus = {
+    feed,
+    chat,
+    search,
+    profile,
+    totalDuration,
+    allSuccessful,
+  };
+
+  // Log summary
+  const successCount = [feed.success, chat.success, search.success, profile.success].filter(Boolean).length;
+  console.log(`${allSuccessful ? '✅' : '⚠️'} App initialization complete: ${successCount}/4 tabs ready in ${totalDuration}ms`);
+  
+  if (!feed.success) {
+    console.warn('⚠️ Feed initialization failed - will load on first tab visit');
+  }
+  if (!chat.success) {
+    console.warn('⚠️ Chat initialization failed - will load on first chat visit');
+  }
+
+  return status;
+}
+
+/**
+ * Get cached feed data (if available)
+ */
+export async function getCachedFeedData(): Promise<any | null> {
+  try {
+    const cached = await AsyncStorage.getItem(FEED_CACHE_KEY);
+    if (cached) {
+      const data = JSON.parse(cached);
+      // Check if cache is less than 5 minutes old
+      const age = Date.now() - data.timestamp;
+      if (age < 5 * 60 * 1000) {
+        return data;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to get cached feed:', error);
+  }
+  return null;
+}
+
+/**
+ * Get cached chat threads (if available)
+ */
+export async function getCachedChatThreads(): Promise<any | null> {
+  try {
+    const cached = await AsyncStorage.getItem(CHAT_CACHE_KEY);
+    if (cached) {
+      const data = JSON.parse(cached);
+      // Check if cache is less than 5 minutes old
+      const age = Date.now() - data.timestamp;
+      if (age < 5 * 60 * 1000) {
+        return data;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to get cached chat threads:', error);
+  }
+  return null;
+}

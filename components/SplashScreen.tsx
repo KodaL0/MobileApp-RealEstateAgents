@@ -1,19 +1,58 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Image, Animated, Dimensions, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Image, Animated, Dimensions, Platform, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface SplashScreenProps {
   onFinish: () => void;
+  initializationTask?: () => Promise<void>;
+  minimumDuration?: number; // Minimum time to show splash (ms)
 }
 
 const { width } = Dimensions.get('window');
 
-export default function SplashScreen({ onFinish }: SplashScreenProps) {
+export default function SplashScreen({ 
+  onFinish, 
+  initializationTask,
+  minimumDuration = 2000 // Default 2 seconds minimum
+}: SplashScreenProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
   const logoRotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const shimmerAnim = useRef(new Animated.Value(-width)).current;
+  
+  const [initializationComplete, setInitializationComplete] = useState(false);
+  const [minimumTimeElapsed, setMinimumTimeElapsed] = useState(false);
+
+  // Run initialization task
+  useEffect(() => {
+    if (!initializationTask) {
+      setInitializationComplete(true);
+      return;
+    }
+
+    const runInitialization = async () => {
+      try {
+        await initializationTask();
+        console.log('✅ Initialization complete');
+      } catch (error) {
+        console.warn('⚠️ Initialization failed:', error);
+      } finally {
+        setInitializationComplete(true);
+      }
+    };
+
+    runInitialization();
+  }, [initializationTask]);
+
+  // Track minimum time
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinimumTimeElapsed(true);
+    }, minimumDuration);
+
+    return () => clearTimeout(timer);
+  }, [minimumDuration]);
 
   useEffect(() => {
     // Native driver only works on iOS/Android, not on web
@@ -74,23 +113,31 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
     pulseAnimation.start();
     shimmerAnimation.start();
 
-    // Finish after 3 seconds
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: useNative,
-      }).start(() => {
-        onFinish();
-      });
-    }, 3000);
-
     return () => {
-      clearTimeout(timer);
       pulseAnimation.stop();
       shimmerAnimation.stop();
     };
-  }, [fadeAnim, scaleAnim, logoRotateAnim, pulseAnim, shimmerAnim, onFinish]);
+  }, [fadeAnim, scaleAnim, logoRotateAnim, pulseAnim, shimmerAnim]);
+
+  // Finish when both initialization and minimum time are complete
+  useEffect(() => {
+    if (initializationComplete && minimumTimeElapsed) {
+      const useNative = Platform.OS !== 'web';
+      
+      // Small delay before fading out
+      const timer = setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: useNative,
+        }).start(() => {
+          onFinish();
+        });
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [initializationComplete, minimumTimeElapsed, fadeAnim, onFinish]);
 
   const logoRotate = logoRotateAnim.interpolate({
     inputRange: [0, 1],

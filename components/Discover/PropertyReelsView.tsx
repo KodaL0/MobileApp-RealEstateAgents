@@ -33,6 +33,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { api } from '@/config/api';
+import { getCachedFeedData } from '@/services/appInitialization';
 import { useChat } from '@/app/features/chat/context/ChatContext';
 import { useUser } from '@/app/_userbase/UserContext';
 import type { FeedProperty, FeedProject, FeedItem } from '@/app/features/types';
@@ -868,13 +869,28 @@ export default function PropertyReelsView() {
     }
   }, [isAuthenticated]);
 
-  // Initialize feed - always fetch fresh from backend
+  // Initialize feed - try cache first, then fetch if needed
   useEffect(() => {
     if (hasMountedRef.current) return;
     hasMountedRef.current = true;
 
     if (isAuthenticated) {
-      fetchFeed(1, false, false);
+      // Try to load from cache first (instant display)
+      getCachedFeedData().then(cachedData => {
+        if (cachedData && cachedData.items && cachedData.items.length > 0) {
+          console.log(`📦 Loading feed from cache: ${cachedData.items.length} items`);
+          setProperties(cachedData.items);
+          setHasNextPage(!!cachedData.next);
+          setLoading(false);
+          
+          // Refresh in background (silent update)
+          fetchFeed(1, false, true);
+        } else {
+          // No cache, fetch normally
+          console.log('📡 No cache found, fetching feed...');
+          fetchFeed(1, false, false);
+        }
+      });
     }
   }, [isAuthenticated, fetchFeed]);
 

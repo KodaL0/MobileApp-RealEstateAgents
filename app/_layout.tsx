@@ -22,6 +22,7 @@ import { ChatProvider } from './features/chat/context/ChatContext';
 import SplashScreen from '../components/SplashScreen';
 import { NativeLogin } from './_userbase/NativeLogin';
 import GlobalOAuthHandler, { useGoogleLogin } from './_userbase/GlobalOAuthHandler';
+import { initializeAllTabs } from '@/services/appInitialization';
 
 ExpoSplash.preventAutoHideAsync();
 
@@ -47,6 +48,7 @@ function InnerApp() {
   const [showCustomSplash, setShowCustomSplash] = useState(true);
   const [splashFinished, setSplashFinished] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
 
   // Framework ready hook
   useFrameworkReady();
@@ -54,14 +56,16 @@ function InnerApp() {
   // Get Google login handler from hook
   const handleGoogleLogin = useGoogleLogin();
 
-  // Debug: Log auth state changes
+  // Track when auth check completes
   useEffect(() => {
-    console.log('_layout.tsx: Auth state changed -', { 
-      user: user?.email || 'null', 
-      isAuthenticated, 
-      isLoading 
-    });
-  }, [user, isAuthenticated, isLoading]);
+    if (!isLoading) {
+      setAuthCheckComplete(true);
+      console.log('_layout.tsx: Auth check complete -', { 
+        user: user?.email || 'null', 
+        isAuthenticated 
+      });
+    }
+  }, [isLoading, user, isAuthenticated]);
 
   // Wait for fonts to load
   useEffect(() => {
@@ -74,14 +78,32 @@ function InnerApp() {
   // 1) fonts
   if (!fontsLoaded && !fontError) return null;
 
-  // 2) splash
+  // 2) splash - runs initialization after auth check
   if (showCustomSplash && !splashFinished) {
+    // Create initialization task that waits for auth then initializes tabs
+    const initializationTask = async () => {
+      // Wait for auth check to complete
+      while (!authCheckComplete) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Only initialize if authenticated
+      if (isAuthenticated) {
+        console.log('🚀 Running app initialization during splash...');
+        await initializeAllTabs();
+      } else {
+        console.log('⏭️ Skipping initialization (not authenticated)');
+      }
+    };
+
     return (
       <SplashScreen
         onFinish={async () => {
           setSplashFinished(true);
           setShowCustomSplash(false);
         }}
+        initializationTask={initializationTask}
+        minimumDuration={2000}
       />
     );
   }
