@@ -479,7 +479,7 @@ export default function SearchEventForm({
                 ]}
               >
                 {type === 'residential_building' 
-                  ? 'Residential Bldg' 
+                  ? 'Residential' 
                   : type.charAt(0).toUpperCase() + type.slice(1)}
               </Text>
             </TouchableOpacity>
