@@ -3,7 +3,6 @@
  * Handles initialization of all tabs and critical data during splash screen
  */
 import { apiClient } from '@/config/api';
-import { clearFeedCache } from './feedPrefetch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FEED_CACHE_KEY = '@feed_cache_v1';
@@ -23,6 +22,18 @@ export interface AppInitializationStatus {
   profile: InitializationResult;
   totalDuration: number;
   allSuccessful: boolean;
+}
+
+/**
+ * Clear feed cache
+ */
+async function clearFeedCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(FEED_CACHE_KEY);
+    console.log('Feed cache cleared');
+  } catch (error) {
+    console.warn('Failed to clear feed cache:', error);
+  }
 }
 
 /**
