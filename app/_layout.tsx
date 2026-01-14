@@ -103,7 +103,7 @@ function InnerApp() {
           setShowCustomSplash(false);
         }}
         initializationTask={initializationTask}
-        minimumDuration={2000}
+        minimumDuration={3000}
       />
     );
   }
