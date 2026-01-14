@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, WS_BASE_URL } from '@/config/api';
 import { useUser } from '../../../_userbase/UserContext';
 import { Thread, Message } from '../../types';
-import { getCachedChatThreads } from '@/services/appInitialization';
+import { getCachedChatThreads, getCachedChatMessages } from '@/services/appInitialization';
 
 interface ChatContextValue {
   threads: Thread[];
@@ -70,6 +70,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     if (cachedData && cachedData.threads) {
       console.log(`📦 Loading chat threads from cache: ${cachedData.threads.length} threads`);
       setThreads(cachedData.threads);
+    }
+    
+    // Load cached messages for instant display
+    const cachedMessages = await getCachedChatMessages();
+    if (cachedMessages && Object.keys(cachedMessages).length > 0) {
+      console.log(`📦 Loading chat messages from cache: ${Object.keys(cachedMessages).length} threads with messages`);
+      setMessages(cachedMessages);
     }
     
     // Fetch fresh data in background

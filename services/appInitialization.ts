@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FEED_CACHE_KEY = '@feed_cache_v1';
 const CHAT_CACHE_KEY = '@chat_threads_cache';
+const CHAT_MESSAGES_CACHE_KEY = '@chat_messages_cache';
 
 export interface InitializationResult {
   success: boolean;
@@ -72,27 +73,70 @@ async function initializeFeed(): Promise<InitializationResult> {
 }
 
 /**
- * Initialize chat - fetch threads and prepare WebSocket
+ * Initialize chat - fetch threads and pre-fetch messages for recent threads
  */
 async function initializeChat(): Promise<InitializationResult> {
   const startTime = Date.now();
   
   try {
     // Prefetch chat threads
-    const response = await apiClient.get('chat/');
-    
-    const duration = Date.now() - startTime;
-    console.log(`✅ Chat initialized: ${response.data.length} threads in ${duration}ms`);
+    const threadsResponse = await apiClient.get('chat/');
+    const threads = threadsResponse.data || [];
     
     // Cache threads for instant display
     await AsyncStorage.setItem(
       CHAT_CACHE_KEY,
       JSON.stringify({
-        threads: response.data,
+        threads,
         timestamp: Date.now(),
       })
     );
 
+    // Pre-fetch messages for the top 10 most recent threads
+    // This ensures the messages tab is fully cached and ready
+    const messagesCache: Record<string, any[]> = {};
+    const threadsToPrefetch = threads.slice(0, 10); // Top 10 most recent threads
+    
+    if (threadsToPrefetch.length > 0) {
+      console.log(`📨 Pre-fetching messages for ${threadsToPrefetch.length} recent threads...`);
+      
+      // Fetch messages for each thread in parallel (but limit concurrency)
+      const messagePromises = threadsToPrefetch.map(async (thread: any) => {
+        try {
+          const messagesResponse = await apiClient.get(`chat/${thread.id}/messages/`, {
+            params: { limit: 30 }
+          });
+          
+          // Messages come in reverse chronological order, reverse them for proper display
+          const messages = (messagesResponse.data.results || []).reverse();
+          messagesCache[thread.id] = messages;
+          
+          return { threadId: thread.id, success: true, count: messages.length };
+        } catch (error: any) {
+          console.warn(`⚠️ Failed to pre-fetch messages for thread ${thread.id}:`, error?.message);
+          return { threadId: thread.id, success: false };
+        }
+      });
+      
+      const results = await Promise.allSettled(messagePromises);
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      const totalMessages = Object.values(messagesCache).reduce((sum, msgs) => sum + msgs.length, 0);
+      
+      console.log(`✅ Pre-fetched messages for ${successful}/${threadsToPrefetch.length} threads (${totalMessages} total messages)`);
+      
+      // Cache messages
+      await AsyncStorage.setItem(
+        CHAT_MESSAGES_CACHE_KEY,
+        JSON.stringify({
+          messages: messagesCache,
+          timestamp: Date.now(),
+        })
+      );
+    }
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Chat initialized: ${threads.length} threads, ${Object.keys(messagesCache).length} threads with cached messages in ${duration}ms`);
+    
     return {
       success: true,
       duration,
@@ -264,6 +308,26 @@ export async function getCachedChatThreads(): Promise<any | null> {
     }
   } catch (error) {
     console.warn('Failed to get cached chat threads:', error);
+  }
+  return null;
+}
+
+/**
+ * Get cached chat messages (if available)
+ */
+export async function getCachedChatMessages(): Promise<Record<string, any[]> | null> {
+  try {
+    const cached = await AsyncStorage.getItem(CHAT_MESSAGES_CACHE_KEY);
+    if (cached) {
+      const data = JSON.parse(cached);
+      // Check if cache is less than 5 minutes old
+      const age = Date.now() - data.timestamp;
+      if (age < 5 * 60 * 1000) {
+        return data.messages || {};
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to get cached chat messages:', error);
   }
   return null;
 }
