@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams, usePathname, useFocusEffect } from 'ex
 import { useChat } from '../../features/chat/context/ChatContext';
 import { useUser } from '../../_userbase/UserContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Home, Clock, User, Search } from 'lucide-react-native';
+import { Home, Clock, User, Search, MessageSquare, Plus } from 'lucide-react-native';
 import type { Thread } from '../../features/types';
 import { setLastChatRoute } from '../../features/chat/navigationState';
 
@@ -117,12 +117,12 @@ export default function ThreadList() {
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Messages</Text>
-            <Text style={styles.subtitle}>
-              Continue the conversation or start a new connection.
-            </Text>
           </View>
           <View style={styles.avatarShell}>
-            <User size={20} color="#FFFFFF" />
+            <MessageSquare size={18} color="#FFFFFF" />
+            <View style={styles.plusIcon}>
+              <Plus size={10} color="#0F3460" strokeWidth={3} />
+            </View>
           </View>
         </View>
 
@@ -262,6 +262,18 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
+    position: 'relative',
+  },
+  plusIcon: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchWrapper: {
     paddingHorizontal: 20,
