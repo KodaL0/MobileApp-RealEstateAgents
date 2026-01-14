@@ -5,9 +5,7 @@
 import { apiClient } from '@/config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearFeedCache, setFeedCache } from '@/data/feedCache';
-
-const CHAT_CACHE_KEY = '@chat_threads_cache';
-const CHAT_MESSAGES_CACHE_KEY = '@chat_messages_cache';
+import { setChatThreadsCache, setChatMessagesCache } from '@/data/chatCache';
 
 export interface InitializationResult {
   success: boolean;
@@ -79,13 +77,7 @@ async function initializeChat(): Promise<InitializationResult> {
     const threads = threadsResponse.data || [];
     
     // Cache threads for instant display
-    await AsyncStorage.setItem(
-      CHAT_CACHE_KEY,
-      JSON.stringify({
-        threads,
-        timestamp: Date.now(),
-      })
-    );
+    await setChatThreadsCache(threads);
 
     // Pre-fetch messages for the top 10 most recent threads
     // This ensures the messages tab is fully cached and ready
@@ -120,13 +112,7 @@ async function initializeChat(): Promise<InitializationResult> {
       console.log(`✅ Pre-fetched messages for ${successful}/${threadsToPrefetch.length} threads (${totalMessages} total messages)`);
       
       // Cache messages
-      await AsyncStorage.setItem(
-        CHAT_MESSAGES_CACHE_KEY,
-        JSON.stringify({
-          messages: messagesCache,
-          timestamp: Date.now(),
-        })
-      );
+      await setChatMessagesCache(messagesCache);
     }
     
     const duration = Date.now() - startTime;
@@ -265,44 +251,4 @@ export async function initializeAllTabs(): Promise<AppInitializationStatus> {
   }
 
   return status;
-}
-
-/**
- * Get cached chat threads (if available)
- */
-export async function getCachedChatThreads(): Promise<any | null> {
-  try {
-    const cached = await AsyncStorage.getItem(CHAT_CACHE_KEY);
-    if (cached) {
-      const data = JSON.parse(cached);
-      // Check if cache is less than 5 minutes old
-      const age = Date.now() - data.timestamp;
-      if (age < 5 * 60 * 1000) {
-        return data;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to get cached chat threads:', error);
-  }
-  return null;
-}
-
-/**
- * Get cached chat messages (if available)
- */
-export async function getCachedChatMessages(): Promise<Record<string, any[]> | null> {
-  try {
-    const cached = await AsyncStorage.getItem(CHAT_MESSAGES_CACHE_KEY);
-    if (cached) {
-      const data = JSON.parse(cached);
-      // Check if cache is less than 5 minutes old
-      const age = Date.now() - data.timestamp;
-      if (age < 5 * 60 * 1000) {
-        return data.messages || {};
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to get cached chat messages:', error);
-  }
-  return null;
 }
