@@ -19,18 +19,21 @@ import SearchResults from '@/components/search/SearchResults';
 export default function SearchResearchScreen() {
   const insets = useSafeAreaInsets();
   const [searchParams, setSearchParams] = useState<SearchEventParams | null>(null);
+  const [showResults, setShowResults] = useState(false);
 
   const handleSearchSubmit = (params: SearchEventParams) => {
-    // Set search params to show results inline
+    // Set search params and show results
     setSearchParams(params);
+    setShowResults(true);
   };
 
   const handleBackToSearch = () => {
-    setSearchParams(null);
+    // Only hide results, keep searchParams to preserve filter state
+    setShowResults(false);
   };
 
   // Show results if search has been submitted
-  if (searchParams) {
+  if (showResults && searchParams) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <StatusBar style="dark" />
@@ -51,8 +54,11 @@ export default function SearchResearchScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Search Event Form */}
-        <SearchEventForm onSubmit={handleSearchSubmit} />
+        {/* Search Event Form - initialValues preserves filters when returning from results */}
+        <SearchEventForm 
+          onSubmit={handleSearchSubmit} 
+          initialValues={searchParams || undefined}
+        />
       </ScrollView>
     </SafeAreaView>
   );

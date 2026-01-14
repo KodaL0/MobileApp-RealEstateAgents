@@ -28,7 +28,7 @@ import type { ListingQueryParams } from '@/types/listings';
 
 export type FilterOption = 'All' | 'Buy' | 'Rent';
 
-export type PropertyType = 'apartment' | 'house' | 'villa' | 'commercial' | 'land';
+export type PropertyType = 'apartment' | 'house' | 'land' | 'hotel' | 'shop' | 'office' | 'residential_building';
 
 export type SortOption = 'recommended' | 'price-asc' | 'price-desc' | 'newest' | 'oldest';
 
@@ -289,12 +289,12 @@ export default function SearchEventForm({
 
   // Options
   const filters: FilterOption[] = ['All', 'Buy', 'Rent'];
-  const propertyTypes: PropertyType[] = ['apartment', 'house', 'villa', 'commercial', 'land'];
+  const propertyTypes: PropertyType[] = ['apartment', 'house', 'land', 'hotel', 'shop', 'office', 'residential_building'];
   const bedroomOptions = [1, 2, 3, 4, 5, 6];
   const bathroomOptions = [1, 2, 3, 4, 5];
   const areaOptions = [50, 100, 150, 200, 300, 500];
   const priceOptions = [50000, 100000, 200000, 300000, 500000, 1000000];
-  const countries = ['Cyprus', 'Greece', 'Spain', 'Portugal', 'Italy'];
+  const countries = ['Cyprus', 'Greece'];
 
   // Clear all filters
   const handleClearFilters = useCallback(() => {
@@ -478,7 +478,9 @@ export default function SearchEventForm({
                   propertyType === type && styles.filterTextActive,
                 ]}
               >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
+                {type === 'residential_building' 
+                  ? 'Residential Bldg' 
+                  : type.charAt(0).toUpperCase() + type.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
