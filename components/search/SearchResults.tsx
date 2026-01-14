@@ -16,7 +16,9 @@ import {
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import PropertyCard from '@/components/property/PropertyCard';
+import { ProjectCard } from '@/components/cards/ProjectCard';
 import { api } from '../../config/api';
+import type { UnifiedListing } from '@/types/listings';
 import {
   buildSearchQueryParams,
   SearchEventParams,
@@ -34,7 +36,7 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
   const router = useRouter();
 
   // Data state:
-  const [listings, setListings] = useState<any[]>([]);
+  const [listings, setListings] = useState<UnifiedListing[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
 
   // Fetch function - supports both initial search and loading more
   // This API call automatically tracks search events on the backend
+  // Now uses unified endpoints that return both properties and projects
   const fetchListings = useCallback(async (page: number = 1, append: boolean = false) => {
     if (append) {
       setLoadingMore(true);
@@ -67,22 +70,19 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
     const qp = buildQueryParams(page);
     try {
       let respData;
+      
+      // Use unified endpoints for Buy/Rent
       if (searchParams.filter === 'Buy') {
-        const paginated = await api.properties.buy(qp);
-        respData = paginated;
+        respData = await api.properties.buy(qp);
       } else if (searchParams.filter === 'Rent') {
-        const paginated = await api.properties.rent(qp);
-        respData = paginated;
+        respData = await api.properties.rent(qp);
       } else {
-        const paginatedRaw = await api.properties.list(buildQueryParams(page));
-        respData = {
-          results: Array.isArray(paginatedRaw) ? paginatedRaw : paginatedRaw.results || [],
-          count: paginatedRaw.count ?? (Array.isArray(paginatedRaw) ? paginatedRaw.length : 0),
-          next: paginatedRaw.next ?? null,
-        };
+        // For 'All', we'll use the Buy endpoint by default
+        // The backend doesn't have an 'all' unified endpoint yet
+        respData = await api.properties.buy(qp);
       }
 
-      const items: any[] = respData.results || [];
+      const items: UnifiedListing[] = respData.results || [];
       
       if (append) {
         // Append to existing listings
@@ -107,7 +107,7 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
     } catch (e: any) {
       console.error('Error fetching listings:', e);
       if (!append) {
-        setError('Failed to load properties. Please try again.');
+        setError('Failed to load listings. Please try again.');
         setListings([]);
         setTotalCount(0);
       }
@@ -145,9 +145,21 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
     }
   }, [loadingMore, hasMore, nextPage, fetchListings]);
 
-  // Render item for FlatList
-  const renderItem = ({ item }: { item: any }) => {
-    // Image normalization
+  // Render item for FlatList - conditionally renders PropertyCard or ProjectCard
+  const renderItem = ({ item }: { item: UnifiedListing }) => {
+    // Check if it's a project and render ProjectCard
+    if (item._type === 'project') {
+      const listingType = searchParams.filter === 'Rent' ? 'rent' : 'sale';
+      return (
+        <ProjectCard 
+          project={item}
+          listingType={listingType}
+        />
+      );
+    }
+    
+    // Otherwise it's a property - render PropertyCard
+    // Image normalization for property
     let imagesArr: string[] = [];
     if (Array.isArray(item.images)) {
       imagesArr = item.images.map((img: any) => {
@@ -165,10 +177,7 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
     const propForCard = {
       id: item.id,
       images: imagesArr,
-      forSale:
-        item.property_status === 'for_sale' ||
-        (typeof item.forSale === 'boolean' && item.forSale) ||
-        (item.listing_type && item.listing_type.toLowerCase() === 'sale'),
+      forSale: item.property_status === 'for_sale',
       price: Number(item.price) || 0,
       title: item.title || '',
       location: item.location || '',
@@ -187,7 +196,7 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
     return (
       <View style={styles.loadMoreContainer}>
         <ActivityIndicator size="small" color="#0F3460" />
-        <Text style={styles.loadMoreText}>Loading more properties...</Text>
+        <Text style={styles.loadMoreText}>Loading more listings...</Text>
       </View>
     );
   };
@@ -243,10 +252,10 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
 
             {!loading && (
               <View style={styles.resultsHeader}>
-                <View style={styles.resultsInfo}>
-                  <Text style={styles.resultsCount}>
-                    {totalCount > 0 ? `${totalCount} ${totalCount === 1 ? 'property' : 'properties'} found` : 'No results'}
-                  </Text>
+              <View style={styles.resultsInfo}>
+                <Text style={styles.resultsCount}>
+                  {totalCount > 0 ? `${totalCount} ${totalCount === 1 ? 'listing' : 'listings'} found` : 'No results'}
+                </Text>
                   {searchParams.filter !== 'All' && (
                     <View style={styles.filterBadge}>
                       <Text style={styles.filterBadgeText}>{searchParams.filter}</Text>
@@ -271,14 +280,14 @@ export default function SearchResults({ searchParams, onBack }: SearchResultsPro
             return (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#0F3460" />
-                <Text style={styles.loadingText}>Searching properties...</Text>
+                <Text style={styles.loadingText}>Searching listings...</Text>
               </View>
             );
           }
           if (listings.length === 0 && !loading) {
             return (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>No properties found</Text>
+                <Text style={styles.emptyTitle}>No listings found</Text>
                 <Text style={styles.emptyText}>
                   Try adjusting your search criteria or filters.
                 </Text>

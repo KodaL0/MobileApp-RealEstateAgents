@@ -8,10 +8,19 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import {
   Search as SearchIcon,
+  X as ClearIcon,
+  MapPin,
+  Home,
+  Bed,
+  Bath,
+  Maximize,
+  DollarSign,
 } from 'lucide-react-native';
+import type { ListingQueryParams } from '@/types/listings';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -61,13 +70,18 @@ export interface SearchEventFormProps {
 /**
  * Builds query parameters object for API calls from SearchEventParams
  * Exported for use in search results screen
+ * 
+ * @param params - Search event parameters from the form
+ * @param page - Page number for pagination (default: 1)
+ * @param pageSize - Number of results per page (default: 20)
+ * @returns Query parameters compatible with ListingQueryParams type and unified listings API
  */
 export const buildSearchQueryParams = (
   params: SearchEventParams,
   page: number = 1,
   pageSize: number = 20
-): Record<string, any> => {
-  const qp: Record<string, any> = {
+): ListingQueryParams => {
+  const qp: ListingQueryParams = {
     page_size: pageSize,
     page: page,
   };
@@ -237,7 +251,13 @@ export default function SearchEventForm({
   onSubmit,
   showAdvancedFilters = false,
 }: SearchEventFormProps) {
+  // Core filters
   const [filter, setFilter] = useState<FilterOption>(initialValues?.filter || 'All');
+  const [searchText, setSearchText] = useState<string>(initialValues?.search || '');
+  const [location, setLocation] = useState<string>(initialValues?.location || '');
+  const [country, setCountry] = useState<string>(initialValues?.country || '');
+  
+  // Property details
   const [propertyType, setPropertyType] = useState<PropertyType | undefined>(
     initialValues?.property_type
   );
@@ -247,29 +267,57 @@ export default function SearchEventForm({
   const [bathrooms, setBathrooms] = useState<number | undefined>(
     initialValues?.bathrooms
   );
+  
+  // Area range
   const [areaMin, setAreaMin] = useState<number | undefined>(
     initialValues?.area_min
   );
   const [areaMax, setAreaMax] = useState<number | undefined>(
     initialValues?.area_max
   );
+  
+  // Price range
   const [priceMin, setPriceMin] = useState<number | undefined>(
     initialValues?.price_min
   );
   const [priceMax, setPriceMax] = useState<number | undefined>(
     initialValues?.price_max
   );
+  
+  // Amenities (future implementation)
+  const [amenities, setAmenities] = useState<string[]>(initialValues?.amenities || []);
 
+  // Options
   const filters: FilterOption[] = ['All', 'Buy', 'Rent'];
-  const propertyTypes: PropertyType[] = ['apartment', 'house', 'villa', 'land'];
+  const propertyTypes: PropertyType[] = ['apartment', 'house', 'villa', 'commercial', 'land'];
   const bedroomOptions = [1, 2, 3, 4, 5, 6];
   const bathroomOptions = [1, 2, 3, 4, 5];
   const areaOptions = [50, 100, 150, 200, 300, 500];
   const priceOptions = [50000, 100000, 200000, 300000, 500000, 1000000];
+  const countries = ['Cyprus', 'Greece', 'Spain', 'Portugal', 'Italy'];
 
+  // Clear all filters
+  const handleClearFilters = useCallback(() => {
+    setSearchText('');
+    setLocation('');
+    setCountry('');
+    setPropertyType(undefined);
+    setBedrooms(undefined);
+    setBathrooms(undefined);
+    setAreaMin(undefined);
+    setAreaMax(undefined);
+    setPriceMin(undefined);
+    setPriceMax(undefined);
+    setAmenities([]);
+  }, []);
+
+  // Submit handler
   const handleSubmit = useCallback(() => {
     const params: SearchEventParams = {
       filter,
+      ...(searchText.trim() && { search: searchText.trim() }),
+      ...(location.trim() && { location: location.trim() }),
+      ...(country.trim() && { country: country.trim() }),
       ...(propertyType && { property_type: propertyType }),
       ...(bedrooms && { bedrooms }),
       ...(bathrooms && { bathrooms }),
@@ -277,12 +325,31 @@ export default function SearchEventForm({
       ...(areaMax && { area_max: areaMax }),
       ...(priceMin && { price_min: priceMin }),
       ...(priceMax && { price_max: priceMax }),
+      ...(amenities.length > 0 && { amenities }),
     };
 
     onSubmit(params);
-  }, [filter, propertyType, bedrooms, bathrooms, areaMin, areaMax, priceMin, priceMax, onSubmit]);
+  }, [
+    filter, 
+    searchText, 
+    location, 
+    country, 
+    propertyType, 
+    bedrooms, 
+    bathrooms, 
+    areaMin, 
+    areaMax, 
+    priceMin, 
+    priceMax, 
+    amenities,
+    onSubmit
+  ]);
 
+  // Count active filters
   const activeFilterCount = [
+    searchText.trim(),
+    location.trim(),
+    country.trim(),
     propertyType,
     bedrooms,
     bathrooms,
@@ -290,12 +357,26 @@ export default function SearchEventForm({
     areaMax,
     priceMin,
     priceMax,
+    amenities.length > 0 && amenities,
   ].filter(Boolean).length;
 
   return (
-    <View style={styles.container}>
-      {/* Filter Type Pills */}
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Header with active filter count */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Search Filters</Text>
+        {activeFilterCount > 0 && (
+          <View style={styles.filterCountBadge}>
+            <Text style={styles.filterCountText}>{activeFilterCount}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Listing Type (Buy/Rent/All) */}
       <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Listing Type</Text>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {filters.map((f) => (
             <TouchableOpacity
@@ -311,8 +392,76 @@ export default function SearchEventForm({
         </ScrollView>
       </View>
 
+      {/* Search Text Input */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <SearchIcon size={16} color="#0F3460" />
+          <Text style={styles.sectionTitle}>Search Keywords</Text>
+        </View>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Search by title, description..."
+            placeholderTextColor="#999"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText('')} style={styles.inputClearButton}>
+              <ClearIcon size={16} color="#999" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Location Input */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <MapPin size={16} color="#0F3460" />
+          <Text style={styles.sectionTitle}>Location</Text>
+        </View>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="City, area, or address..."
+            placeholderTextColor="#999"
+            value={location}
+            onChangeText={setLocation}
+          />
+          {location.length > 0 && (
+            <TouchableOpacity onPress={() => setLocation('')} style={styles.inputClearButton}>
+              <ClearIcon size={16} color="#999" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Country Selection */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Country</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {countries.map((c) => (
+            <TouchableOpacity
+              key={c}
+              style={[styles.filterPill, country === c && styles.filterPillActive]}
+              onPress={() => setCountry(country === c ? '' : c)}
+            >
+              <Text style={[styles.filterText, country === c && styles.filterTextActive]}>
+                {c}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Property Type */}
       <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Home size={16} color="#0F3460" />
+          <Text style={styles.sectionTitle}>Property Type</Text>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {propertyTypes.map((type) => (
             <TouchableOpacity
@@ -338,6 +487,10 @@ export default function SearchEventForm({
 
       {/* Bedrooms */}
       <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Bed size={16} color="#0F3460" />
+          <Text style={styles.sectionTitle}>Bedrooms (minimum)</Text>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {bedroomOptions.map((count) => (
             <TouchableOpacity
@@ -354,7 +507,7 @@ export default function SearchEventForm({
                   bedrooms === count && styles.filterTextActive,
                 ]}
               >
-                {count}+ Bed
+                {count}+
               </Text>
             </TouchableOpacity>
           ))}
@@ -363,6 +516,10 @@ export default function SearchEventForm({
 
       {/* Bathrooms */}
       <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Bath size={16} color="#0F3460" />
+          <Text style={styles.sectionTitle}>Bathrooms (minimum)</Text>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {bathroomOptions.map((count) => (
             <TouchableOpacity
@@ -379,7 +536,7 @@ export default function SearchEventForm({
                   bathrooms === count && styles.filterTextActive,
                 ]}
               >
-                {count}+ Bath
+                {count}+
               </Text>
             </TouchableOpacity>
           ))}
@@ -388,6 +545,15 @@ export default function SearchEventForm({
 
       {/* Area Range */}
       <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Maximize size={16} color="#0F3460" />
+          <Text style={styles.sectionTitle}>Area (m²)</Text>
+          {(areaMin || areaMax) && (
+            <Text style={styles.rangeIndicator}>
+              {areaMin && areaMax ? `${areaMin} - ${areaMax}` : areaMin ? `${areaMin}+` : `up to ${areaMax}`}
+            </Text>
+          )}
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {areaOptions.map((area) => (
             <TouchableOpacity
@@ -417,7 +583,7 @@ export default function SearchEventForm({
                   (areaMin === area || areaMax === area) && styles.filterTextActive,
                 ]}
               >
-                {area}m²+
+                {area}
               </Text>
             </TouchableOpacity>
           ))}
@@ -426,6 +592,19 @@ export default function SearchEventForm({
 
       {/* Price Range */}
       <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <DollarSign size={16} color="#0F3460" />
+          <Text style={styles.sectionTitle}>Price (€)</Text>
+          {(priceMin || priceMax) && (
+            <Text style={styles.rangeIndicator}>
+              {priceMin && priceMax 
+                ? `€${(priceMin / 1000).toFixed(0)}k - €${(priceMax / 1000).toFixed(0)}k` 
+                : priceMin 
+                  ? `€${(priceMin / 1000).toFixed(0)}k+` 
+                  : `up to €${(priceMax! / 1000).toFixed(0)}k`}
+            </Text>
+          )}
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {priceOptions.map((price) => (
             <TouchableOpacity
@@ -455,38 +634,128 @@ export default function SearchEventForm({
                   (priceMin === price || priceMax === price) && styles.filterTextActive,
                 ]}
               >
-                €{(price / 1000).toFixed(0)}k+
+                {price / 1000}k
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      {/* Submit Button */}
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <SearchIcon size={20} color="#fff" style={styles.submitButtonIcon} />
-        <Text style={styles.submitButtonText}>Search</Text>
-      </TouchableOpacity>
-    </View>
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        {activeFilterCount > 0 && (
+          <TouchableOpacity 
+            style={styles.clearButton} 
+            onPress={handleClearFilters}
+          >
+            <ClearIcon size={18} color="#0F3460" />
+            <Text style={styles.clearButtonText}>Clear All</Text>
+          </TouchableOpacity>
+        )}
+        
+        <TouchableOpacity 
+          style={[styles.submitButton, activeFilterCount === 0 && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+        >
+          <SearchIcon size={20} color="#fff" style={styles.submitButtonIcon} />
+          <Text style={styles.submitButtonText}>
+            Search {activeFilterCount > 0 ? `(${activeFilterCount} filters)` : ''}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Bottom spacing */}
+      <View style={styles.bottomSpacing} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  headerTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 22,
+    color: '#0F3460',
+  },
+  filterCountBadge: {
+    backgroundColor: '#0F3460',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterCountText: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 12,
+    color: '#FFF',
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 6,
+  },
+  sectionTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: '#0F3460',
+    flex: 1,
+  },
+  rangeIndicator: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
+    color: '#666',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F7FA',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  textInput: {
+    flex: 1,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: '#333',
+    paddingVertical: 12,
+  },
+  inputClearButton: {
+    padding: 4,
   },
   filterPill: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingVertical: 10,
     backgroundColor: '#F5F7FA',
     borderRadius: 20,
     marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   filterPillActive: {
     backgroundColor: '#0F3460',
+    borderColor: '#0F3460',
   },
   filterText: {
     fontFamily: 'Poppins-Medium',
@@ -496,21 +765,50 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#FFF',
   },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F7FA',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 6,
+  },
+  clearButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: '#0F3460',
+  },
   submitButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0F3460',
     borderRadius: 12,
     paddingVertical: 14,
-    marginTop: 8,
+    gap: 8,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonIcon: {
-    marginRight: 8,
+    marginRight: 0,
   },
   submitButtonText: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
     color: '#fff',
+  },
+  bottomSpacing: {
+    height: 40,
   },
 });

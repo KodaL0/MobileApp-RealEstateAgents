@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import type { FeedProperty, PublicProfileData, PublicProfileResponse } from '@/app/features/types';
 import { normalizePropertyData, normalizeProjectData } from '@/app/features/types';
+import type { UnifiedListingsResponse, ListingQueryParams } from '@/types/listings';
 
 /**
  * Mobile API client for PropertPro backend.
@@ -302,27 +303,11 @@ export const api = {
 
     /**
      * Buy endpoint with pagination metadata
+     * Returns unified listings (properties + projects) from /api/listings/buy/
      */
-    buy: (params?: Record<string, any>) =>
-      apiGet<{ count: number; next: string | null; previous: string | null; results: any[] }>(
-        'properties/buy',
-        { params }
-      ).then(res => {
-        const d = res.data;
-        return {
-          results: Array.isArray(d.results) ? d.results : Array.isArray(d) ? d : [],
-          count: d.count || (Array.isArray(d) ? d.length : 0),
-          next: d.next,
-          previous: d.previous,
-        };
-      }),
-
-    /**
-     * Rent endpoint with pagination metadata
-     */
-    rent: (params?: Record<string, any>) =>
-      apiGet<{ count: number; next: string | null; previous: string | null; results: any[] }>(
-        'properties/rent',
+    buy: (params?: ListingQueryParams) =>
+      apiGet<UnifiedListingsResponse>(
+        'listings/buy',
         { params }
       ).then(res => {
         const d = res.data;
@@ -331,6 +316,26 @@ export const api = {
           count: d.count || 0,
           next: d.next,
           previous: d.previous,
+          search_event_id: d.search_event_id,
+        };
+      }),
+
+    /**
+     * Rent endpoint with pagination metadata
+     * Returns unified listings (properties + projects) from /api/listings/rent/
+     */
+    rent: (params?: ListingQueryParams) =>
+      apiGet<UnifiedListingsResponse>(
+        'listings/rent',
+        { params }
+      ).then(res => {
+        const d = res.data;
+        return {
+          results: Array.isArray(d.results) ? d.results : [],
+          count: d.count || 0,
+          next: d.next,
+          previous: d.previous,
+          search_event_id: d.search_event_id,
         };
       }),
 
