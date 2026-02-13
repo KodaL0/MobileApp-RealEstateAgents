@@ -118,12 +118,26 @@ interface UserProviderProps {
   children: ReactNode;
 }
 
+// Guard: prevent double fetch on mount (React Strict Mode / remounts)
+let cachedUser: User | null = null;
+let initialFetchDone = false;
+
 export const UserProvider = ({ children }: UserProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const fetchUser = async (forceCheck: boolean = false) => {
+    // Skip if already fetched this session (avoids double fetch from Strict Mode)
+    if (!forceCheck && initialFetchDone) {
+      if (cachedUser) {
+        setUser(cachedUser);
+        setIsAuthenticated(true);
+      }
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Check for authentication
@@ -149,17 +163,23 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
       if (!userData || !userData.id) {
         console.warn('UserContext: No valid user data found');
+        cachedUser = null;
         setUser(null);
         setIsAuthenticated(false);
         return;
       }
 
+      cachedUser = userData;
+      initialFetchDone = true;
       console.log('UserContext: Setting user and isAuthenticated to true');
       setUser(userData);
       setIsAuthenticated(true);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      cachedUser = null;
+      initialFetchDone = true; // Don't retry on next mount
       // Clear auth on 401
-      if (e?.response?.status === 401) {
+      const err = e as { response?: { status?: number } };
+      if (err?.response?.status === 401) {
         if (Platform.OS !== 'web') {
           await AsyncStorage.removeItem('access_token');
           await AsyncStorage.removeItem('mobile_access_token');
@@ -177,6 +197,8 @@ export const UserProvider = ({ children }: UserProviderProps) => {
 
   const login = async (accessToken: string, refreshToken: string, userData: User) => {
     try {
+      cachedUser = userData;
+      initialFetchDone = true;
       // Store tokens
       await AsyncStorage.setItem('access_token', accessToken);
       await setRefreshToken(refreshToken);
@@ -192,6 +214,8 @@ export const UserProvider = ({ children }: UserProviderProps) => {
   };
 
   const logout = async () => {
+    cachedUser = null;
+    initialFetchDone = false; // Allow fresh fetch after login
     try {
       // Call backend logout endpoint
       await apiLogout();

@@ -23,13 +23,15 @@ export default function SplashScreen({
   
   const [initializationComplete, setInitializationComplete] = useState(false);
   const [minimumTimeElapsed, setMinimumTimeElapsed] = useState(false);
+  const initStartedRef = useRef(false);
 
-  // Run initialization task
+  // Run initialization task (only once - guard prevents re-run when task reference changes)
   useEffect(() => {
-    if (!initializationTask) {
-      setInitializationComplete(true);
+    if (!initializationTask || initStartedRef.current) {
+      if (!initializationTask) setInitializationComplete(true);
       return;
     }
+    initStartedRef.current = true;
 
     const runInitialization = async () => {
       try {
