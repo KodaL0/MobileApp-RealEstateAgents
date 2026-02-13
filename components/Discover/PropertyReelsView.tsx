@@ -11,7 +11,14 @@ import {
 	UserCircle,
 } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ImageStyle, LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
+import type {
+	ImageStyle,
+	LayoutChangeEvent,
+	NativeScrollEvent,
+	NativeSyntheticEvent,
+	StyleProp,
+	ViewStyle,
+} from "react-native";
 import {
 	ActivityIndicator,
 	Alert,
@@ -1109,17 +1116,51 @@ export default function PropertyReelsView({
 		preloadImages();
 	}, [properties]);
 
+	const horizontalScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 	const handleHorizontalScrollBegin = useCallback(() => {
+		// Clear any pending re-enable timeout
+		if (horizontalScrollTimeoutRef.current) {
+			clearTimeout(horizontalScrollTimeoutRef.current);
+			horizontalScrollTimeoutRef.current = null;
+		}
 		setFeedScrollEnabled(false);
 	}, []);
 
 	const handleHorizontalScrollEnd = useCallback(() => {
-		setFeedScrollEnabled(true);
+		// Clear any pending timeout first
+		if (horizontalScrollTimeoutRef.current) {
+			clearTimeout(horizontalScrollTimeoutRef.current);
+		}
+		// Re-enable with a tiny delay to let momentum settle
+		horizontalScrollTimeoutRef.current = setTimeout(() => {
+			setFeedScrollEnabled(true);
+			horizontalScrollTimeoutRef.current = null;
+		}, 50);
 	}, []);
+
+	// Safety: if horizontal scroll lock gets stuck, re-enable after 2 seconds
+	useEffect(() => {
+		if (!feedScrollEnabled) {
+			const safetyTimer = setTimeout(() => {
+				setFeedScrollEnabled(true);
+			}, 2000);
+			return () => clearTimeout(safetyTimer);
+		}
+	}, [feedScrollEnabled]);
+
+	// CSS scroll-snap-align for web items (RN's ViewStyle doesn't know about it, so cast)
+	const webSnapStyle = useMemo(
+		() =>
+			Platform.OS === "web"
+				? ({ scrollSnapAlign: "start" } as ViewStyle)
+				: undefined,
+		[],
+	);
 
 	const renderItem = useCallback(
 		({ item }: { item: FeedItem; index: number }) => (
-			<View style={[styles.reelItem, { height: containerHeight }]}>
+			<View style={[styles.reelItem, { height: containerHeight }, webSnapStyle]}>
 				{isProperty(item) ? (
 					<PropertyReelCard
 						property={item}
@@ -1141,6 +1182,7 @@ export default function PropertyReelsView({
 		),
 		[
 			containerHeight,
+			webSnapStyle,
 			handleFavoriteMetaUpdate,
 			handleHorizontalScrollBegin,
 			handleHorizontalScrollEnd,
@@ -1160,11 +1202,46 @@ export default function PropertyReelsView({
 		checkAndPrefetchNextPageRef.current = checkAndPrefetchNextPage;
 	}, [checkAndPrefetchNextPage]);
 
+	// --- Web: use onScroll to track current index (viewability is broken with pagingEnabled on RNW) ---
+	// --- Native: use onViewableItemsChanged which works correctly ---
+	const webScrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const handleScroll = useCallback(
+		(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+			if (Platform.OS !== "web" || containerHeight <= 0) return;
+
+			const offsetY = e.nativeEvent.contentOffset.y;
+			const index = Math.round(offsetY / containerHeight);
+
+			// Debounce: only process after scroll settles
+			if (webScrollDebounceRef.current) {
+				clearTimeout(webScrollDebounceRef.current);
+			}
+			webScrollDebounceRef.current = setTimeout(() => {
+				webScrollDebounceRef.current = null;
+				if (!isAppendingRef.current) {
+					checkAndPrefetchNextPageRef.current(index);
+				}
+			}, 300);
+		},
+		[containerHeight],
+	);
+
+	// Cleanup web scroll debounce on unmount
+	useEffect(
+		() => () => {
+			if (webScrollDebounceRef.current) {
+				clearTimeout(webScrollDebounceRef.current);
+			}
+		},
+		[],
+	);
+
 	// Debounce viewability to prevent rapid processing during scroll (causes reel cycling on web)
 	const viewabilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingViewableRef = useRef<{ index: number } | null>(null);
 
-	// Define stable viewability callback (doesn't change between renders)
+	// Define stable viewability callback – native only (broken on web with pagingEnabled)
 	const handleViewableItemsChanged = useCallback(
 		({
 			viewableItems,
@@ -1216,6 +1293,48 @@ export default function PropertyReelsView({
 		minimumViewTime: 500,
 		waitForInteraction: false,
 	}).current;
+
+	// CellRendererComponent fix for web: correct the y offset that pagingEnabled breaks (RNW issue #1798).
+	// eslint-disable-next-line react/no-unstable-nested-components
+	const WebCellRenderer = useMemo(() => {
+		// eslint-disable-next-line react/display-name
+		const Renderer = (props: Record<string, unknown>) => {
+			const { onLayout, index: cellIndex, children, style, ...rest } = props as {
+				onLayout?: (e: LayoutChangeEvent) => void;
+				index: number;
+				children: React.ReactNode;
+				style?: StyleProp<ViewStyle>;
+				[key: string]: unknown;
+			};
+
+			const fixedOnLayout = useCallback(
+				(e: LayoutChangeEvent) => {
+					if (onLayout) {
+						const corrected = {
+							...e,
+							nativeEvent: {
+								...e.nativeEvent,
+								layout: {
+									...e.nativeEvent.layout,
+									y: cellIndex * containerHeight,
+								},
+							},
+						};
+						onLayout(corrected as LayoutChangeEvent);
+					}
+				},
+				[onLayout, cellIndex],
+			);
+
+			return (
+				<View {...rest} style={style} onLayout={fixedOnLayout}>
+					{children}
+				</View>
+			);
+		};
+		Renderer.displayName = "WebCellRenderer";
+		return Renderer;
+	}, [containerHeight]);
 
 	const getItemLayout = useCallback(
 		(_: unknown, index: number) => ({
@@ -1273,7 +1392,7 @@ export default function PropertyReelsView({
 				renderItem={renderItem}
 				keyExtractor={keyExtractor}
 				getItemLayout={getItemLayout}
-				pagingEnabled
+				pagingEnabled={Platform.OS !== "web"}
 				snapToInterval={containerHeight}
 				snapToAlignment="start"
 				decelerationRate="fast"
@@ -1281,6 +1400,7 @@ export default function PropertyReelsView({
 				scrollEnabled={feedScrollEnabled}
 				onEndReached={loadMore}
 				onEndReachedThreshold={0.5}
+				onScroll={Platform.OS === "web" ? handleScroll : undefined}
 				onViewableItemsChanged={
 					Platform.OS === "web"
 						? undefined
@@ -1289,6 +1409,7 @@ export default function PropertyReelsView({
 				viewabilityConfig={
 					Platform.OS === "web" ? undefined : viewabilityConfig
 				}
+				{...(Platform.OS === "web" ? { CellRendererComponent: WebCellRenderer as never } : {})}
 				scrollEventThrottle={16}
 				overScrollMode="never"
 				bounces={false}
@@ -1306,13 +1427,18 @@ export default function PropertyReelsView({
 					fetchFeed(1, false, false);
 				}}
 				removeClippedSubviews={Platform.OS === "android"}
-				disableVirtualization={Platform.OS === "web"}
-				maxToRenderPerBatch={2}
-				windowSize={5}
-				initialNumToRender={2}
+				maxToRenderPerBatch={3}
+				windowSize={Platform.OS === "web" ? 11 : 5}
+				initialNumToRender={3}
 				updateCellsBatchingPeriod={100}
 				disableIntervalMomentum={true}
 				nestedScrollEnabled={true}
+				{...(Platform.OS === "web" ? {
+					style: {
+						// CSS scroll-snap replaces pagingEnabled on web (which adds a broken wrapper div)
+						scrollSnapType: "y mandatory",
+					} as ViewStyle,
+				} : {})}
 			/>
 		</View>
 	);
