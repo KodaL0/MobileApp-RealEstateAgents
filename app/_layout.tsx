@@ -8,7 +8,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { SplashScreen as ExpoSplash, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Image,
@@ -56,6 +56,8 @@ function InnerApp() {
 	const [splashFinished, setSplashFinished] = useState(false);
 	const [isRegisterMode, setIsRegisterMode] = useState(false);
 	const [authCheckComplete, setAuthCheckComplete] = useState(false);
+	const authCheckCompleteRef = useRef(false);
+	authCheckCompleteRef.current = authCheckComplete;
 
 	// Framework ready hook
 	useFrameworkReady();
@@ -67,6 +69,7 @@ function InnerApp() {
 	useEffect(() => {
 		if (!isLoading) {
 			setAuthCheckComplete(true);
+			authCheckCompleteRef.current = true;
 			console.log("_layout.tsx: Auth check complete -", {
 				user: user?.email || "null",
 				isAuthenticated,
@@ -82,9 +85,9 @@ function InnerApp() {
 		}
 	}, [fontsLoaded, showCustomSplash, splashFinished]);
 
-	// Memoize init task (must be before any early returns - hooks rules)
+	// Init task uses ref so it always reads current auth state (avoids stale closure)
 	const initializationTask = useCallback(async () => {
-		while (!authCheckComplete) {
+		while (!authCheckCompleteRef.current) {
 			await new Promise((resolve) => setTimeout(resolve, 100));
 		}
 		if (isAuthenticated) {
@@ -93,7 +96,7 @@ function InnerApp() {
 		} else {
 			console.log("⏭️ Skipping initialization (not authenticated)");
 		}
-	}, [authCheckComplete, isAuthenticated]);
+	}, [isAuthenticated]);
 
 	// 1) fonts
 	if (!fontsLoaded && !fontError) return null;
