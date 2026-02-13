@@ -36,7 +36,7 @@ const IS_WEB = Platform.OS === "web";
 // Web gets a tighter limit because every <Image> decodes a full bitmap in
 // browser memory and mobile browsers crash at ~400-600 MB.
 const INITIAL_IMAGE_LIMIT = IS_WEB ? 5 : 10;
-const EXPAND_THRESHOLD = 5;
+const EXPAND_THRESHOLD = 3;
 
 // ---------- OptimizedImage (force-cache + fadeDuration 0 for perf) ----------
 const OptimizedImage = React.memo(
