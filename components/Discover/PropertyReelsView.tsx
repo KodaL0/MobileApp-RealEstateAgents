@@ -760,8 +760,14 @@ function isProperty(item: FeedItem): item is FeedProperty {
 	);
 }
 
+/** Build URL slug for a feed item: property-{id} or project-{id} */
+function getItemSlug(item: FeedItem): string {
+	const id = item?.id?.toString() ?? "";
+	return isProperty(item) ? `property-${id}` : `project-${id}`;
+}
+
 // ---------- Feed Container Component ----------
-export default function PropertyReelsView() {
+export default function PropertyReelsView({ initialSlug }: { initialSlug?: string } = {}) {
 	const [properties, setProperties] = useState<FeedItem[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -772,6 +778,7 @@ export default function PropertyReelsView() {
 	const [_currentIndex, setCurrentIndex] = useState(0);
 	const { isAuthenticated } = useUser();
 	const flatListRef = useRef<FlatList>(null);
+	const lastUrlSlugRef = useRef<string | null>(null);
 	const hasMountedRef = useRef(false);
 	const isLoadingNextPageRef = useRef(false);
 	const lastViewableCheckRef = useRef(0);
@@ -888,6 +895,13 @@ export default function PropertyReelsView() {
 		[isAuthenticated],
 	);
 
+	// [DEBUG] Log feed URL state on web mount
+	useEffect(() => {
+		if (__DEV__ && Platform.OS === "web") {
+			console.log("[feed:url] mount", initialSlug ? { initialSlug } : { initialSlug: "(none)" });
+		}
+	}, [initialSlug]);
+
 	// Initialize feed - try cache first, then fetch if needed
 	useEffect(() => {
 		if (hasMountedRef.current) return;
@@ -914,6 +928,27 @@ export default function PropertyReelsView() {
 			});
 		}
 	}, [isAuthenticated, fetchFeed]);
+
+	// Scroll to item when landing on /feed/slug (e.g. refresh or shared link)
+	useEffect(() => {
+		if (!initialSlug || properties.length === 0 || !flatListRef.current) return;
+		// Parse slug: property-123 or project-456
+		const match = initialSlug.match(/^(property|project)-(.+)$/);
+		if (!match) return;
+		const [, type, idStr] = match;
+		const index = properties.findIndex((item) => {
+			const itemType = isProperty(item) ? "property" : "project";
+			const itemId = item.id?.toString();
+			return itemType === type && itemId === idStr;
+		});
+		if (index >= 0) {
+			lastUrlSlugRef.current = initialSlug;
+			flatListRef.current.scrollToOffset({ offset: index * SCREEN_HEIGHT, animated: false });
+			if (__DEV__ && Platform.OS === "web") {
+				console.log("[feed:url] deep link →", { initialSlug, index, totalItems: properties.length });
+			}
+		}
+	}, [initialSlug, properties]);
 
 	const loadMore = useCallback(() => {
 		// Prevent multiple simultaneous loads
@@ -1044,24 +1079,43 @@ export default function PropertyReelsView() {
 	}, [checkAndPrefetchNextPage]);
 
 	// Define stable viewability callback (doesn't change between renders)
-	const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
-		// Only process if not currently appending items
-		if (
-			isAppendingRef.current ||
-			!viewableItems ||
-			viewableItems.length === 0
-		) {
-			return;
-		}
+	const handleViewableItemsChanged = useCallback(
+		({ viewableItems }: { viewableItems: Array<{ item: FeedItem; index: number }> }) => {
+			// Only process if not currently appending items
+			if (
+				isAppendingRef.current ||
+				!viewableItems ||
+				viewableItems.length === 0
+			) {
+				return;
+			}
 
-		const currentItem = viewableItems[0];
-		if (
-			currentItem?.index !== undefined &&
-			typeof currentItem.index === "number"
-		) {
-			checkAndPrefetchNextPageRef.current(currentItem.index);
-		}
-	}).current;
+			const currentViewable = viewableItems[0];
+			if (
+				currentViewable?.index !== undefined &&
+				typeof currentViewable.index === "number"
+			) {
+				checkAndPrefetchNextPageRef.current(currentViewable.index);
+			}
+
+			// Update URL with feed/slug on web when scrolling to a new item
+			// Use history.replaceState to avoid remounting (router.replace would navigate)
+			if (Platform.OS === "web" && typeof window !== "undefined" && currentViewable?.item) {
+				const slug = getItemSlug(currentViewable.item);
+				if (slug && slug !== lastUrlSlugRef.current) {
+					lastUrlSlugRef.current = slug;
+					const pathname = window.location.pathname;
+					const base = pathname.split("/feed")[0] || "";
+					const newPath = `${base}/feed/${slug}`;
+					window.history.replaceState(null, "", newPath);
+					if (__DEV__) {
+						console.log("[feed:url] scroll →", { slug, index: currentViewable.index, path: newPath });
+					}
+				}
+			}
+		},
+		[],
+	);
 
 	const viewabilityConfig = useRef({
 		itemVisiblePercentThreshold: 50,

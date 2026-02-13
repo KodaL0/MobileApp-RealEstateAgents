@@ -1,12 +1,15 @@
 import { View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import PropertyReelsView from '../../components/Discover/PropertyReelsView'
+import { useLocalSearchParams } from 'expo-router';
+import PropertyReelsView from '../../../components/Discover/PropertyReelsView';
 
-export default function FeedScreen() {
+export default function FeedSlugScreen() {
+  const { slug } = useLocalSearchParams<{ slug: string }>();
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" backgroundColor="#000" translucent />
-      <PropertyReelsView />
+      <PropertyReelsView initialSlug={slug ?? undefined} />
     </View>
   );
 }

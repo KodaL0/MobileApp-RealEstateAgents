@@ -1,7 +1,7 @@
 // File: app/(tabs)/_layout.tsx
-import { Tabs, type Href, usePathname, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Dimensions, Platform, StyleSheet } from 'react-native';
+import { Tabs, type Href, usePathname, useRouter } from 'expo-router';
 import { Home, Search, MessageSquare, User } from 'lucide-react-native';
 import { getLastChatRoute } from '../features/chat/navigationState';
 
