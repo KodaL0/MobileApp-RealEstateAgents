@@ -415,6 +415,7 @@ export function BaseReelCard({
 }
 
 const ICON_CIRCLE_SIZE = 40;
+const SIDE_ACTIONS_WIDTH = 56; // Icon column width to avoid image overlap
 
 const styles = StyleSheet.create({
   safeContainer: {
@@ -447,7 +448,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   imageFrame: {
-    width: SCREEN_WIDTH,
+    width: SCREEN_WIDTH - SIDE_ACTIONS_WIDTH * 2,
     height: IMAGE_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',

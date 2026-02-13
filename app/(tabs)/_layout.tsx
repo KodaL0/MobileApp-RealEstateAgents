@@ -40,6 +40,7 @@ export default function TabLayout() {
         tabBarStyle: tabBarStyle,
         tabBarLabelStyle: styles.label,
         tabBarShowLabel: !IS_SMALL_SCREEN,
+        tabBarScrollEnabled: IS_SMALL_SCREEN,
       }}
     >
       <Tabs.Screen
