@@ -308,8 +308,12 @@ function ProjectReelCard({
 		if (onViewProject) {
 			onViewProject();
 		} else if (project?.id) {
-			// Use URL from API if available, otherwise use ID-based route
-			const projectUrl = project.url || `/project/${project.id}`;
+			// From feed: use /project/[id] for click tracking (Feed API v2)
+			// Otherwise use canonical URL if available
+			const projectUrl =
+				source === "feed"
+					? `/project/${project.id}`
+					: project.url || `/project/${project.id}`;
 			const queryParams = source ? `?source=${source}` : "";
 			router.push(`${projectUrl}${queryParams}` as never);
 		}

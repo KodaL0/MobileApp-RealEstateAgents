@@ -177,18 +177,39 @@ function PropertyReelCard({
 		[],
 	);
 
-	const bedroomsValue = useMemo(
-		() => (property ? parseNumericValue(property.bedrooms) : null),
-		[property, parseNumericValue],
-	);
-	const bathroomsValue = useMemo(
-		() => (property ? parseNumericValue(property.bathrooms) : null),
-		[property, parseNumericValue],
-	);
-	const areaValue = useMemo(
-		() => (property ? parseNumericValue(property.area) : null),
-		[property, parseNumericValue],
-	);
+	// Multi-unit: use unit_*_min/max when has_units (Feed API v2)
+	const prop = property as Record<string, unknown>;
+	const hasUnits = Boolean(prop?.has_units);
+	const bedroomsValue = useMemo(() => {
+		if (!property) return null;
+		if (hasUnits) {
+			const min = parseNumericValue(prop.unit_bedrooms_min);
+			const max = parseNumericValue(prop.unit_bedrooms_max);
+			if (min != null && max != null && min !== max) return `${min}–${max}`;
+			return min ?? max ?? parseNumericValue(prop.bedrooms);
+		}
+		return parseNumericValue(property.bedrooms);
+	}, [property, hasUnits, prop?.unit_bedrooms_min, prop?.unit_bedrooms_max, prop?.bedrooms, parseNumericValue]);
+	const bathroomsValue = useMemo(() => {
+		if (!property) return null;
+		if (hasUnits) {
+			const min = parseNumericValue(prop.unit_bathrooms_min);
+			const max = parseNumericValue(prop.unit_bathrooms_max);
+			if (min != null && max != null && min !== max) return `${min}–${max}`;
+			return min ?? max ?? parseNumericValue(prop.bathrooms);
+		}
+		return parseNumericValue(property.bathrooms);
+	}, [property, hasUnits, prop?.unit_bathrooms_min, prop?.unit_bathrooms_max, prop?.bathrooms, parseNumericValue]);
+	const areaValue = useMemo(() => {
+		if (!property) return null;
+		if (hasUnits) {
+			const min = parseNumericValue(prop.unit_area_min);
+			const max = parseNumericValue(prop.unit_area_max);
+			if (min != null && max != null && min !== max) return `${min}–${max}`;
+			return min ?? max ?? parseNumericValue(prop.area);
+		}
+		return parseNumericValue(property.area);
+	}, [property, hasUnits, prop?.unit_area_min, prop?.unit_area_max, prop?.area, parseNumericValue]);
 
 	const formatBathrooms = useCallback((value: number | null) => {
 		if (value === null) return null;
@@ -374,7 +395,25 @@ function PropertyReelCard({
 			</TouchableOpacity>
 
 			<View style={styles.priceRow}>
-				<Text style={styles.price}>{formatPrice(property.price)}</Text>
+				<Text style={styles.price}>
+					{hasUnits &&
+					(prop.unit_price_min != null || prop.unit_price_max != null)
+						? (() => {
+								const min = Number(prop.unit_price_min);
+								const max = Number(prop.unit_price_max);
+								if (
+									!Number.isNaN(min) &&
+									!Number.isNaN(max) &&
+									min !== max
+								) {
+									return `From ${formatPrice(min)}`;
+								}
+								const single =
+									prop.unit_price_min ?? prop.unit_price_max ?? property.price;
+								return formatPrice(Number(single) || 0);
+						  })()
+						: formatPrice(property.price ?? 0)}
+				</Text>
 				<Text style={styles.priceLabel}>
 					{property.property_status === "for_sale"
 						? "Purchase Price"
@@ -396,11 +435,15 @@ function PropertyReelCard({
 						<Text style={styles.statText}>{bedroomsValue.toString()}</Text>
 					</View>
 				)}
-				{formatBathrooms(bathroomsValue) && (
+				{(typeof bathroomsValue === "string"
+					? bathroomsValue
+					: formatBathrooms(bathroomsValue as number | null)) && (
 					<View style={styles.statPill}>
 						<Bath size={14} color="#fff" />
 						<Text style={styles.statText}>
-							{formatBathrooms(bathroomsValue)}
+							{typeof bathroomsValue === "string"
+								? bathroomsValue
+								: formatBathrooms(bathroomsValue as number | null)}
 						</Text>
 					</View>
 				)}
@@ -408,7 +451,9 @@ function PropertyReelCard({
 					<View style={styles.statPill}>
 						<Square size={14} color="#fff" />
 						<Text style={styles.statText}>
-							{areaValue.toLocaleString()} m²
+							{typeof areaValue === "number"
+								? `${areaValue.toLocaleString()} m²`
+								: `${areaValue} m²`}
 						</Text>
 					</View>
 				)}

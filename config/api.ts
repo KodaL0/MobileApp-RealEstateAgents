@@ -423,8 +423,8 @@ export const api = {
      */
     toggleFavorite: (id: number | string, type: 'property' | 'project') => {
       if (type === 'project') {
-        // Backend endpoint accepts project_id in body
-        return apiPost(`properties/0/favourite`, { project_id: id }).then(res => res.data);
+        // Backend: POST /api/properties/toggle-favourite/ with { project_id }
+        return apiPost('properties/toggle-favourite', { project_id: id }).then(res => res.data);
       } else {
         // Property uses URL param
         return apiPost(`properties/${id}/favourite`).then(res => res.data);
@@ -444,7 +444,7 @@ export const api = {
      * @deprecated Use api.listings.toggleFavorite(id, 'project') instead
      */
     toggleFavorite: (pid: number | string) =>
-      apiPost(`properties/0/favourite`, { project_id: pid }).then(res => res.data),
+      apiPost('properties/toggle-favourite', { project_id: pid }).then(res => res.data),
   },
 
   // Feed endpoints (personalized property and project feed)
