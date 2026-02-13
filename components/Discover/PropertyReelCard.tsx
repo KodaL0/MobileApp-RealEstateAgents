@@ -428,7 +428,6 @@ function PropertyReelCard({
 				onShare={handleShare}
 				onAgentPress={handleAgentProfilePress}
 				onView={handleViewPress}
-				onNotInterested={onNotInterested}
 				isLiked={isLiked}
 				favoriteCount={favoriteCount}
 				isChatLoading={isChatLoading}

@@ -20,7 +20,6 @@ function ProjectReelCard({
 	onHorizontalScrollBegin,
 	onHorizontalScrollEnd,
 	containerHeight,
-	onNotInterested,
 }: {
 	project: FeedProject;
 	onViewProject?: () => void;
@@ -32,7 +31,6 @@ function ProjectReelCard({
 	onHorizontalScrollBegin?: () => void;
 	onHorizontalScrollEnd?: () => void;
 	containerHeight?: number;
-	onNotInterested?: () => void;
 }) {
 	const router = useRouter();
 	const getFavoriteCountValue = useCallback((value: unknown): number | null => {
@@ -533,7 +531,6 @@ function ProjectReelCard({
 				onShare={handleShare}
 				onAgentPress={handleAgentProfilePress}
 				onView={handleViewPress}
-				onNotInterested={onNotInterested}
 				isLiked={isLiked}
 				favoriteCount={favoriteCount}
 				isChatLoading={isChatLoading}

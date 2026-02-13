@@ -178,25 +178,6 @@ export default function PropertyReelsView({
 		[],
 	);
 
-	// ── Not interested ──────────────────────────────────────────────────
-	const handleNotInterested = useCallback(
-		(itemId: number | string, itemType: "property" | "project") => {
-			// Optimistically remove from feed
-			setProperties((prev) => prev.filter((item) => item.id !== itemId));
-
-			// Fire API + analytics (non-blocking, must never throw)
-			try {
-				api.feed.notInterested(itemId, itemType).catch((err) => {
-					if (__DEV__) console.warn("Failed to send not-interested signal:", err);
-				});
-				analytics.trackFeedNotInterested({ itemId, itemType });
-			} catch {
-				// Swallow – network/analytics failures must not crash the feed
-			}
-		},
-		[],
-	);
-
 	// ── Favourite meta propagation ──────────────────────────────────────
 	const handleFavoriteMetaUpdate = useCallback(
 		(
@@ -547,7 +528,6 @@ export default function PropertyReelsView({
 						onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
 						onHorizontalScrollBegin={handleHorizontalScrollBegin}
 						onHorizontalScrollEnd={handleHorizontalScrollEnd}
-						onNotInterested={() => handleNotInterested(item.id, "property")}
 					/>
 				) : (
 					<ProjectReelCard
@@ -557,7 +537,6 @@ export default function PropertyReelsView({
 						onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
 						onHorizontalScrollBegin={handleHorizontalScrollBegin}
 						onHorizontalScrollEnd={handleHorizontalScrollEnd}
-						onNotInterested={() => handleNotInterested(item.id, "project")}
 					/>
 				)}
 			</View>
@@ -568,7 +547,6 @@ export default function PropertyReelsView({
 			handleFavoriteMetaUpdate,
 			handleHorizontalScrollBegin,
 			handleHorizontalScrollEnd,
-			handleNotInterested,
 		],
 	);
 

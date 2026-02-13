@@ -96,33 +96,6 @@ const OptimizedImage = React.memo(
 );
 OptimizedImage.displayName = "OptimizedImage";
 
-// ---------- Carousel dots ----------
-const CarouselDots = React.memo(
-	({
-		count,
-		currentIndex,
-		style,
-	}: {
-		count: number;
-		currentIndex: number;
-		style?: ViewStyle;
-	}) => {
-		if (count <= 1) return null;
-
-		return (
-			<View style={[styles.carouselDots, style]}>
-				{Array.from({ length: count }, (_, i) => i).map((dotIndex) => (
-					<View
-						key={`dot-${dotIndex}`}
-						style={[styles.dot, dotIndex === currentIndex && styles.dotActive]}
-					/>
-				))}
-			</View>
-		);
-	},
-);
-CarouselDots.displayName = "CarouselDots";
-
 // ---------- Props ----------
 export interface BaseReelCardProps {
 	// Images
@@ -174,7 +147,6 @@ export function BaseReelCard({
 	// Use measured height when available; fall back to static screen height
 	const h = containerHeightProp || SCREEN_HEIGHT;
 
-	const [currentIndex, setCurrentIndex] = useState(0);
 	const [showHeartAnimation, setShowHeartAnimation] = useState(false);
 	const scrollViewRef = useRef<ScrollView>(null);
 	const heartScale = useRef(new Animated.Value(0)).current;
@@ -241,7 +213,6 @@ export function BaseReelCard({
 
 	useEffect(() => {
 		setShowHeartAnimation(false);
-		setCurrentIndex(0);
 		if (scrollViewRef.current) {
 			scrollViewRef.current.scrollTo({ x: 0, animated: false });
 		}
@@ -252,7 +223,6 @@ export function BaseReelCard({
 			const index = Math.round(
 				event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
 			);
-			setCurrentIndex(index);
 			onImageChange?.(index);
 		},
 		[onImageChange],
@@ -526,24 +496,6 @@ const styles = StyleSheet.create({
 	imageErrorText: {
 		color: "#6b7280",
 		fontSize: 12,
-	},
-
-	// Carousel dots (position comes from dynamic style prop)
-	carouselDots: {
-		flexDirection: "row",
-		justifyContent: "center",
-		alignItems: "center",
-		gap: 6,
-	},
-	dot: {
-		width: 6,
-		height: 6,
-		borderRadius: 3,
-		backgroundColor: "rgba(255, 255, 255, 0.4)",
-	},
-	dotActive: {
-		width: 20,
-		backgroundColor: "rgba(255, 255, 255, 0.9)",
 	},
 
 	// Heart animation
