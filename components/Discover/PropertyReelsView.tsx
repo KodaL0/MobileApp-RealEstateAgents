@@ -1281,8 +1281,14 @@ export default function PropertyReelsView({
 				scrollEnabled={feedScrollEnabled}
 				onEndReached={loadMore}
 				onEndReachedThreshold={0.5}
-				onViewableItemsChanged={handleViewableItemsChanged}
-				viewabilityConfig={viewabilityConfig}
+				onViewableItemsChanged={
+					Platform.OS === "web"
+						? undefined
+						: handleViewableItemsChanged
+				}
+				viewabilityConfig={
+					Platform.OS === "web" ? undefined : viewabilityConfig
+				}
 				scrollEventThrottle={16}
 				overScrollMode="never"
 				bounces={false}
@@ -1300,6 +1306,7 @@ export default function PropertyReelsView({
 					fetchFeed(1, false, false);
 				}}
 				removeClippedSubviews={Platform.OS === "android"}
+				disableVirtualization={Platform.OS === "web"}
 				maxToRenderPerBatch={2}
 				windowSize={5}
 				initialNumToRender={2}

@@ -117,6 +117,20 @@ ProjectReelCard wraps BaseReelCard in a View with `flex: 1`. PropertyReelCard us
 
 ---
 
+## Web / Mobile Browser: Wrong Reels Without User Input
+
+**Symptom:** After scrolling, the feed starts showing different reels on its own, especially on mobile browsers.
+
+**Root cause (React Native Web):**
+- `onViewableItemsChanged` is broken when `pagingEnabled` is true (react-native-web#1798) – returns wrong viewable items.
+- FlatList virtualization/cell recycling on web can render the wrong item in recycled cells.
+
+**Fixes applied:**
+- **Disable `onViewableItemsChanged` on web** – avoid using broken viewability; rely on `onEndReached` for pagination.
+- **Disable virtualization on web** – `disableVirtualization={Platform.OS === "web"}` so all items render (no cell recycling), preventing wrong-item display.
+
+---
+
 ## Recommended Fixes
 
 1. **Use measured height** – Replace static `SCREEN_HEIGHT` with `onLayout`-measured container height for the feed. Use this for `getItemLayout`, `snapToInterval`, and item/card heights.
