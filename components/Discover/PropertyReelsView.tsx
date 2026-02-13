@@ -17,17 +17,16 @@ import {
 	Alert,
 	Animated,
 	Dimensions,
-	FlatList,
 	Image,
 	Platform,
-	ScrollView,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
-import { useAppInit } from "@/app/context/AppInitContext";
+import { FlatList, ScrollView } from "react-native-gesture-handler";
 import { useUser } from "@/app/_userbase/UserContext";
+import { useAppInit } from "@/app/context/AppInitContext";
 import { useChat } from "@/app/features/chat/context/ChatContext";
 import type { FeedItem, FeedProperty } from "@/app/features/types";
 import { api } from "@/config/api";
@@ -119,6 +118,9 @@ const PropertyReelCard = memo(function PropertyReelCard({
 	onViewProperty,
 	source,
 	onFavoriteMetaUpdate,
+	onHorizontalScrollBegin,
+	onHorizontalScrollEnd,
+	horizontalScrollRef,
 }: {
 	property: FeedProperty;
 	onViewProperty?: () => void;
@@ -127,6 +129,9 @@ const PropertyReelCard = memo(function PropertyReelCard({
 		propertyId: number | string,
 		meta: { favorites_count?: number | null; is_favourite?: boolean | null },
 	) => void;
+	onHorizontalScrollBegin?: () => void;
+	onHorizontalScrollEnd?: () => void;
+	horizontalScrollRef?: React.RefObject<unknown>;
 }) {
 	const router = useRouter();
 	const getFavoriteCountValue = useCallback((value: unknown): number | null => {
@@ -147,7 +152,9 @@ const PropertyReelCard = memo(function PropertyReelCard({
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [isChatLoading, setIsChatLoading] = useState(false);
 	const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-	const scrollViewRef = useRef<ScrollView>(null);
+	const scrollViewRef = useRef<{
+		scrollTo: (opts: { x: number; animated: boolean }) => void;
+	} | null>(null);
 	const heartScale = useRef(new Animated.Value(0)).current;
 	const heartOpacity = useRef(new Animated.Value(0)).current;
 	const lastTap = useRef<number>(0);
@@ -556,11 +563,23 @@ const PropertyReelCard = memo(function PropertyReelCard({
 			>
 				{/* IMAGE CAROUSEL – fixed 9:16-ish frame, blur + contain */}
 				<ScrollView
-					ref={scrollViewRef}
+					ref={(node) => {
+						scrollViewRef.current = node;
+						if (horizontalScrollRef) horizontalScrollRef.current = node;
+					}}
 					horizontal
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
 					onScroll={handleScroll}
+					onScrollBeginDrag={
+						images.length > 1 ? onHorizontalScrollBegin : undefined
+					}
+					onScrollEndDrag={
+						images.length > 1 ? onHorizontalScrollEnd : undefined
+					}
+					onMomentumScrollEnd={
+						images.length > 1 ? onHorizontalScrollEnd : undefined
+					}
 					scrollEventThrottle={16}
 					style={styles.imageScroll}
 					decelerationRate="fast"
@@ -804,6 +823,9 @@ export default function PropertyReelsView({
 	const isLoadingNextPageRef = useRef(false);
 	const lastViewableCheckRef = useRef(0);
 	const isAppendingRef = useRef(false);
+	const horizontalScrollRef = useRef<unknown>(null);
+	const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
+	const [viewableIndex, setViewableIndex] = useState(0);
 
 	const handleFavoriteMetaUpdate = useCallback(
 		(
@@ -1077,9 +1099,24 @@ export default function PropertyReelsView({
 		preloadImages();
 	}, [properties]);
 
+	const handleHorizontalScrollBegin = useCallback(() => {
+		setFeedScrollEnabled(false);
+	}, []);
+
+	const handleHorizontalScrollEnd = useCallback(() => {
+		setFeedScrollEnabled(true);
+	}, []);
+
 	const renderItem = useCallback(
-		({ item }: { item: FeedItem; index: number }) => {
-			// Memoize the item to prevent unnecessary re-renders
+		({ item, index }: { item: FeedItem; index: number }) => {
+			const isViewable = index === viewableIndex;
+			const directionLockProps = isViewable
+				? {
+						onHorizontalScrollBegin: handleHorizontalScrollBegin,
+						onHorizontalScrollEnd: handleHorizontalScrollEnd,
+						horizontalScrollRef,
+					}
+				: {};
 			return (
 				<View style={styles.reelItem}>
 					{isProperty(item) ? (
@@ -1087,18 +1124,25 @@ export default function PropertyReelsView({
 							property={item}
 							source="feed"
 							onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
+							{...directionLockProps}
 						/>
 					) : (
 						<ProjectReelCard
 							project={item}
 							source="feed"
 							onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
+							{...directionLockProps}
 						/>
 					)}
 				</View>
 			);
 		},
-		[handleFavoriteMetaUpdate],
+		[
+			handleFavoriteMetaUpdate,
+			handleHorizontalScrollBegin,
+			handleHorizontalScrollEnd,
+			viewableIndex,
+		],
 	);
 
 	const keyExtractor = useCallback((item: FeedItem) => {
@@ -1117,7 +1161,7 @@ export default function PropertyReelsView({
 		({
 			viewableItems,
 		}: {
-			viewableItems: Array<{ item: FeedItem; index: number }>;
+			viewableItems: Array<{ item: FeedItem; index: number | null }>;
 		}) => {
 			// Only process if not currently appending items
 			if (
@@ -1129,11 +1173,10 @@ export default function PropertyReelsView({
 			}
 
 			const currentViewable = viewableItems[0];
-			if (
-				currentViewable?.index !== undefined &&
-				typeof currentViewable.index === "number"
-			) {
-				checkAndPrefetchNextPageRef.current(currentViewable.index);
+			const index = currentViewable?.index;
+			if (index !== undefined && index !== null && typeof index === "number") {
+				setViewableIndex(index);
+				checkAndPrefetchNextPageRef.current(index);
 			}
 
 			// Update URL with feed/slug on web when scrolling to a new item
@@ -1153,7 +1196,7 @@ export default function PropertyReelsView({
 					if (__DEV__) {
 						console.log("[feed:url] scroll →", {
 							slug,
-							index: currentViewable.index,
+							index,
 							path: newPath,
 						});
 					}
@@ -1189,7 +1232,6 @@ export default function PropertyReelsView({
 
 	// Only show error/empty states when we have no content and are done loading (no loading circles after splash)
 	if (properties.length === 0 && !loading) {
-
 		if (error) {
 			return (
 				<View style={styles.errorContainer}>
@@ -1228,6 +1270,8 @@ export default function PropertyReelsView({
 				snapToAlignment="start"
 				decelerationRate="fast"
 				showsVerticalScrollIndicator={false}
+				scrollEnabled={feedScrollEnabled}
+				waitFor={[horizontalScrollRef]}
 				onEndReached={loadMore}
 				onEndReachedThreshold={0.5}
 				onViewableItemsChanged={handleViewableItemsChanged}
@@ -1254,7 +1298,7 @@ export default function PropertyReelsView({
 				initialNumToRender={2}
 				updateCellsBatchingPeriod={100}
 				disableIntervalMomentum={true}
-				nestedScrollEnabled={false}
+				nestedScrollEnabled={true}
 			/>
 		</View>
 	);

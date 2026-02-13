@@ -9,7 +9,6 @@ import {
 	Image,
 	type ImageStyle,
 	Platform,
-	ScrollView,
 	type StyleProp,
 	StyleSheet,
 	Text,
@@ -17,6 +16,7 @@ import {
 	View,
 	type ViewStyle,
 } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -134,6 +134,10 @@ export interface BaseReelCardProps {
 	onImageChange?: (index: number) => void;
 	// Base URL for images
 	baseUrl?: string;
+	// Direction lock for nested scroll (feed)
+	onHorizontalScrollBegin?: () => void;
+	onHorizontalScrollEnd?: () => void;
+	horizontalScrollRef?: React.RefObject<unknown>;
 }
 
 export function BaseReelCard({
@@ -150,10 +154,13 @@ export function BaseReelCard({
 	isChatLoading = false,
 	onImageChange,
 	baseUrl = "https://propertprodjango.onrender.com",
+	onHorizontalScrollBegin,
+	onHorizontalScrollEnd,
+	horizontalScrollRef,
 }: BaseReelCardProps) {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-	const scrollViewRef = useRef<ScrollView>(null);
+	const scrollViewRef = useRef<{ scrollTo: (opts: { x: number; animated: boolean }) => void } | null>(null);
 	const heartScale = useRef(new Animated.Value(0)).current;
 	const heartOpacity = useRef(new Animated.Value(0)).current;
 	const lastTap = useRef<number>(0);
@@ -271,16 +278,27 @@ export function BaseReelCard({
 			>
 				{/* IMAGE CAROUSEL */}
 				<ScrollView
-					ref={scrollViewRef}
+					ref={(node) => {
+						scrollViewRef.current = node;
+						if (horizontalScrollRef) {
+							(horizontalScrollRef as React.MutableRefObject<unknown>).current = node;
+						}
+					}}
 					horizontal
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
 					onScroll={handleScroll}
+					onScrollBeginDrag={displayImages.length > 1 ? onHorizontalScrollBegin : undefined}
+					onScrollEndDrag={displayImages.length > 1 ? onHorizontalScrollEnd : undefined}
+					onMomentumScrollEnd={displayImages.length > 1 ? onHorizontalScrollEnd : undefined}
 					scrollEventThrottle={16}
 					style={styles.imageScroll}
 					decelerationRate="fast"
 					snapToInterval={SCREEN_WIDTH}
 					snapToAlignment="center"
+					directionalLockEnabled={true}
+					alwaysBounceVertical={false}
+					nestedScrollEnabled={true}
 				>
 					{displayImages.map((uri: string) => (
 						<View key={uri} style={styles.imageWrapper}>
