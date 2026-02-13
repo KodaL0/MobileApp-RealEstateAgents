@@ -38,7 +38,6 @@ const PAGE_SIZE = 10;
 // Web: keep only 2 pages in memory to prevent mobile browser crashes
 const MAX_PAGES_WEB = 2;
 const MAX_ITEMS_WEB = PAGE_SIZE * MAX_PAGES_WEB;
-const REFRESH_HEADER_HEIGHT = 56;
 
 // Type guard to check if item is a property
 function isProperty(item: FeedItem): item is FeedProperty {
@@ -387,7 +386,7 @@ export default function PropertyReelsView({
 		if (adjustment === null) return;
 		pendingScrollAdjustmentRef.current = null;
 		const newOffset = Math.max(
-			REFRESH_HEADER_HEIGHT,
+			0,
 			lastScrollOffsetRef.current - adjustment,
 		);
 		requestAnimationFrame(() => {
@@ -467,7 +466,7 @@ export default function PropertyReelsView({
 		});
 		if (index >= 0) {
 			flatListRef.current.scrollToOffset({
-				offset: REFRESH_HEADER_HEIGHT + index * containerHeight,
+				offset: index * containerHeight,
 				animated: false,
 			});
 			if (__DEV__ && Platform.OS === "web") {
@@ -698,10 +697,7 @@ export default function PropertyReelsView({
 
 			const offsetY = e.nativeEvent.contentOffset.y;
 			lastScrollOffsetRef.current = offsetY;
-			const index = Math.max(
-				0,
-				Math.round((offsetY - REFRESH_HEADER_HEIGHT) / containerHeight),
-			);
+			const index = Math.max(0, Math.round(offsetY / containerHeight));
 
 			// Debounce: only process after scroll settles
 			if (webScrollDebounceRef.current) {
@@ -829,37 +825,10 @@ export default function PropertyReelsView({
 	const getItemLayout = useCallback(
 		(_: unknown, index: number) => ({
 			length: containerHeight,
-			offset: REFRESH_HEADER_HEIGHT + containerHeight * index,
+			offset: containerHeight * index,
 			index,
 		}),
 		[containerHeight],
-	);
-
-	// Refresh header: guides user to pull down (native) or tap (web, where pull doesn't work)
-	const renderRefreshHeader = useCallback(
-		() => (
-			<TouchableOpacity
-				style={styles.refreshHeader}
-				onPress={handleRefresh}
-				activeOpacity={0.7}
-				accessibilityRole="button"
-				accessibilityLabel="Refresh feed"
-			>
-				<Text style={styles.refreshHeaderText}>
-					{Platform.OS === "web"
-						? "↓ Drag down or tap to refresh"
-						: "↓ Pull down to refresh"}
-				</Text>
-				{isRefreshing && (
-					<ActivityIndicator
-						size="small"
-						color="#10b981"
-						style={styles.refreshHeaderSpinner}
-					/>
-				)}
-			</TouchableOpacity>
-		),
-		[handleRefresh, isRefreshing],
 	);
 
 	// Only show loading before init completes (splash handles loading state)
@@ -951,7 +920,6 @@ export default function PropertyReelsView({
 				scrollEventThrottle={16}
 				overScrollMode="never"
 				bounces={true}
-				ListHeaderComponent={renderRefreshHeader}
 				refreshControl={
 					<RefreshControl
 						refreshing={isRefreshing}
@@ -1003,22 +971,6 @@ const styles = StyleSheet.create({
 		width: SCREEN_WIDTH,
 		backgroundColor: "#000",
 		overflow: "hidden",
-	},
-	refreshHeader: {
-		height: REFRESH_HEADER_HEIGHT,
-		backgroundColor: "rgba(0,0,0,0.85)",
-		justifyContent: "center",
-		alignItems: "center",
-		flexDirection: "row",
-		borderBottomWidth: 1,
-		borderBottomColor: "rgba(255,255,255,0.1)",
-	},
-	refreshHeaderText: {
-		color: "rgba(255,255,255,0.9)",
-		fontSize: 14,
-	},
-	refreshHeaderSpinner: {
-		marginLeft: 8,
 	},
 	floatingRefreshButton: {
 		position: "absolute",
