@@ -1178,8 +1178,8 @@ export default function PropertyReelsView({
 		[],
 	);
 
-	// Don't show feed content until init has completed (cache is populated during splash)
-	if (!isInitComplete || (properties.length === 0 && loading)) {
+	// Only show loading before init completes (splash handles loading state)
+	if (!isInitComplete) {
 		return (
 			<View style={styles.loadingContainer}>
 				<ActivityIndicator size="large" color="#10b981" />
@@ -1187,8 +1187,8 @@ export default function PropertyReelsView({
 		);
 	}
 
-	// Only show error/empty states if we have no content to display
-	if (properties.length === 0) {
+	// Only show error/empty states when we have no content and are done loading (no loading circles after splash)
+	if (properties.length === 0 && !loading) {
 
 		if (error) {
 			return (
