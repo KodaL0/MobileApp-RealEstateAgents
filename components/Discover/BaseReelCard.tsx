@@ -28,6 +28,13 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 // 9:16 vertical frame – clamped so it doesn't exceed the screen
 const REEL_ASPECT_RATIO = 16 / 9;
 
+// ── Lazy image loading strategy ──────────────────────────────────────
+// Mount only the first INITIAL_IMAGE_LIMIT images. Once the user swipes
+// past EXPAND_THRESHOLD, mount the rest. This avoids firing dozens of
+// network requests for cards with 20-30+ photos that the user never sees.
+const INITIAL_IMAGE_LIMIT = 10;
+const EXPAND_THRESHOLD = 5;
+
 // ---------- OptimizedImage (force-cache + fadeDuration 0 for perf) ----------
 const OptimizedImage = React.memo(
 	({
@@ -148,6 +155,9 @@ export function BaseReelCard({
 	const h = containerHeightProp || SCREEN_HEIGHT;
 
 	const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+	// Lazy image expansion: false = show first INITIAL_IMAGE_LIMIT only
+	const [imagesExpanded, setImagesExpanded] = useState(false);
+	const imagesExpandedRef = useRef(false); // ref mirror – keeps handleScroll stable
 	const scrollViewRef = useRef<ScrollView>(null);
 	const heartScale = useRef(new Animated.Value(0)).current;
 	const heartOpacity = useRef(new Animated.Value(0)).current;
@@ -224,6 +234,13 @@ export function BaseReelCard({
 				event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
 			);
 			onImageChange?.(index);
+
+			// Lazy expand: once user swipes past EXPAND_THRESHOLD, mount all remaining images.
+			// Uses ref guard so the setState only fires once and the callback stays stable.
+			if (index >= EXPAND_THRESHOLD && !imagesExpandedRef.current) {
+				imagesExpandedRef.current = true;
+				setImagesExpanded(true);
+			}
 		},
 		[onImageChange],
 	);
@@ -309,6 +326,16 @@ export function BaseReelCard({
 	const validImages = images.map(getValidUrl).filter(Boolean);
 	const displayImages = validImages.length > 0 ? validImages : [getValidUrl()];
 
+	// Lazy slice: only mount the first INITIAL_IMAGE_LIMIT images until the
+	// user proves they're browsing deeply. Remaining images are appended
+	// seamlessly after the current scroll position so there's no visual jump.
+	const visibleImages = useMemo(() => {
+		if (imagesExpanded || displayImages.length <= INITIAL_IMAGE_LIMIT) {
+			return displayImages;
+		}
+		return displayImages.slice(0, INITIAL_IMAGE_LIMIT);
+	}, [displayImages, imagesExpanded]);
+
 	return (
 		<View style={dyn.outer}>
 			<View
@@ -318,7 +345,7 @@ export function BaseReelCard({
 				onStartShouldSetResponder={() => false}
 				onMoveShouldSetResponder={() => false}
 			>
-				{/* IMAGE CAROUSEL */}
+				{/* IMAGE CAROUSEL – renders visibleImages (lazy subset until expanded) */}
 				<ScrollView
 					ref={scrollViewRef}
 					horizontal
@@ -343,7 +370,7 @@ export function BaseReelCard({
 					alwaysBounceVertical={false}
 					nestedScrollEnabled={true}
 				>
-					{displayImages.map((uri: string, index: number) => (
+					{visibleImages.map((uri: string, index: number) => (
 						<View key={uri || `image-${index}`} style={dyn.page}>
 							{/* Blurred background */}
 							<OptimizedImage
