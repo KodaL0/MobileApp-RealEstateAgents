@@ -28,7 +28,6 @@ function PropertyReelCard({
 	onHorizontalScrollBegin,
 	onHorizontalScrollEnd,
 	containerHeight,
-	onNotInterested,
 }: {
 	property: FeedProperty;
 	onViewProperty?: () => void;
@@ -40,7 +39,6 @@ function PropertyReelCard({
 	onHorizontalScrollBegin?: () => void;
 	onHorizontalScrollEnd?: () => void;
 	containerHeight?: number;
-	onNotInterested?: () => void;
 }) {
 	const router = useRouter();
 	const getFavoriteCountValue = useCallback((value: unknown): number | null => {

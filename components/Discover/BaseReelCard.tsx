@@ -4,7 +4,6 @@ import {
 	MessageCircle,
 	Share,
 	UserCircle,
-	X,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -26,11 +25,8 @@ import {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// Side-action column width (used for image frame inset)
-const SIDE_ACTIONS_WIDTH = 56;
-const IMAGE_PADDING = 48;
-const IMAGE_WIDTH = SCREEN_WIDTH - IMAGE_PADDING;
-const IMAGE_ASPECT_RATIO = 16 / 9;
+// 9:16 vertical frame – clamped so it doesn't exceed the screen
+const REEL_ASPECT_RATIO = 16 / 9;
 
 // ---------- OptimizedImage (force-cache + fadeDuration 0 for perf) ----------
 const OptimizedImage = React.memo(
@@ -141,7 +137,6 @@ export interface BaseReelCardProps {
 	onShare?: () => void;
 	onAgentPress?: () => void;
 	onView: () => void;
-	onNotInterested?: () => void;
 	// State
 	isLiked: boolean;
 	favoriteCount: number;
@@ -167,7 +162,6 @@ export function BaseReelCard({
 	onShare,
 	onAgentPress,
 	onView,
-	onNotInterested,
 	isLiked,
 	favoriteCount,
 	isChatLoading = false,
@@ -228,13 +222,6 @@ export function BaseReelCard({
 				right: 20,
 				zIndex: 10,
 			} as ViewStyle,
-			dots: {
-				position: "absolute" as const,
-				top: h * 0.15,
-				left: 0,
-				right: 0,
-				zIndex: 5,
-			} as ViewStyle,
 			sideActions: {
 				position: "absolute" as const,
 				right: 16,
@@ -243,8 +230,8 @@ export function BaseReelCard({
 				zIndex: 20,
 			} as ViewStyle,
 			imageFrame: {
-				width: SCREEN_WIDTH - SIDE_ACTIONS_WIDTH * 2,
-				height: Math.min(IMAGE_WIDTH / IMAGE_ASPECT_RATIO, h * 0.68),
+				width: SCREEN_WIDTH,
+				height: Math.min(SCREEN_WIDTH * REEL_ASPECT_RATIO, h * 0.9),
 				justifyContent: "center" as const,
 				alignItems: "center" as const,
 			} as ViewStyle,
@@ -415,13 +402,6 @@ export function BaseReelCard({
 					))}
 				</ScrollView>
 
-				{/* Carousel dots */}
-				<CarouselDots
-					count={displayImages.length}
-					currentIndex={currentIndex}
-					style={dyn.dots}
-				/>
-
 				{/* Bottom gradient */}
 				<LinearGradient
 					colors={["transparent", "rgba(0,0,0,0.4)", "rgba(0,0,0,0.9)"]}
@@ -510,17 +490,6 @@ export function BaseReelCard({
 					>
 						<Text style={styles.viewText}>View</Text>
 					</TouchableOpacity>
-
-					{/* Not interested */}
-					{onNotInterested && (
-						<TouchableOpacity
-							style={styles.notInterestedCircle}
-							onPress={onNotInterested}
-							activeOpacity={0.8}
-						>
-							<X size={20} color="rgba(255,255,255,0.6)" strokeWidth={2} />
-						</TouchableOpacity>
-					)}
 				</View>
 
 				{/* BOTTOM CONTENT */}
@@ -619,16 +588,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: "700",
 	},
-	notInterestedCircle: {
-		width: 32,
-		height: 32,
-		borderRadius: 16,
-		backgroundColor: "rgba(0,0,0,0.25)",
-		alignItems: "center",
-		justifyContent: "center",
-		marginTop: 10,
-	},
-
 	// Bottom content
 	bottomInfo: {
 		position: "absolute",
