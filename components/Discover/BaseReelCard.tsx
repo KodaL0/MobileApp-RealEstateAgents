@@ -27,12 +27,15 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // 9:16 vertical frame – clamped so it doesn't exceed the screen
 const REEL_ASPECT_RATIO = 16 / 9;
+const IS_WEB = Platform.OS === "web";
 
 // ── Lazy image loading strategy ──────────────────────────────────────
 // Mount only the first INITIAL_IMAGE_LIMIT images. Once the user swipes
 // past EXPAND_THRESHOLD, mount the rest. This avoids firing dozens of
 // network requests for cards with 20-30+ photos that the user never sees.
-const INITIAL_IMAGE_LIMIT = 10;
+// Web gets a tighter limit because every <Image> decodes a full bitmap in
+// browser memory and mobile browsers crash at ~400-600 MB.
+const INITIAL_IMAGE_LIMIT = IS_WEB ? 5 : 10;
 const EXPAND_THRESHOLD = 5;
 
 // ---------- OptimizedImage (force-cache + fadeDuration 0 for perf) ----------
@@ -372,13 +375,18 @@ export function BaseReelCard({
 				>
 					{visibleImages.map((uri: string, index: number) => (
 						<View key={uri || `image-${index}`} style={dyn.page}>
-							{/* Blurred background */}
-							<OptimizedImage
-								uri={uri}
-								style={StyleSheet.absoluteFillObject}
-								containerStyle={StyleSheet.absoluteFillObject}
-								blurRadius={25}
-							/>
+							{/* Blurred background – skipped on web to save memory.
+							    Each blur creates a full-screen bitmap + GPU compositing layer
+							    via CSS filter:blur(). On mobile browsers this alone can double
+							    memory usage and trigger an OOM crash. */}
+							{!IS_WEB && (
+								<OptimizedImage
+									uri={uri}
+									style={StyleSheet.absoluteFillObject}
+									containerStyle={StyleSheet.absoluteFillObject}
+									blurRadius={25}
+								/>
+							)}
 
 							{/* Dark overlay */}
 							<View style={styles.imageOverlay} />

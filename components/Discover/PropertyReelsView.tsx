@@ -797,7 +797,7 @@ export default function PropertyReelsView({
 				}}
 				removeClippedSubviews={Platform.OS === "android"}
 				maxToRenderPerBatch={3}
-				windowSize={Platform.OS === "web" ? 11 : 5}
+				windowSize={5}
 				initialNumToRender={3}
 				updateCellsBatchingPeriod={100}
 				disableIntervalMomentum={true}

@@ -1,0 +1,226 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    CARD COMPONENT RELATIONSHIPS                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PropertyReelsView                                   │
+│                         (Container/Orchestrator)                             │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  FlatList                                                           │  │
+│  │  ┌───────────────────────────────────────────────────────────────┐  │  │
+│  │  │  renderItem()                                                 │  │  │
+│  │  │  ┌─────────────────────────────────────────────────────┐   │  │  │
+│  │  │  │  if (isProperty(item))                                │   │  │  │
+│  │  │  │    → PropertyReelCard                                 │   │  │  │
+│  │  │  │  else                                                  │   │  │  │
+│  │  │  │    → ProjectReelCard                                  │   │  │  │
+│  │  │  └─────────────────────────────────────────────────────┘   │   │  │  │
+│  │  └───────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  State: properties[], loading, page, hasNextPage                           │
+│  Callbacks: handleFavoriteMetaUpdate, handleHorizontalScrollBegin/End      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+        ┌───────────────────────┐      ┌───────────────────────┐
+        │  PropertyReelCard     │      │  ProjectReelCard      │
+        │  (Property Wrapper)   │      │  (Project Wrapper)    │
+        ├───────────────────────┤      ├───────────────────────┤
+        │ • Prepares property   │      │ • Prepares project     │
+        │   data                │      │   data                │
+        │ • Formats images      │      │ • Formats images       │
+        │ • Creates topBar      │      │ • Creates topBar      │
+        │ • Creates bottom      │      │ • Creates bottom      │
+        │ • Handles favorite    │      │ • Handles favorite    │
+        │ • Handles chat        │      │ • Handles chat        │
+        │ • Navigates to        │      │ • Navigates to        │
+        │   /property/:id       │      │   /project/:id        │
+        └───────────────────────┘      └───────────────────────┘
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │      BaseReelCard              │
+                    │   (Shared Layout Foundation)   │
+                    ├───────────────────────────────┤
+                    │                               │
+                    │  ┌─────────────────────────┐ │
+                    │  │  Horizontal ScrollView  │ │
+                    │  │  (Image Carousel)        │ │
+                    │  │  • Lazy loading          │ │
+                    │  │  • Scroll locking        │ │
+                    │  └─────────────────────────┘ │
+                    │                               │
+                    │  ┌─────────────────────────┐ │
+                    │  │  Side Actions Column     │ │
+                    │  │  • Heart (Favorite)      │ │
+                    │  │  • Chat                   │ │
+                    │  │  • Share                 │ │
+                    │  │  • Agent Profile         │ │
+                    │  │  • View Button          │ │
+                    │  └─────────────────────────┘ │
+                    │                               │
+                    │  ┌─────────────────────────┐ │
+                    │  │  Top Bar                 │ │
+                    │  │  (Receives topBarContent) │ │
+                    │  └─────────────────────────┘ │
+                    │                               │
+                    │  ┌─────────────────────────┐ │
+                    │  │  Bottom Content          │ │
+                    │  │  (Receives bottomContent)│ │
+                    │  └─────────────────────────┘ │
+                    │                               │
+                    │  Features:                    │
+                    │  • Double-tap to favorite     │
+                    │  • Heart animation            │
+                    │  • Scroll lock coordination    │
+                    │  • Image change tracking      │
+                    └───────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          DATA FLOW: FAVORITE ACTION                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    User Taps Heart
+         │
+         ▼
+    BaseReelCard.onFavorite()
+         │
+         ▼
+    PropertyReelCard.handleFavorite()
+         │
+         ├──► API: api.properties.toggleFavorite(id)
+         │         │
+         │         └──► Response: { is_favourite, favorites_count }
+         │
+         ├──► Update local state (isLiked, favoriteCount)
+         │
+         └──► onFavoriteMetaUpdate(id, meta)
+                  │
+                  ▼
+         PropertyReelsView.handleFavoriteMetaUpdate()
+                  │
+                  ├──► Update item in properties array
+                  │
+                  └──► Props flow back down
+                           │
+                           ▼
+                  BaseReelCard receives updated props
+                           │
+                           ▼
+                  UI updates (heart fills, count changes)
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        SCROLL LOCK FLOW                                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    User Swipes Image Horizontally
+         │
+         ▼
+    BaseReelCard ScrollView
+         │
+         ├──► onScrollBeginDrag fires
+         │         │
+         │         └──► onHorizontalScrollBegin()
+         │                  │
+         │                  ▼
+         │         PropertyReelsView
+         │                  │
+         │                  └──► setFeedScrollEnabled(false)
+         │                           │
+         │                           ▼
+         │                  FlatList.scrollEnabled = false
+         │                           │
+         │                           └──► Vertical scroll DISABLED
+         │
+         └──► User releases swipe
+                  │
+                  ├──► onScrollEndDrag fires
+                  │
+                  └──► onMomentumScrollEnd fires
+                           │
+                           └──► onHorizontalScrollEnd()
+                                    │
+                                    ▼
+                           PropertyReelsView
+                                    │
+                                    └──► setTimeout(() => 
+                                         setFeedScrollEnabled(true), 50ms)
+                                              │
+                                              ▼
+                                     FlatList.scrollEnabled = true
+                                              │
+                                              └──► Vertical scroll ENABLED
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          PROPS FLOW SUMMARY                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+PropertyReelsView ──────────────────────────────────────────────────────────────┐
+    │                                                                           │
+    ├──► property/project (FeedItem)                                            │
+    ├──► containerHeight (number)                                              │
+    ├──► onFavoriteMetaUpdate (callback)                                       │
+    ├──► onHorizontalScrollBegin (callback)                                    │
+    ├──► onHorizontalScrollEnd (callback)                                      │
+    ├──► onNotInterested (callback)                                            │
+    └──► source (string)                                                       │
+        │                                                                       │
+        └──► PropertyReelCard / ProjectReelCard ───────────────────────────────┤
+            │                                                                   │
+            ├──► images (string[])                                             │
+            ├──► topBarContent (ReactNode)                                     │
+            ├──► bottomContent (ReactNode)                                     │
+            ├──► onFavorite (function)                                        │
+            ├──► onChat (function)                                             │
+            ├──► onShare (function)                                            │
+            ├──► onAgentPress (function)                                       │
+            ├──► onView (function)                                             │
+            ├──► isLiked (boolean)                                              │
+            ├──► favoriteCount (number)                                        │
+            ├──► isChatLoading (boolean)                                      │
+            ├──► onImageChange (function)                                      │
+            ├──► containerHeight (number)                                       │
+            ├──► onHorizontalScrollBegin (function)                           │
+            └──► onHorizontalScrollEnd (function)                              │
+                │                                                               │
+                └──► BaseReelCard ─────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    KEY DIFFERENCES: PROPERTY vs PROJECT                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────┬─────────────────────────┐
+│   PropertyReelCard      │   ProjectReelCard        │
+├─────────────────────────┼─────────────────────────┤
+│ Single Price            │ Price Range              │
+│ €500,000                │ €400,000 - €600,000      │
+├─────────────────────────┼─────────────────────────┤
+│ Single Stats            │ Stat Ranges              │
+│ 3 beds                  │ 2-4 beds                │
+│ 2 baths                 │ 1.5-2.5 baths           │
+│ 120 m²                  │ 100-150 m²              │
+├─────────────────────────┼─────────────────────────┤
+│ No units stat           │ Units Available         │
+│                         │ 5/10                    │
+├─────────────────────────┼─────────────────────────┤
+│ api.properties          │ api.listings            │
+│ .toggleFavorite()       │ .toggleFavorite(id,     │
+│                         │  "project")             │
+├─────────────────────────┼─────────────────────────┤
+│ /property/:id           │ /project/:id            │
+│                         │ or project.url         │
+├─────────────────────────┼─────────────────────────┤
+│ "PROPERTY · ..."        │ "PROJECT · ..."         │
+└─────────────────────────┴─────────────────────────┘
+
+Both share the same BaseReelCard layout! ✨
