@@ -65,7 +65,11 @@ export default function PropertyReelsView({
 	const isLoadingNextPageRef = useRef(false);
 	const lastViewableCheckRef = useRef(0);
 	const isAppendingRef = useRef(false);
+	const isMountedRef = useRef(true);
 	const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
+
+	// Unmount guard – prevents state updates after the component is torn down
+	useEffect(() => () => { isMountedRef.current = false; }, []);
 
 	// Use measured container height for scroll stability. Static SCREEN_HEIGHT can mismatch
 	// the actual visible area (tab bar, safe area), causing wrong items to display.
@@ -90,27 +94,29 @@ export default function PropertyReelsView({
 		id: number | string;
 		type: "property" | "project";
 		startTime: number;
-		index: number;
+		position: number; // positional snapshot (informational only – dedup is by id)
 		slotType?: string | null;
 		matchScore?: number | null;
 	} | null>(null);
 
 	// Stable callback – reads properties from ref, never triggers re-render cascade.
+	// All tracking is id-based: even if the positional index is stale after a removal,
+	// we verify the item id before firing and never re-fire for the same id.
 	const trackVisibility = useCallback((index: number) => {
 		try {
 			const currentProperties = propertiesRef.current;
 			if (index < 0 || index >= currentProperties.length) return;
 
 			const item = currentProperties[index];
-			if (!item) return;
+			if (!item || item.id == null) return; // guard missing id
 
 			const itemType = isProperty(item) ? "property" : "project";
 			const itemId = item.id;
 
-			// Same item – nothing to do
+			// Same item – nothing to do (id-based, immune to index shifts)
 			if (currentVisibleRef.current?.id === itemId) return;
 
-			// Fire dwell for previous item
+			// Fire dwell for previous item (uses stored id, not positional index)
 			if (currentVisibleRef.current) {
 				const dwellTimeMs = Date.now() - currentVisibleRef.current.startTime;
 				if (dwellTimeMs > 500) {
@@ -118,7 +124,7 @@ export default function PropertyReelsView({
 						itemId: currentVisibleRef.current.id,
 						itemType: currentVisibleRef.current.type,
 						dwellTimeMs,
-						position: currentVisibleRef.current.index,
+						position: currentVisibleRef.current.position,
 					});
 				}
 			}
@@ -140,7 +146,7 @@ export default function PropertyReelsView({
 				id: itemId,
 				type: itemType,
 				startTime: Date.now(),
-				index,
+				position: index,
 				slotType: feedItem.slot_type,
 				matchScore: feedItem.match_score,
 			};
@@ -150,7 +156,7 @@ export default function PropertyReelsView({
 		}
 	}, []); // Stable – reads from propertiesRef
 
-	// Flush dwell on unmount
+	// Flush dwell on unmount (id-based – immune to stale indices)
 	useEffect(
 		() => () => {
 			try {
@@ -161,7 +167,7 @@ export default function PropertyReelsView({
 							itemId: currentVisibleRef.current.id,
 							itemType: currentVisibleRef.current.type,
 							dwellTimeMs,
-							position: currentVisibleRef.current.index,
+							position: currentVisibleRef.current.position,
 						});
 					}
 				}
@@ -246,8 +252,10 @@ export default function PropertyReelsView({
 			silent: boolean = false,
 		): Promise<void> => {
 			if (!isAuthenticated) {
-				setError("Please sign in to view your personalized feed.");
-				setLoading(false);
+				if (isMountedRef.current) {
+					setError("Please sign in to view your personalized feed.");
+					setLoading(false);
+				}
 				return;
 			}
 
@@ -260,6 +268,9 @@ export default function PropertyReelsView({
 				setError(null);
 
 				const response = await api.feed.list({ page: pageNum, page_size: 10 });
+
+				// Guard: component may have unmounted during the await
+				if (!isMountedRef.current) return;
 
 				if (append) {
 					setProperties((prev) => {
@@ -286,7 +297,7 @@ export default function PropertyReelsView({
 
 					// Brief lock to let render complete, then clear
 					setTimeout(() => {
-						isAppendingRef.current = false;
+						if (isMountedRef.current) isAppendingRef.current = false;
 					}, 100);
 				} else {
 					const items = response.results;
@@ -304,6 +315,7 @@ export default function PropertyReelsView({
 				setHasNextPage(response.next !== null);
 			} catch (err: unknown) {
 				console.error("Failed to fetch feed:", err);
+				if (!isMountedRef.current) return;
 				if (!silent) {
 					setError(
 						(err as { response?: { data?: { detail?: string } } })?.response
@@ -311,9 +323,11 @@ export default function PropertyReelsView({
 					);
 				}
 			} finally {
-				setLoading(false);
-				setLoadingMore(false);
-				setIsRefreshing(false);
+				if (isMountedRef.current) {
+					setLoading(false);
+					setLoadingMore(false);
+					setIsRefreshing(false);
+				}
 			}
 		},
 		[isAuthenticated],
@@ -341,6 +355,7 @@ export default function PropertyReelsView({
 
 		// Keep loading=true until we have data (avoids "No properties found" flash)
 		getCachedFeedData().then((cachedData) => {
+			if (!isMountedRef.current) return; // unmounted during cache read
 			if (cachedData?.items && cachedData.items.length > 0) {
 				console.log(
 					`📦 Loading feed from cache: ${cachedData.items.length} items`,
@@ -401,7 +416,7 @@ export default function PropertyReelsView({
 			fetchFeed(nextPage, true).finally(() => {
 				// Shorter cooldown to prevent UI freeze
 				setTimeout(() => {
-					isLoadingNextPageRef.current = false;
+					if (isMountedRef.current) isLoadingNextPageRef.current = false;
 				}, 200);
 			});
 		}
@@ -497,7 +512,7 @@ export default function PropertyReelsView({
 		}
 		// Re-enable with a tiny delay to let momentum settle
 		horizontalScrollTimeoutRef.current = setTimeout(() => {
-			setFeedScrollEnabled(true);
+			if (isMountedRef.current) setFeedScrollEnabled(true);
 			horizontalScrollTimeoutRef.current = null;
 		}, 50);
 	}, []);
@@ -506,7 +521,7 @@ export default function PropertyReelsView({
 	useEffect(() => {
 		if (!feedScrollEnabled) {
 			const safetyTimer = setTimeout(() => {
-				setFeedScrollEnabled(true);
+				if (isMountedRef.current) setFeedScrollEnabled(true);
 			}, 2000);
 			return () => clearTimeout(safetyTimer);
 		}
@@ -557,11 +572,19 @@ export default function PropertyReelsView({
 		],
 	);
 
-	const keyExtractor = useCallback((item: FeedItem, index: number) => {
-		const type = isProperty(item) ? "property" : "project";
-		// Stable key: type + id. Index only for fallback when id is missing (avoids wrong reels on scroll).
-		const id = item.id?.toString();
-		return id ? `${type}-${id}` : `${type}-idx-${index}`;
+	const keyExtractor = useCallback((item: FeedItem) => {
+		// Stable key: _type:id – survives removals and pagination without index shifts.
+		// Read _type discriminator directly to avoid heuristic cost on every key call.
+		const type =
+			(item as { _type?: string })._type ||
+			(isProperty(item) ? "property" : "project");
+		// id is required on all feed items; fallback to slug/title if somehow missing.
+		const id =
+			item.id ??
+			(item as { slug?: string }).slug ??
+			(item as { title?: string }).title ??
+			"";
+		return `${type}:${id}`;
 	}, []);
 
 	// Store the prefetch function in a ref for stable callback
