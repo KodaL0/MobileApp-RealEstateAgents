@@ -22,7 +22,11 @@ import { useUser } from "@/app/_userbase/UserContext";
 import { useAppInit } from "@/app/context/AppInitContext";
 import type { FeedItem, FeedProperty } from "@/app/features/types";
 import { api } from "@/config/api";
-import { getCachedFeedData, setFeedCache } from "@/data/feedCache";
+import {
+	getCachedFeedDataAllowStale,
+	getCacheAge,
+	setFeedCache,
+} from "@/data/feedCache";
 import { analytics } from "@/services/analytics";
 import ProjectReelCard from "./ProjectReelCard";
 import PropertyReelCard from "./PropertyReelCard";
@@ -356,7 +360,8 @@ export default function PropertyReelsView({
 		}
 	}, [initialSlug]);
 
-	// Initialize feed - try cache first, then fetch if needed
+	// Initialize feed - stale-while-revalidate: show cache for instant display,
+	// always fetch fresh so each app open gets new feed (fixes same feed on reopen)
 	useEffect(() => {
 		if (hasMountedRef.current) return;
 		hasMountedRef.current = true;
@@ -366,17 +371,25 @@ export default function PropertyReelsView({
 			return;
 		}
 
-		// Keep loading=true until we have data (avoids "No properties found" flash)
-		getCachedFeedData().then((cachedData) => {
-			if (!isMountedRef.current) return; // unmounted during cache read
+		// Stale-while-revalidate: show cached data immediately if available
+		getCachedFeedDataAllowStale().then((cachedData) => {
+			if (!isMountedRef.current) return;
 			if (cachedData?.items && cachedData.items.length > 0) {
+				const cacheAge = getCacheAge(cachedData);
+				const isInitialPageOnly = cachedData.items.length <= 10; // Only page 1, safe to replace
+				// Revalidate when cache is stale (>30s) - fixes same feed on app reopen
+				const shouldRevalidate =
+					isInitialPageOnly && cacheAge > 30 * 1000;
 				console.log(
-					`📦 Loading feed from cache: ${cachedData.items.length} items`,
+					`📦 Loading feed from cache: ${cachedData.items.length} items (age: ${Math.round(cacheAge / 1000)}s${shouldRevalidate ? ", revalidating" : ""})`,
 				);
 				setProperties(cachedData.items);
 				setHasNextPage(!!cachedData.next);
 				setPage(cachedData.page ?? 1);
 				setLoading(false);
+				if (shouldRevalidate) {
+					fetchFeed(1, false, true); // silent = no loading overlay
+				}
 			} else {
 				console.log("📡 No cache found, fetching feed...");
 				fetchFeed(1, false, false);
@@ -433,7 +446,7 @@ export default function PropertyReelsView({
 		}
 	}, [page, loadingMore, hasNextPage, fetchFeed]);
 
-	// Smart prefetch: Load next page when user is 5 items away from the end
+	// Smart prefetch: Load next page well before end so new feed is ready before user reaches it
 	// Throttled to prevent excessive calls during scrolling
 	const checkAndPrefetchNextPage = useCallback(
 		(index: number) => {
@@ -454,7 +467,8 @@ export default function PropertyReelsView({
 			trackVisibility(index);
 
 			const itemsRemaining = properties.length - index;
-			const shouldPrefetch = itemsRemaining <= 5; // Start loading when 5 items left
+			// Prefetch when 8 items left (was 5) - new feed ready before user reaches end
+			const shouldPrefetch = itemsRemaining <= 8;
 
 			if (
 				shouldPrefetch &&

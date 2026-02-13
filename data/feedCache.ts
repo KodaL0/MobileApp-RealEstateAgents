@@ -36,7 +36,7 @@ export async function getCachedFeedData(): Promise<FeedCacheData | null> {
     }
 
     const data: FeedCacheData = JSON.parse(cached);
-    
+
     // Check if cache is still valid
     if (isCacheValid(data)) {
       return data;
@@ -44,6 +44,23 @@ export async function getCachedFeedData(): Promise<FeedCacheData | null> {
 
     // Cache expired
     return null;
+  } catch (error) {
+    console.warn('Failed to get cached feed:', error);
+    return null;
+  }
+}
+
+/**
+ * Get cached feed data even if expired (for stale-while-revalidate)
+ * Returns null only if cache is missing
+ */
+export async function getCachedFeedDataAllowStale(): Promise<FeedCacheData | null> {
+  try {
+    const cached = await AsyncStorage.getItem(FEED_CACHE_KEY);
+    if (!cached) {
+      return null;
+    }
+    return JSON.parse(cached) as FeedCacheData;
   } catch (error) {
     console.warn('Failed to get cached feed:', error);
     return null;
