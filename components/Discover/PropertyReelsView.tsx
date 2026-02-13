@@ -31,7 +31,7 @@ import { useAppInit } from "@/app/context/AppInitContext";
 import { useChat } from "@/app/features/chat/context/ChatContext";
 import type { FeedItem, FeedProperty } from "@/app/features/types";
 import { api } from "@/config/api";
-import { getCachedFeedData } from "@/data/feedCache";
+import { getCachedFeedData, setFeedCache } from "@/data/feedCache";
 import { analytics } from "@/services/analytics";
 import ProjectReelCard from "./ProjectReelCard";
 
@@ -900,6 +900,13 @@ export default function PropertyReelsView({
 							`✅ Page ${pageNum} loaded: ${newItems.length} new items (total: ${updated.length})`,
 						);
 
+						// Update cache so back-navigation restores full list
+						setFeedCache({
+							items: updated,
+							page: pageNum,
+							next: response.next,
+						}).catch(() => {});
+
 						return updated;
 					});
 
@@ -908,8 +915,16 @@ export default function PropertyReelsView({
 						isAppendingRef.current = false;
 					}, 100);
 				} else {
-					setProperties(response.results);
-					console.log(`✅ Feed loaded: ${response.results.length} items`);
+					const items = response.results;
+					setProperties(items);
+					console.log(`✅ Feed loaded: ${items.length} items`);
+
+					// Update cache so back-navigation restores state
+					setFeedCache({
+						items,
+						page: pageNum,
+						next: response.next,
+					}).catch(() => {});
 				}
 
 				setHasNextPage(response.next !== null);
@@ -958,10 +973,10 @@ export default function PropertyReelsView({
 				);
 				setProperties(cachedData.items);
 				setHasNextPage(!!cachedData.next);
+				setPage(cachedData.page ?? 1);
 				setLoading(false);
-
-				// Refresh in background (silent update)
-				fetchFeed(1, false, true);
+				// Don't replace with API fetch - preserves state when navigating back.
+				// Cache is updated on every fetch, so we have the latest data.
 			} else {
 				// No cache, fetch normally
 				console.log("📡 No cache found, fetching feed...");
@@ -1128,9 +1143,11 @@ export default function PropertyReelsView({
 		],
 	);
 
-	const keyExtractor = useCallback((item: FeedItem) => {
+	const keyExtractor = useCallback((item: FeedItem, index: number) => {
 		const type = isProperty(item) ? "property" : "project";
-		return `${type}-${item.id?.toString() || Math.random()}`;
+		// Stable key: id + index. Never Math.random() - causes wrong reels on scroll.
+		const id = item.id?.toString();
+		return `${type}-${id ?? `idx-${index}`}-${index}`;
 	}, []);
 
 	// Store the prefetch function in a ref for stable callback
