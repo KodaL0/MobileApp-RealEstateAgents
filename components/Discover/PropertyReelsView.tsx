@@ -76,6 +76,9 @@ export default function PropertyReelsView({
 	// is down or a new feed hasn't been generated yet.
 	const MAX_PAGINATION_RETRIES = 3;
 	const consecutiveFailsRef = useRef(0);
+	// Debounce onEndReached – prevents repeated fires (RN bug) that cause layout thrash/shuffle
+	const lastOnEndReachedRef = useRef(0);
+	const ON_END_REACHED_DEBOUNCE_MS = 1500;
 	// True when the user has consumed every item and server has no more
 	const [feedExhausted, setFeedExhausted] = useState(false);
 
@@ -446,6 +449,14 @@ export default function PropertyReelsView({
 		}
 	}, [page, loadingMore, hasNextPage, fetchFeed]);
 
+	// Wrapped onEndReached: debounce to prevent RN's repeated firing (causes shuffle on web)
+	const handleEndReached = useCallback(() => {
+		const now = Date.now();
+		if (now - lastOnEndReachedRef.current < ON_END_REACHED_DEBOUNCE_MS) return;
+		lastOnEndReachedRef.current = now;
+		loadMore();
+	}, [loadMore]);
+
 	// Smart prefetch: Load next page well before end so new feed is ready before user reaches it
 	// Throttled to prevent excessive calls during scrolling
 	const checkAndPrefetchNextPage = useCallback(
@@ -811,7 +822,7 @@ export default function PropertyReelsView({
 				decelerationRate="fast"
 				showsVerticalScrollIndicator={false}
 				scrollEnabled={feedScrollEnabled}
-				onEndReached={loadMore}
+				onEndReached={handleEndReached}
 				onEndReachedThreshold={0.5}
 				onScroll={Platform.OS === "web" ? handleScroll : undefined}
 				onViewableItemsChanged={
@@ -822,17 +833,22 @@ export default function PropertyReelsView({
 				viewabilityConfig={
 					Platform.OS === "web" ? undefined : viewabilityConfig
 				}
-				{...(Platform.OS === "web" ? { CellRendererComponent: WebCellRenderer as never } : {})}
+				{...(Platform.OS === "web"
+					? {
+							CellRendererComponent: WebCellRenderer as never,
+							disableVirtualization: true, // RNW cell recycling can show wrong items (shuffle)
+						}
+					: {})}
 				scrollEventThrottle={16}
 				overScrollMode="never"
 				bounces={false}
 				ListFooterComponent={
 					loadingMore ? (
-						<View style={styles.footerLoader}>
+						<View style={[styles.footerLoader, styles.footerMinHeight]}>
 							<ActivityIndicator size="small" color="#10b981" />
 						</View>
 					) : feedExhausted ? (
-						<View style={styles.feedEndContainer}>
+						<View style={[styles.feedEndContainer, styles.footerMinHeight]}>
 							<Text style={styles.feedEndText}>
 								You're all caught up!
 							</Text>
@@ -840,7 +856,10 @@ export default function PropertyReelsView({
 								Pull down to refresh for new listings
 							</Text>
 						</View>
-					) : null
+					) : (
+						/* Minimal footer – prevents onEndReached loop when switching to loading/exhausted */
+						<View style={styles.footerPlaceholder} />
+					)
 				}
 				refreshing={isRefreshing}
 				onRefresh={() => {
@@ -931,6 +950,13 @@ const styles = StyleSheet.create({
 	footerLoader: {
 		paddingVertical: 20,
 		alignItems: "center",
+	},
+	/* Fixed min height prevents onEndReached from firing in a loop when footer content changes */
+	footerMinHeight: {
+		minHeight: 80,
+	},
+	footerPlaceholder: {
+		height: 1,
 	},
 	feedEndContainer: {
 		paddingVertical: 32,
