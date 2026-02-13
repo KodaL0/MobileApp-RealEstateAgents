@@ -77,6 +77,7 @@ export default function PropertyReelsView({
 	const isAppendingRef = useRef(false);
 	const isMountedRef = useRef(true);
 	const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
+	const [showPullHint, setShowPullHint] = useState(true);
 
 	// Pagination retry tracking – prevents infinite retry storms when the API
 	// is down or a new feed hasn't been generated yet.
@@ -724,10 +725,15 @@ export default function PropertyReelsView({
 
 	const handleScroll = useCallback(
 		(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-			if (Platform.OS !== "web" || containerHeight <= 0) return;
-
 			const offsetY = e.nativeEvent.contentOffset.y;
 			lastScrollOffsetRef.current = offsetY;
+
+			// Show pull hint when at top (first property) – both native and web
+			const atTop = offsetY <= 40;
+			setShowPullHint((prev) => (atTop ? true : offsetY > 60 ? false : prev));
+
+			if (Platform.OS !== "web" || containerHeight <= 0) return;
+
 			const index = Math.max(0, Math.round(offsetY / containerHeight));
 
 			// Debounce: only process after scroll settles
@@ -904,6 +910,15 @@ export default function PropertyReelsView({
 			onLayout={handleLayout}
 			{...webPullResponder.panHandlers}
 		>
+			{showPullHint && !isRefreshing && (
+				<View
+					style={styles.pullHintOverlay}
+					pointerEvents="none"
+					accessibilityLabel="Pull down to refresh feed"
+				>
+					<Text style={styles.pullHintText}>Pull down to refresh</Text>
+				</View>
+			)}
 			<FlatList
 				ref={flatListRef}
 				data={properties}
@@ -918,7 +933,7 @@ export default function PropertyReelsView({
 				scrollEnabled={feedScrollEnabled}
 				onEndReached={handleEndReached}
 				onEndReachedThreshold={0.5}
-				onScroll={Platform.OS === "web" ? handleScroll : undefined}
+				onScroll={handleScroll}
 				onViewableItemsChanged={
 					Platform.OS === "web"
 						? undefined
@@ -989,6 +1004,22 @@ const styles = StyleSheet.create({
 		width: SCREEN_WIDTH,
 		backgroundColor: "#000",
 		overflow: "hidden",
+	},
+	pullHintOverlay: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		paddingVertical: 10,
+		paddingHorizontal: 16,
+		alignItems: "center",
+		zIndex: 10,
+		backgroundColor: "rgba(0,0,0,0.5)",
+	},
+	pullHintText: {
+		color: "rgba(255,255,255,0.9)",
+		fontSize: 13,
+		fontWeight: "500",
 	},
 	reelItem: {
 		width: SCREEN_WIDTH,
