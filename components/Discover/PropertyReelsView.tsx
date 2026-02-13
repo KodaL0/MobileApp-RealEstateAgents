@@ -13,6 +13,7 @@ import {
 	FlatList,
 	Image,
 	Platform,
+	RefreshControl,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
@@ -37,6 +38,7 @@ const PAGE_SIZE = 10;
 // Web: keep only 2 pages in memory to prevent mobile browser crashes
 const MAX_PAGES_WEB = 2;
 const MAX_ITEMS_WEB = PAGE_SIZE * MAX_PAGES_WEB;
+const REFRESH_HEADER_HEIGHT = 56;
 
 // Type guard to check if item is a property
 function isProperty(item: FeedItem): item is FeedProperty {
@@ -385,7 +387,7 @@ export default function PropertyReelsView({
 		if (adjustment === null) return;
 		pendingScrollAdjustmentRef.current = null;
 		const newOffset = Math.max(
-			0,
+			REFRESH_HEADER_HEIGHT,
 			lastScrollOffsetRef.current - adjustment,
 		);
 		requestAnimationFrame(() => {
@@ -465,7 +467,7 @@ export default function PropertyReelsView({
 		});
 		if (index >= 0) {
 			flatListRef.current.scrollToOffset({
-				offset: index * containerHeight,
+				offset: REFRESH_HEADER_HEIGHT + index * containerHeight,
 				animated: false,
 			});
 			if (__DEV__ && Platform.OS === "web") {
@@ -477,6 +479,15 @@ export default function PropertyReelsView({
 			}
 		}
 	}, [initialSlug, properties, containerHeight]);
+
+	const handleRefresh = useCallback(() => {
+		setIsRefreshing(true);
+		setPage(1);
+		setHasNextPage(true);
+		setFeedExhausted(false);
+		consecutiveFailsRef.current = 0;
+		fetchFeed(1, false, false);
+	}, [fetchFeed]);
 
 	const loadMore = useCallback(() => {
 		// Prevent multiple simultaneous loads
@@ -687,7 +698,10 @@ export default function PropertyReelsView({
 
 			const offsetY = e.nativeEvent.contentOffset.y;
 			lastScrollOffsetRef.current = offsetY;
-			const index = Math.round(offsetY / containerHeight);
+			const index = Math.max(
+				0,
+				Math.round((offsetY - REFRESH_HEADER_HEIGHT) / containerHeight),
+			);
 
 			// Debounce: only process after scroll settles
 			if (webScrollDebounceRef.current) {
@@ -815,10 +829,37 @@ export default function PropertyReelsView({
 	const getItemLayout = useCallback(
 		(_: unknown, index: number) => ({
 			length: containerHeight,
-			offset: containerHeight * index,
+			offset: REFRESH_HEADER_HEIGHT + containerHeight * index,
 			index,
 		}),
 		[containerHeight],
+	);
+
+	// Refresh header: guides user to pull down (native) or tap (web, where pull doesn't work)
+	const renderRefreshHeader = useCallback(
+		() => (
+			<TouchableOpacity
+				style={styles.refreshHeader}
+				onPress={handleRefresh}
+				activeOpacity={0.7}
+				accessibilityRole="button"
+				accessibilityLabel="Refresh feed"
+			>
+				<Text style={styles.refreshHeaderText}>
+					{Platform.OS === "web"
+						? "↓ Drag down or tap to refresh"
+						: "↓ Pull down to refresh"}
+				</Text>
+				{isRefreshing && (
+					<ActivityIndicator
+						size="small"
+						color="#10b981"
+						style={styles.refreshHeaderSpinner}
+					/>
+				)}
+			</TouchableOpacity>
+		),
+		[handleRefresh, isRefreshing],
 	);
 
 	// Only show loading before init completes (splash handles loading state)
@@ -893,7 +934,16 @@ export default function PropertyReelsView({
 					: {})}
 				scrollEventThrottle={16}
 				overScrollMode="never"
-				bounces={false}
+				bounces={true}
+				ListHeaderComponent={renderRefreshHeader}
+				refreshControl={
+					<RefreshControl
+						refreshing={isRefreshing}
+						onRefresh={handleRefresh}
+						tintColor="#10b981"
+						colors={["#10b981"]}
+					/>
+				}
 				ListFooterComponent={
 					loadingMore ? (
 						<View style={[styles.footerLoader, styles.footerMinHeight]}>
@@ -913,16 +963,6 @@ export default function PropertyReelsView({
 						<View style={styles.footerPlaceholder} />
 					)
 				}
-				refreshing={isRefreshing}
-				onRefresh={() => {
-					// Pull down at top → fresh feed (clears trimmed window, fetches new page 1)
-					setIsRefreshing(true);
-					setPage(1);
-					setHasNextPage(true);
-					setFeedExhausted(false);
-					consecutiveFailsRef.current = 0;
-					fetchFeed(1, false, false);
-				}}
 				removeClippedSubviews={Platform.OS === "android"}
 				maxToRenderPerBatch={3}
 				windowSize={5}
@@ -947,6 +987,22 @@ const styles = StyleSheet.create({
 		width: SCREEN_WIDTH,
 		backgroundColor: "#000",
 		overflow: "hidden",
+	},
+	refreshHeader: {
+		height: REFRESH_HEADER_HEIGHT,
+		backgroundColor: "rgba(0,0,0,0.85)",
+		justifyContent: "center",
+		alignItems: "center",
+		flexDirection: "row",
+		borderBottomWidth: 1,
+		borderBottomColor: "rgba(255,255,255,0.1)",
+	},
+	refreshHeaderText: {
+		color: "rgba(255,255,255,0.9)",
+		fontSize: 14,
+	},
+	refreshHeaderSpinner: {
+		marginLeft: 8,
 	},
 	reelItem: {
 		width: SCREEN_WIDTH,
