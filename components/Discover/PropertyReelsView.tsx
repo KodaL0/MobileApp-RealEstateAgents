@@ -33,6 +33,10 @@ import PropertyReelCard from "./PropertyReelCard";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const BASE_URL = "https://propertprodjango.onrender.com";
+const PAGE_SIZE = 10;
+// Web: keep only 2 pages in memory to prevent mobile browser crashes
+const MAX_PAGES_WEB = 2;
+const MAX_ITEMS_WEB = PAGE_SIZE * MAX_PAGES_WEB;
 
 // Type guard to check if item is a property
 function isProperty(item: FeedItem): item is FeedProperty {
@@ -81,6 +85,10 @@ export default function PropertyReelsView({
 	const ON_END_REACHED_DEBOUNCE_MS = 1500;
 	// True when the user has consumed every item and server has no more
 	const [feedExhausted, setFeedExhausted] = useState(false);
+	// Web: track scroll offset for trim adjustment; store scroll adjustment when we trim from top
+	const lastScrollOffsetRef = useRef(0);
+	const pendingScrollAdjustmentRef = useRef<number | null>(null);
+	const [trimTrigger, setTrimTrigger] = useState(0);
 
 	// Unmount guard – prevents state updates after the component is torn down
 	useEffect(() => () => { isMountedRef.current = false; }, []);
@@ -88,6 +96,10 @@ export default function PropertyReelsView({
 	// Use measured container height for scroll stability. Static SCREEN_HEIGHT can mismatch
 	// the actual visible area (tab bar, safe area), causing wrong items to display.
 	const [containerHeight, setContainerHeight] = useState(SCREEN_HEIGHT);
+	const containerHeightRef = useRef(containerHeight);
+	useEffect(() => {
+		containerHeightRef.current = containerHeight;
+	}, [containerHeight]);
 
 	const handleLayout = useCallback((e: LayoutChangeEvent) => {
 		const { height } = e.nativeEvent.layout;
@@ -277,13 +289,25 @@ export default function PropertyReelsView({
 						const newItems = response.results.filter(
 							(item) => !existingIds.has(item.id),
 						);
-						const updated = [...prev, ...newItems];
+						let updated = [...prev, ...newItems];
+
+						// Web: keep only 2 pages to prevent mobile browser crashes
+						if (Platform.OS === "web" && updated.length > MAX_ITEMS_WEB) {
+							const removeCount = updated.length - MAX_ITEMS_WEB;
+							const itemHeight = containerHeightRef.current || SCREEN_HEIGHT;
+							pendingScrollAdjustmentRef.current = removeCount * itemHeight;
+							updated = updated.slice(-MAX_ITEMS_WEB);
+							setTrimTrigger((t) => t + 1); // Trigger scroll adjustment effect
+							console.log(
+								`📦 Trimmed to ${MAX_ITEMS_WEB} items (removed ${removeCount} from top)`,
+							);
+						}
 
 						console.log(
 							`✅ Page ${pageNum} loaded: ${newItems.length} new items (total: ${updated.length})`,
 						);
 
-						// Update cache so back-navigation restores full list
+						// Update cache – on web, cache only the trimmed window
 						setFeedCache({
 							items: updated,
 							page: pageNum,
@@ -353,6 +377,25 @@ export default function PropertyReelsView({
 		[isAuthenticated],
 	);
 
+	// Apply scroll adjustment after trim (web only) – keeps viewport stable when we remove items from top
+	// biome-ignore lint/correctness/useExhaustiveDependencies: trimTrigger intentionally used as run trigger only
+	useEffect(() => {
+		if (Platform.OS !== "web" || !flatListRef.current) return;
+		const adjustment = pendingScrollAdjustmentRef.current;
+		if (adjustment === null) return;
+		pendingScrollAdjustmentRef.current = null;
+		const newOffset = Math.max(
+			0,
+			lastScrollOffsetRef.current - adjustment,
+		);
+		requestAnimationFrame(() => {
+			flatListRef.current?.scrollToOffset({
+				offset: newOffset,
+				animated: false,
+			});
+		});
+	}, [trimTrigger]);
+
 	// [DEBUG] Log feed URL state on web mount
 	useEffect(() => {
 		if (__DEV__ && Platform.OS === "web") {
@@ -379,14 +422,22 @@ export default function PropertyReelsView({
 			if (!isMountedRef.current) return;
 			if (cachedData?.items && cachedData.items.length > 0) {
 				const cacheAge = getCacheAge(cachedData);
-				const isInitialPageOnly = cachedData.items.length <= 10; // Only page 1, safe to replace
+				const isInitialPageOnly = cachedData.items.length <= PAGE_SIZE;
 				// Revalidate when cache is stale (>30s) - fixes same feed on app reopen
 				const shouldRevalidate =
 					isInitialPageOnly && cacheAge > 30 * 1000;
+				// Web: trim cache to 2 pages on load to prevent memory bloat
+				let items = cachedData.items;
+				if (Platform.OS === "web" && items.length > MAX_ITEMS_WEB) {
+					items = items.slice(-MAX_ITEMS_WEB);
+					console.log(
+						`📦 Cache trimmed to ${MAX_ITEMS_WEB} items on load`,
+					);
+				}
 				console.log(
-					`📦 Loading feed from cache: ${cachedData.items.length} items (age: ${Math.round(cacheAge / 1000)}s${shouldRevalidate ? ", revalidating" : ""})`,
+					`📦 Loading feed from cache: ${items.length} items (age: ${Math.round(cacheAge / 1000)}s${shouldRevalidate ? ", revalidating" : ""})`,
 				);
-				setProperties(cachedData.items);
+				setProperties(items);
 				setHasNextPage(!!cachedData.next);
 				setPage(cachedData.page ?? 1);
 				setLoading(false);
@@ -635,6 +686,7 @@ export default function PropertyReelsView({
 			if (Platform.OS !== "web" || containerHeight <= 0) return;
 
 			const offsetY = e.nativeEvent.contentOffset.y;
+			lastScrollOffsetRef.current = offsetY;
 			const index = Math.round(offsetY / containerHeight);
 
 			// Debounce: only process after scroll settles
@@ -863,6 +915,7 @@ export default function PropertyReelsView({
 				}
 				refreshing={isRefreshing}
 				onRefresh={() => {
+					// Pull down at top → fresh feed (clears trimmed window, fetches new page 1)
 					setIsRefreshing(true);
 					setPage(1);
 					setHasNextPage(true);
