@@ -789,12 +789,6 @@ function isProperty(item: FeedItem): item is FeedProperty {
 	);
 }
 
-/** Build URL slug for a feed item: property-{id} or project-{id} */
-function getItemSlug(item: FeedItem): string {
-	const id = item?.id?.toString() ?? "";
-	return isProperty(item) ? `property-${id}` : `project-${id}`;
-}
-
 // ---------- Feed Container Component ----------
 export default function PropertyReelsView({
 	initialSlug,
@@ -812,7 +806,6 @@ export default function PropertyReelsView({
 	const [_currentIndex, setCurrentIndex] = useState(0);
 	const { isAuthenticated } = useUser();
 	const flatListRef = useRef<FlatList>(null);
-	const lastUrlSlugRef = useRef<string | null>(null);
 	const hasMountedRef = useRef(false);
 	const isLoadingNextPageRef = useRef(false);
 	const lastViewableCheckRef = useRef(0);
@@ -998,7 +991,6 @@ export default function PropertyReelsView({
 			return itemType === type && itemId === idStr;
 		});
 		if (index >= 0) {
-			lastUrlSlugRef.current = initialSlug;
 			flatListRef.current.scrollToOffset({
 				offset: index * SCREEN_HEIGHT,
 				animated: false,
@@ -1156,6 +1148,10 @@ export default function PropertyReelsView({
 		checkAndPrefetchNextPageRef.current = checkAndPrefetchNextPage;
 	}, [checkAndPrefetchNextPage]);
 
+	// Debounce viewability to prevent rapid processing during scroll (causes reel cycling on web)
+	const viewabilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const pendingViewableRef = useRef<{ index: number } | null>(null);
+
 	// Define stable viewability callback (doesn't change between renders)
 	const handleViewableItemsChanged = useCallback(
 		({
@@ -1163,7 +1159,6 @@ export default function PropertyReelsView({
 		}: {
 			viewableItems: Array<{ item: FeedItem; index: number | null }>;
 		}) => {
-			// Only process if not currently appending items
 			if (
 				isAppendingRef.current ||
 				!viewableItems ||
@@ -1174,40 +1169,39 @@ export default function PropertyReelsView({
 
 			const currentViewable = viewableItems[0];
 			const index = currentViewable?.index;
-			if (index !== undefined && index !== null && typeof index === "number") {
-				checkAndPrefetchNextPageRef.current(index);
+			if (index === undefined || index === null || typeof index !== "number") {
+				return;
 			}
 
-			// Update URL with feed/slug on web when scrolling to a new item
-			// Use history.replaceState to avoid remounting (router.replace would navigate)
-			if (
-				Platform.OS === "web" &&
-				typeof window !== "undefined" &&
-				currentViewable?.item
-			) {
-				const slug = getItemSlug(currentViewable.item);
-				if (slug && slug !== lastUrlSlugRef.current) {
-					lastUrlSlugRef.current = slug;
-					const pathname = window.location.pathname;
-					const base = pathname.split("/feed")[0] || "";
-					const newPath = `${base}/feed/${slug}`;
-					window.history.replaceState(null, "", newPath);
-					if (__DEV__) {
-						console.log("[feed:url] scroll →", {
-							slug,
-							index,
-							path: newPath,
-						});
-					}
+			// Debounce: only process after scroll settles (~400ms)
+			pendingViewableRef.current = { index };
+			if (viewabilityDebounceRef.current) {
+				clearTimeout(viewabilityDebounceRef.current);
+			}
+			viewabilityDebounceRef.current = setTimeout(() => {
+				viewabilityDebounceRef.current = null;
+				const pending = pendingViewableRef.current;
+				if (pending !== null) {
+					checkAndPrefetchNextPageRef.current(pending.index);
 				}
+			}, 400);
+		},
+		[],
+	);
+
+	// Cleanup debounce on unmount
+	useEffect(
+		() => () => {
+			if (viewabilityDebounceRef.current) {
+				clearTimeout(viewabilityDebounceRef.current);
 			}
 		},
 		[],
 	);
 
 	const viewabilityConfig = useRef({
-		itemVisiblePercentThreshold: 50,
-		minimumViewTime: 300,
+		itemVisiblePercentThreshold: 60,
+		minimumViewTime: 500,
 		waitForInteraction: false,
 	}).current;
 
