@@ -213,77 +213,89 @@ async function initializeProfile(): Promise<InitializationResult> {
 	}
 }
 
+// Guard: prevent double initialization (React Strict Mode / re-renders can trigger twice)
+let initializationPromise: Promise<AppInitializationStatus> | null = null;
+
 /**
  * Initialize all tabs in parallel
- * This is called during splash screen after authentication
+ * This is called during splash screen after authentication.
+ * Returns cached promise if already running/completed (prevents double init from Strict Mode).
  */
 export async function initializeAllTabs(): Promise<AppInitializationStatus> {
-	const overallStartTime = Date.now();
-
-	console.log("🚀 Starting app initialization...");
-
-	// Initialize all tabs in parallel for faster loading
-	const [feedResult, chatResult, searchResult, profileResult] =
-		await Promise.allSettled([
-			initializeFeed(),
-			initializeChat(),
-			initializeSearch(),
-			initializeProfile(),
-		]);
-
-	// Extract results
-	const feed: InitializationResult =
-		feedResult.status === "fulfilled"
-			? feedResult.value
-			: { success: false, error: String(feedResult.reason), duration: 0 };
-
-	const chat: InitializationResult =
-		chatResult.status === "fulfilled"
-			? chatResult.value
-			: { success: false, error: String(chatResult.reason), duration: 0 };
-
-	const search: InitializationResult =
-		searchResult.status === "fulfilled"
-			? searchResult.value
-			: { success: false, error: String(searchResult.reason), duration: 0 };
-
-	const profile: InitializationResult =
-		profileResult.status === "fulfilled"
-			? profileResult.value
-			: { success: false, error: String(profileResult.reason), duration: 0 };
-
-	const totalDuration = Date.now() - overallStartTime;
-	const allSuccessful =
-		feed.success && chat.success && search.success && profile.success;
-
-	const status: AppInitializationStatus = {
-		feed,
-		chat,
-		search,
-		profile,
-		totalDuration,
-		allSuccessful,
-	};
-
-	// Log summary
-	const successCount = [
-		feed.success,
-		chat.success,
-		search.success,
-		profile.success,
-	].filter(Boolean).length;
-	console.log(
-		`${allSuccessful ? "✅" : "⚠️"} App initialization complete: ${successCount}/4 tabs ready in ${totalDuration}ms`,
-	);
-
-	if (!feed.success) {
-		console.warn("⚠️ Feed initialization failed - will load on first tab visit");
+	if (initializationPromise) {
+		return initializationPromise;
 	}
-	if (!chat.success) {
-		console.warn(
-			"⚠️ Chat initialization failed - will load on first chat visit",
+
+	initializationPromise = (async () => {
+		const overallStartTime = Date.now();
+
+		console.log("🚀 Starting app initialization...");
+
+		// Initialize all tabs in parallel for faster loading
+		const [feedResult, chatResult, searchResult, profileResult] =
+			await Promise.allSettled([
+				initializeFeed(),
+				initializeChat(),
+				initializeSearch(),
+				initializeProfile(),
+			]);
+
+		// Extract results
+		const feed: InitializationResult =
+			feedResult.status === "fulfilled"
+				? feedResult.value
+				: { success: false, error: String(feedResult.reason), duration: 0 };
+
+		const chat: InitializationResult =
+			chatResult.status === "fulfilled"
+				? chatResult.value
+				: { success: false, error: String(chatResult.reason), duration: 0 };
+
+		const search: InitializationResult =
+			searchResult.status === "fulfilled"
+				? searchResult.value
+				: { success: false, error: String(searchResult.reason), duration: 0 };
+
+		const profile: InitializationResult =
+			profileResult.status === "fulfilled"
+				? profileResult.value
+				: { success: false, error: String(profileResult.reason), duration: 0 };
+
+		const totalDuration = Date.now() - overallStartTime;
+		const allSuccessful =
+			feed.success && chat.success && search.success && profile.success;
+
+		const status: AppInitializationStatus = {
+			feed,
+			chat,
+			search,
+			profile,
+			totalDuration,
+			allSuccessful,
+		};
+
+		// Log summary
+		const successCount = [
+			feed.success,
+			chat.success,
+			search.success,
+			profile.success,
+		].filter(Boolean).length;
+		console.log(
+			`${allSuccessful ? "✅" : "⚠️"} App initialization complete: ${successCount}/4 tabs ready in ${totalDuration}ms`,
 		);
-	}
 
-	return status;
+		if (!feed.success) {
+			console.warn("⚠️ Feed initialization failed - will load on first tab visit");
+		}
+		if (!chat.success) {
+			console.warn(
+				"⚠️ Chat initialization failed - will load on first chat visit",
+			);
+		}
+
+		return status;
+	})();
+
+	return initializationPromise;
 }

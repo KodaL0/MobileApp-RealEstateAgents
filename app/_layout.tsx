@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView
@@ -75,27 +75,24 @@ function InnerApp() {
     }
   }, [fontsLoaded, showCustomSplash, splashFinished]);
 
+  // Memoize init task (must be before any early returns - hooks rules)
+  const initializationTask = useCallback(async () => {
+    while (!authCheckComplete) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (isAuthenticated) {
+      console.log('🚀 Running app initialization during splash...');
+      await initializeAllTabs();
+    } else {
+      console.log('⏭️ Skipping initialization (not authenticated)');
+    }
+  }, [authCheckComplete, isAuthenticated]);
+
   // 1) fonts
   if (!fontsLoaded && !fontError) return null;
 
   // 2) splash - runs initialization after auth check
   if (showCustomSplash && !splashFinished) {
-    // Create initialization task that waits for auth then initializes tabs
-    const initializationTask = async () => {
-      // Wait for auth check to complete
-      while (!authCheckComplete) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      // Only initialize if authenticated
-      if (isAuthenticated) {
-        console.log('🚀 Running app initialization during splash...');
-        await initializeAllTabs();
-      } else {
-        console.log('⏭️ Skipping initialization (not authenticated)');
-      }
-    };
-
     return (
       <SplashScreen
         onFinish={async () => {
