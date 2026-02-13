@@ -1,21 +1,19 @@
-import React, {
-  useState,
-  useRef,
-  useCallback,
-  useEffect,
-  ReactNode,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Dimensions,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
+  type ImageStyle,
+  type StyleProp,
+  type ViewStyle,
   ActivityIndicator,
   Animated,
+  Dimensions,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {
   Heart,
@@ -47,10 +45,10 @@ const OptimizedImage = React.memo(
     containerStyle,
   }: {
     uri: string;
-    style: any;
+    style: StyleProp<ImageStyle>;
     blurRadius?: number;
     onError?: () => void;
-    containerStyle?: any;
+    containerStyle?: StyleProp<ViewStyle>;
   }) => {
     const [imageError, setImageError] = useState(false);
     const [imageLoading, setImageLoading] = useState(true);
@@ -120,12 +118,12 @@ const CarouselDots = React.memo(
 
     return (
       <View style={styles.carouselDots}>
-        {Array.from({ length: count }).map((_, index) => (
+        {Array.from({ length: count }, (_, i) => i).map((dotIndex) => (
           <View
-            key={index}
+            key={`dot-${dotIndex}`}
             style={[
               styles.dot,
-              index === currentIndex && styles.dotActive,
+              dotIndex === currentIndex && styles.dotActive,
             ]}
           />
         ))}
@@ -188,10 +186,10 @@ export function BaseReelCard({
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ x: 0, animated: false });
     }
-  }, [images.length]);
+  }, []);
 
   const handleScroll = useCallback(
-    (event: any) => {
+    (event: { nativeEvent: { contentOffset: { x: number } } }) => {
       const index = Math.round(
         event.nativeEvent.contentOffset.x / SCREEN_WIDTH
       );
@@ -231,7 +229,7 @@ export function BaseReelCard({
   }, [heartScale, heartOpacity]);
 
   // Tap / double-tap handler
-  const handleTouchStart = useCallback((event: any) => {
+  const handleTouchStart = useCallback((event: { nativeEvent: { touches: Array<{ pageY: number; pageX: number }> } }) => {
     const touch = event.nativeEvent.touches[0];
     if (touch) {
       touchStartY.current = touch.pageY;
@@ -240,7 +238,7 @@ export function BaseReelCard({
   }, []);
 
   const handleTouchEnd = useCallback(
-    (event: any) => {
+    (event: { nativeEvent: { changedTouches?: Array<{ pageY: number; pageX: number }> } }) => {
       const touch = event.nativeEvent.changedTouches?.[0];
       if (!touch) return;
 
@@ -297,8 +295,8 @@ export function BaseReelCard({
           snapToInterval={SCREEN_WIDTH}
           snapToAlignment="center"
         >
-          {displayImages.map((uri: string, index: number) => (
-            <View key={`image-${index}`} style={styles.imageWrapper}>
+          {displayImages.map((uri: string) => (
+            <View key={uri} style={styles.imageWrapper}>
               <OptimizedImage
                 uri={uri}
                 style={StyleSheet.absoluteFillObject}

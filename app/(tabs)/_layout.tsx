@@ -1,8 +1,8 @@
 // File: app/(tabs)/_layout.tsx
 import { useMemo } from 'react';
 import { Dimensions, Platform, StyleSheet } from 'react-native';
-import { Tabs, type Href, usePathname, useRouter } from 'expo-router';
-import { Home, Search, MessageSquare, User } from 'lucide-react-native';
+import { type Href, Tabs, usePathname, useRouter } from 'expo-router';
+import { Home, MessageSquare, Search, User } from 'lucide-react-native';
 import { getLastChatRoute } from '../features/chat/navigationState';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -40,7 +40,6 @@ export default function TabLayout() {
         tabBarStyle: tabBarStyle,
         tabBarLabelStyle: styles.label,
         tabBarShowLabel: !IS_SMALL_SCREEN,
-        tabBarScrollEnabled: IS_SMALL_SCREEN,
       }}
     >
       <Tabs.Screen

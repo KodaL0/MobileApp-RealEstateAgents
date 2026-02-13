@@ -1,14 +1,14 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
+	Bath,
+	Bed,
 	Heart,
 	MapPin,
-	Square,
-	UserCircle,
 	MessageCircle,
 	Share,
-	Bed,
-	Bath,
+	Square,
+	UserCircle,
 } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -25,6 +25,7 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
+import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
 import { useUser } from "@/app/_userbase/UserContext";
 import { useChat } from "@/app/features/chat/context/ChatContext";
 import type { FeedItem, FeedProperty } from "@/app/features/types";
@@ -51,12 +52,12 @@ const OptimizedImage = memo(
 		blurRadius = 0,
 		onError,
 		containerStyle,
-	}: {
+  }: {
 		uri: string;
-		style: any;
+		style: StyleProp<ImageStyle>;
 		blurRadius?: number;
 		onError?: () => void;
-		containerStyle?: any;
+		containerStyle?: StyleProp<ViewStyle>;
 	}) => {
 		const [imageError, setImageError] = useState(false);
 		const [imageLoading, setImageLoading] = useState(true);
@@ -263,7 +264,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
 		if (!property) return [getValidUrl()];
 		if (property.images && property.images.length > 0) {
 			return property.images
-				.map((img: any) =>
+				.map((img: { image?: string } | string) =>
 					typeof img === "string" ? getValidUrl(img) : getValidUrl(img.image),
 				)
 				.filter(Boolean);
@@ -271,7 +272,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
 		return [getValidUrl()];
 	}, [property, getValidUrl]);
 
-	const handleScroll = useCallback((event: any) => {
+	const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
 		const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
 		setCurrentIndex(index);
 	}, []);
@@ -406,14 +407,14 @@ const PropertyReelCard = memo(function PropertyReelCard({
 					fetchError,
 				);
 			}
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error("Failed to toggle favorite:", e);
 			Alert.alert("Error", "Failed to update favorite. Please try again.");
 		}
 	}, [property?.id, isLiked, onFavoriteMetaUpdate, getFavoriteCountValue]);
 
 	// Tap / double-tap handler
-	const handleTouchStart = useCallback((event: any) => {
+	const handleTouchStart = useCallback((event: { nativeEvent: { touches: Array<{ pageY: number; pageX: number }> } }) => {
 		const touch = event.nativeEvent.touches[0];
 		if (touch) {
 			touchStartY.current = touch.pageY;
@@ -422,7 +423,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
 	}, []);
 
 	const handleTouchEnd = useCallback(
-		(event: any) => {
+		(event: { nativeEvent: { changedTouches?: Array<{ pageY: number; pageX: number }> } }) => {
 			const touch = event.nativeEvent.changedTouches?.[0];
 			if (!touch) return;
 
@@ -487,7 +488,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
 			});
 
 			router.push(`/chat/${threadId}`);
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error("Failed to initiate chat:", e);
 			Alert.alert("Error", "Failed to open chat. Please try again.");
 		} finally {
@@ -510,7 +511,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
 				"Share tracked! Full sharing functionality coming soon.",
 				[{ text: "OK" }],
 			);
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error("Failed to track share:", e);
 			Alert.alert("Error", "Failed to track share. Please try again.");
 		}
@@ -751,12 +752,14 @@ PropertyReelCard.displayName = "PropertyReelCard";
 // Type guard to check if item is a property
 function isProperty(item: FeedItem): item is FeedProperty {
 	// Check _type discriminator first (most reliable)
-	if ((item as any)._type === "property") return true;
-	if ((item as any)._type === "project") return false;
+	const withType = item as { _type?: string };
+	if (withType._type === "property") return true;
+	if (withType._type === "project") return false;
 	// Fallback: check for property_type field (properties have it, projects don't)
+	const withTypes = item as { property_types?: unknown[] };
 	return (
 		"property_type" in item &&
-		!("property_types" in item && Array.isArray((item as any).property_types))
+		!("property_types" in item && Array.isArray(withTypes.property_types))
 	);
 }
 
@@ -878,11 +881,11 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 				}
 
 				setHasNextPage(response.next !== null);
-			} catch (err: any) {
+			} catch (err: unknown) {
 				console.error("Failed to fetch feed:", err);
 				if (!silent) {
 					setError(
-						err?.response?.data?.detail ||
+						(err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
 							"Failed to load feed. Please try again.",
 					);
 				}
@@ -1022,7 +1025,7 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 					// Preload all images for first few items
 					const imagesToLoad = item.images.slice(0, 3); // First 3 images per property
 					return Promise.all(
-						imagesToLoad.map((img: any) => {
+						imagesToLoad.map((img: { image?: string } | string) => {
 							const imageUrl = typeof img === "string" ? img : img?.image;
 							if (typeof imageUrl === "string" && imageUrl) {
 								const fullUrl = imageUrl.startsWith("http")
@@ -1124,7 +1127,7 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 	}).current;
 
 	const getItemLayout = useCallback(
-		(_: any, index: number) => ({
+		(_: unknown, index: number) => ({
 			length: SCREEN_HEIGHT,
 			offset: SCREEN_HEIGHT * index,
 			index,
