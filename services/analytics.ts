@@ -491,6 +491,99 @@ export function trackInstagramPost(params: {
 }
 
 // ============================================================================
+// FEED EVENTS (impression, dwell, not-interested)
+// ============================================================================
+
+export interface FeedImpressionParams {
+  itemId: number | string;
+  itemType: 'property' | 'project';
+  position: number;
+  slotType?: string | null;
+  matchScore?: number | null;
+}
+
+export interface FeedDwellParams {
+  itemId: number | string;
+  itemType: 'property' | 'project';
+  dwellTimeMs: number;
+  position: number;
+}
+
+export interface FeedNotInterestedParams {
+  itemId: number | string;
+  itemType: 'property' | 'project';
+}
+
+/**
+ * Track when a feed item becomes visible in the viewport.
+ *
+ * @example
+ * ```ts
+ * analytics.trackFeedImpression({
+ *   itemId: 123,
+ *   itemType: 'property',
+ *   position: 0,
+ *   slotType: 'personalized',
+ *   matchScore: 0.87,
+ * });
+ * ```
+ */
+export function trackFeedImpression(params: FeedImpressionParams): void {
+  trackEvent('feed_impression', {
+    propertyId: params.itemId,
+    metadata: {
+      item_type: params.itemType,
+      position: params.position,
+      slot_type: params.slotType ?? null,
+      match_score: params.matchScore ?? null,
+    },
+  });
+}
+
+/**
+ * Track how long a user viewed a single feed item.
+ * Only fired when dwell > 500 ms (meaningful view).
+ *
+ * @example
+ * ```ts
+ * analytics.trackFeedDwell({
+ *   itemId: 123,
+ *   itemType: 'property',
+ *   dwellTimeMs: 4200,
+ *   position: 2,
+ * });
+ * ```
+ */
+export function trackFeedDwell(params: FeedDwellParams): void {
+  trackEvent('feed_dwell', {
+    propertyId: params.itemId,
+    metadata: {
+      item_type: params.itemType,
+      dwell_time_ms: params.dwellTimeMs,
+      position: params.position,
+    },
+  });
+}
+
+/**
+ * Track when a user explicitly signals "not interested" on a feed item.
+ * This is a strong negative signal for the ranking algorithm.
+ *
+ * @example
+ * ```ts
+ * analytics.trackFeedNotInterested({ itemId: 123, itemType: 'property' });
+ * ```
+ */
+export function trackFeedNotInterested(params: FeedNotInterestedParams): void {
+  trackEvent('feed_not_interested', {
+    propertyId: params.itemId,
+    metadata: {
+      item_type: params.itemType,
+    },
+  });
+}
+
+// ============================================================================
 // EXPORT: Centralized Analytics Object
 // ============================================================================
 
@@ -534,6 +627,11 @@ export const analytics = {
 
   // Instagram events
   trackInstagramPost,
+
+  // Feed events
+  trackFeedImpression,
+  trackFeedDwell,
+  trackFeedNotInterested,
 };
 
 export default analytics;

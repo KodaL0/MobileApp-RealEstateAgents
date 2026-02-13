@@ -544,6 +544,13 @@ export const api = {
         previous: payload?.previous ?? null,
       };
     },
+
+    /**
+     * Signal "not interested" for a feed item.
+     * Tells the ranking algorithm to de-prioritise similar content.
+     */
+    notInterested: (itemId: number | string, itemType: 'property' | 'project') =>
+      apiPost('feed/not-interested', { item_id: itemId, item_type: itemType }).then(res => res.data),
   },
 
   // Analytics endpoints

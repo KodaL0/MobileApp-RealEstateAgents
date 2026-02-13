@@ -1,7 +1,13 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { Heart, MessageCircle, Share, UserCircle } from "lucide-react-native";
+import {
+	Heart,
+	MessageCircle,
+	Share,
+	UserCircle,
+	X,
+} from "lucide-react-native";
 import type { ReactNode } from "react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Animated,
@@ -20,17 +26,13 @@ import {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// Calculate consistent image dimensions
+// Side-action column width (used for image frame inset)
+const SIDE_ACTIONS_WIDTH = 56;
 const IMAGE_PADDING = 48;
 const IMAGE_WIDTH = SCREEN_WIDTH - IMAGE_PADDING;
 const IMAGE_ASPECT_RATIO = 16 / 9;
-const IMAGE_MAX_HEIGHT = SCREEN_HEIGHT * 0.68;
-const IMAGE_HEIGHT = Math.min(
-	IMAGE_WIDTH / IMAGE_ASPECT_RATIO,
-	IMAGE_MAX_HEIGHT,
-);
 
-// Memoized image component
+// ---------- OptimizedImage (force-cache + fadeDuration 0 for perf) ----------
 const OptimizedImage = React.memo(
 	({
 		uri,
@@ -81,12 +83,16 @@ const OptimizedImage = React.memo(
 				)}
 
 				<Image
-					source={{ uri: imageUri }}
+					source={{
+						uri: imageUri,
+						cache: "force-cache",
+					}}
 					style={[StyleSheet.absoluteFillObject, style]}
 					resizeMode="cover"
 					onError={handleError}
 					onLoad={handleLoad}
 					blurRadius={blurRadius}
+					fadeDuration={0}
 				/>
 			</View>
 		);
@@ -94,13 +100,21 @@ const OptimizedImage = React.memo(
 );
 OptimizedImage.displayName = "OptimizedImage";
 
-// Carousel dots component
+// ---------- Carousel dots ----------
 const CarouselDots = React.memo(
-	({ count, currentIndex }: { count: number; currentIndex: number }) => {
+	({
+		count,
+		currentIndex,
+		style,
+	}: {
+		count: number;
+		currentIndex: number;
+		style?: ViewStyle;
+	}) => {
 		if (count <= 1) return null;
 
 		return (
-			<View style={styles.carouselDots}>
+			<View style={[styles.carouselDots, style]}>
 				{Array.from({ length: count }, (_, i) => i).map((dotIndex) => (
 					<View
 						key={`dot-${dotIndex}`}
@@ -113,6 +127,7 @@ const CarouselDots = React.memo(
 );
 CarouselDots.displayName = "CarouselDots";
 
+// ---------- Props ----------
 export interface BaseReelCardProps {
 	// Images
 	images: string[];
@@ -126,6 +141,7 @@ export interface BaseReelCardProps {
 	onShare?: () => void;
 	onAgentPress?: () => void;
 	onView: () => void;
+	onNotInterested?: () => void;
 	// State
 	isLiked: boolean;
 	favoriteCount: number;
@@ -134,11 +150,14 @@ export interface BaseReelCardProps {
 	onImageChange?: (index: number) => void;
 	// Base URL for images
 	baseUrl?: string;
+	// Measured container height from feed (prevents layout drift vs static SCREEN_HEIGHT)
+	containerHeight?: number;
 	// Direction lock for nested scroll (feed)
 	onHorizontalScrollBegin?: () => void;
 	onHorizontalScrollEnd?: () => void;
 }
 
+// ---------- Component ----------
 export function BaseReelCard({
 	images,
 	topBarContent,
@@ -148,14 +167,19 @@ export function BaseReelCard({
 	onShare,
 	onAgentPress,
 	onView,
+	onNotInterested,
 	isLiked,
 	favoriteCount,
 	isChatLoading = false,
 	onImageChange,
 	baseUrl = "https://propertprodjango.onrender.com",
+	containerHeight: containerHeightProp,
 	onHorizontalScrollBegin,
 	onHorizontalScrollEnd,
 }: BaseReelCardProps) {
+	// Use measured height when available; fall back to static screen height
+	const h = containerHeightProp || SCREEN_HEIGHT;
+
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [showHeartAnimation, setShowHeartAnimation] = useState(false);
 	const scrollViewRef = useRef<ScrollView>(null);
@@ -164,6 +188,69 @@ export function BaseReelCard({
 	const lastTap = useRef<number>(0);
 	const touchStartY = useRef<number>(0);
 	const touchStartX = useRef<number>(0);
+
+	// Height-dependent styles recomputed when container height changes
+	const dyn = useMemo(
+		() => ({
+			outer: {
+				height: h,
+				width: SCREEN_WIDTH,
+				backgroundColor: "#000",
+			} as ViewStyle,
+			inner: {
+				width: SCREEN_WIDTH,
+				height: h,
+				position: "relative" as const,
+				backgroundColor: "#000",
+				overflow: "hidden" as const,
+			} as ViewStyle,
+			scroll: { width: SCREEN_WIDTH, height: h } as ViewStyle,
+			page: {
+				width: SCREEN_WIDTH,
+				height: h,
+				justifyContent: "center" as const,
+				alignItems: "center" as const,
+				position: "relative" as const,
+				backgroundColor: "#000",
+				overflow: "hidden" as const,
+			} as ViewStyle,
+			gradient: {
+				position: "absolute" as const,
+				bottom: 0,
+				left: 0,
+				right: 0,
+				height: h * 0.45,
+			} as ViewStyle,
+			topBar: {
+				position: "absolute" as const,
+				top: h * 0.05,
+				left: 20,
+				right: 20,
+				zIndex: 10,
+			} as ViewStyle,
+			dots: {
+				position: "absolute" as const,
+				top: h * 0.15,
+				left: 0,
+				right: 0,
+				zIndex: 5,
+			} as ViewStyle,
+			sideActions: {
+				position: "absolute" as const,
+				right: 16,
+				top: h * 0.25,
+				alignItems: "center" as const,
+				zIndex: 20,
+			} as ViewStyle,
+			imageFrame: {
+				width: SCREEN_WIDTH - SIDE_ACTIONS_WIDTH * 2,
+				height: Math.min(IMAGE_WIDTH / IMAGE_ASPECT_RATIO, h * 0.68),
+				justifyContent: "center" as const,
+				alignItems: "center" as const,
+			} as ViewStyle,
+		}),
+		[h],
+	);
 
 	useEffect(() => {
 		setShowHeartAnimation(false);
@@ -266,9 +353,9 @@ export function BaseReelCard({
 	const displayImages = validImages.length > 0 ? validImages : [getValidUrl()];
 
 	return (
-		<View style={styles.safeContainer}>
+		<View style={dyn.outer}>
 			<View
-				style={styles.container}
+				style={dyn.inner}
 				onTouchStart={handleTouchStart}
 				onTouchEnd={handleTouchEnd}
 				onStartShouldSetResponder={() => false}
@@ -281,11 +368,17 @@ export function BaseReelCard({
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
 					onScroll={handleScroll}
-					onScrollBeginDrag={displayImages.length > 1 ? onHorizontalScrollBegin : undefined}
-					onScrollEndDrag={displayImages.length > 1 ? onHorizontalScrollEnd : undefined}
-					onMomentumScrollEnd={displayImages.length > 1 ? onHorizontalScrollEnd : undefined}
+					onScrollBeginDrag={
+						displayImages.length > 1 ? onHorizontalScrollBegin : undefined
+					}
+					onScrollEndDrag={
+						displayImages.length > 1 ? onHorizontalScrollEnd : undefined
+					}
+					onMomentumScrollEnd={
+						displayImages.length > 1 ? onHorizontalScrollEnd : undefined
+					}
 					scrollEventThrottle={16}
-					style={styles.imageScroll}
+					style={dyn.scroll}
 					decelerationRate="fast"
 					snapToInterval={SCREEN_WIDTH}
 					snapToAlignment="center"
@@ -293,20 +386,29 @@ export function BaseReelCard({
 					alwaysBounceVertical={false}
 					nestedScrollEnabled={true}
 				>
-					{displayImages.map((uri: string) => (
-						<View key={uri} style={styles.imageWrapper}>
+					{displayImages.map((uri: string, index: number) => (
+						<View key={uri || `image-${index}`} style={dyn.page}>
+							{/* Blurred background */}
 							<OptimizedImage
 								uri={uri}
 								style={StyleSheet.absoluteFillObject}
 								containerStyle={StyleSheet.absoluteFillObject}
 								blurRadius={25}
 							/>
+
+							{/* Dark overlay */}
 							<View style={styles.imageOverlay} />
-							<View style={styles.imageFrame}>
+
+							{/* Foreground image (contain) */}
+							<View style={dyn.imageFrame}>
 								<Image
-									source={{ uri }}
+									source={{
+										uri,
+										cache: "force-cache",
+									}}
 									style={styles.image}
 									resizeMode="contain"
+									fadeDuration={0}
 								/>
 							</View>
 						</View>
@@ -317,16 +419,17 @@ export function BaseReelCard({
 				<CarouselDots
 					count={displayImages.length}
 					currentIndex={currentIndex}
+					style={dyn.dots}
 				/>
 
 				{/* Bottom gradient */}
 				<LinearGradient
 					colors={["transparent", "rgba(0,0,0,0.4)", "rgba(0,0,0,0.9)"]}
-					style={styles.bottomGradient}
+					style={dyn.gradient}
 				/>
 
 				{/* Top bar */}
-				{topBarContent && <View style={styles.topBar}>{topBarContent}</View>}
+				{topBarContent && <View style={dyn.topBar}>{topBarContent}</View>}
 
 				{/* Heart animation overlay */}
 				{showHeartAnimation && (
@@ -345,7 +448,8 @@ export function BaseReelCard({
 				)}
 
 				{/* RIGHT-SIDE ACTION COLUMN */}
-				<View style={styles.sideActions}>
+				<View style={dyn.sideActions}>
+					{/* Heart + count */}
 					<TouchableOpacity
 						style={styles.iconCircle}
 						onPress={onFavorite}
@@ -360,6 +464,7 @@ export function BaseReelCard({
 					</TouchableOpacity>
 					<Text style={styles.likeCount}>{favoriteCount}</Text>
 
+					{/* Chat */}
 					{onChat && (
 						<TouchableOpacity
 							style={styles.iconCircle}
@@ -375,6 +480,7 @@ export function BaseReelCard({
 						</TouchableOpacity>
 					)}
 
+					{/* Share */}
 					{onShare && (
 						<TouchableOpacity
 							style={styles.iconCircle}
@@ -385,6 +491,7 @@ export function BaseReelCard({
 						</TouchableOpacity>
 					)}
 
+					{/* Agent */}
 					{onAgentPress && (
 						<TouchableOpacity
 							style={styles.iconCircle}
@@ -395,6 +502,7 @@ export function BaseReelCard({
 						</TouchableOpacity>
 					)}
 
+					{/* View */}
 					<TouchableOpacity
 						style={styles.viewCircle}
 						onPress={onView}
@@ -402,6 +510,17 @@ export function BaseReelCard({
 					>
 						<Text style={styles.viewText}>View</Text>
 					</TouchableOpacity>
+
+					{/* Not interested */}
+					{onNotInterested && (
+						<TouchableOpacity
+							style={styles.notInterestedCircle}
+							onPress={onNotInterested}
+							activeOpacity={0.8}
+						>
+							<X size={20} color="rgba(255,255,255,0.6)" strokeWidth={2} />
+						</TouchableOpacity>
+					)}
 				</View>
 
 				{/* BOTTOM CONTENT */}
@@ -412,54 +531,16 @@ export function BaseReelCard({
 }
 
 const ICON_CIRCLE_SIZE = 40;
-const SIDE_ACTIONS_WIDTH = 56; // Icon column width to avoid image overlap
 
 const styles = StyleSheet.create({
-	safeContainer: {
-		height: SCREEN_HEIGHT,
-		width: SCREEN_WIDTH,
-		backgroundColor: "#000",
-	},
-	container: {
-		width: SCREEN_WIDTH,
-		height: SCREEN_HEIGHT,
-		position: "relative",
-		backgroundColor: "#000",
-		overflow: "hidden",
-	},
-	imageScroll: {
-		width: SCREEN_WIDTH,
-		height: SCREEN_HEIGHT,
-	},
-	imageWrapper: {
-		width: SCREEN_WIDTH,
-		height: SCREEN_HEIGHT,
-		justifyContent: "center",
-		alignItems: "center",
-		position: "relative",
-		backgroundColor: "#000",
-		overflow: "hidden",
-	},
+	// Image
 	imageOverlay: {
 		...StyleSheet.absoluteFillObject,
 		backgroundColor: "rgba(0,0,0,0.35)",
 	},
-	imageFrame: {
-		width: SCREEN_WIDTH - SIDE_ACTIONS_WIDTH * 2,
-		height: IMAGE_HEIGHT,
-		justifyContent: "center",
-		alignItems: "center",
-	},
 	image: {
 		width: "100%",
 		height: "100%",
-	},
-	bottomGradient: {
-		position: "absolute",
-		bottom: 0,
-		left: 0,
-		right: 0,
-		height: SCREEN_HEIGHT * 0.45,
 	},
 	imageLoadingOverlay: {
 		backgroundColor: "#111827",
@@ -477,23 +558,13 @@ const styles = StyleSheet.create({
 		color: "#6b7280",
 		fontSize: 12,
 	},
-	topBar: {
-		position: "absolute",
-		top: SCREEN_HEIGHT * 0.05,
-		left: 20,
-		right: 20,
-		zIndex: 10,
-	},
+
+	// Carousel dots (position comes from dynamic style prop)
 	carouselDots: {
-		position: "absolute",
-		top: SCREEN_HEIGHT * 0.15,
-		left: 0,
-		right: 0,
 		flexDirection: "row",
 		justifyContent: "center",
 		alignItems: "center",
 		gap: 6,
-		zIndex: 5,
 	},
 	dot: {
 		width: 6,
@@ -505,6 +576,8 @@ const styles = StyleSheet.create({
 		width: 20,
 		backgroundColor: "rgba(255, 255, 255, 0.9)",
 	},
+
+	// Heart animation
 	heartAnimation: {
 		position: "absolute",
 		top: "50%",
@@ -515,13 +588,8 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	sideActions: {
-		position: "absolute",
-		right: 16,
-		top: SCREEN_HEIGHT * 0.25,
-		alignItems: "center",
-		zIndex: 20,
-	},
+
+	// Side actions
 	iconCircle: {
 		width: ICON_CIRCLE_SIZE,
 		height: ICON_CIRCLE_SIZE,
@@ -551,6 +619,17 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: "700",
 	},
+	notInterestedCircle: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: "rgba(0,0,0,0.25)",
+		alignItems: "center",
+		justifyContent: "center",
+		marginTop: 10,
+	},
+
+	// Bottom content
 	bottomInfo: {
 		position: "absolute",
 		bottom: 72,

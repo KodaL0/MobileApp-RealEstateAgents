@@ -17,8 +17,10 @@ function ProjectReelCard({
 	onViewProject,
 	source,
 	onFavoriteMetaUpdate,
-  onHorizontalScrollBegin,
-  onHorizontalScrollEnd,
+	onHorizontalScrollBegin,
+	onHorizontalScrollEnd,
+	containerHeight,
+	onNotInterested,
 }: {
 	project: FeedProject;
 	onViewProject?: () => void;
@@ -27,8 +29,10 @@ function ProjectReelCard({
 		projectId: number | string,
 		meta: { favorites_count?: number | null; is_favourite?: boolean | null },
 	) => void;
-  onHorizontalScrollBegin?: () => void;
-  onHorizontalScrollEnd?: () => void;
+	onHorizontalScrollBegin?: () => void;
+	onHorizontalScrollEnd?: () => void;
+	containerHeight?: number;
+	onNotInterested?: () => void;
 }) {
 	const router = useRouter();
 	const getFavoriteCountValue = useCallback((value: unknown): number | null => {
@@ -62,8 +66,17 @@ function ProjectReelCard({
 		}
 	}, [project?.favorites_count, getFavoriteCountValue]);
 
+	// Only fetch favourite metadata if not already provided by the feed
 	useEffect(() => {
 		if (!project?.id) return;
+
+		// Skip if we already have the data from feed
+		if (
+			project.is_favourite !== undefined &&
+			project.favorites_count !== undefined
+		) {
+			return;
+		}
 
 		let isMounted = true;
 
@@ -99,7 +112,13 @@ function ProjectReelCard({
 		return () => {
 			isMounted = false;
 		};
-	}, [project?.id, getFavoriteCountValue, onFavoriteMetaUpdate]);
+	}, [
+		project?.id,
+		project?.is_favourite,
+		project?.favorites_count,
+		getFavoriteCountValue,
+		onFavoriteMetaUpdate,
+	]);
 
 	useEffect(() => {
 		setIsChatLoading(false);
@@ -302,6 +321,7 @@ function ProjectReelCard({
 		handleViewPress();
 	}, [handleViewPress]);
 
+	// Optimised favourite – trust toggle response, no follow-up getById
 	const handleFavorite = useCallback(async () => {
 		if (!project?.id) {
 			console.warn(
@@ -332,28 +352,12 @@ function ProjectReelCard({
 				return nextLiked ? safePrev + 1 : Math.max(0, safePrev - 1);
 			});
 
-			try {
-				const details = await api.listings.getById(projectId, "project");
-				const refreshedCount = getFavoriteCountValue(details?.favorites_count);
-				if (refreshedCount !== null) {
-					setFavoriteCount(refreshedCount);
-				}
-				if (typeof details?.is_favourite === "boolean") {
-					setIsLiked(details.is_favourite);
-				}
-				onFavoriteMetaUpdate?.(projectId, {
-					favorites_count: refreshedCount ?? details?.favorites_count ?? null,
-					is_favourite:
-						typeof details?.is_favourite === "boolean"
-							? details.is_favourite
-							: null,
-				});
-			} catch (fetchError) {
-				console.warn(
-					"ProjectReelCard: Failed to refresh favorites_count after toggle",
-					fetchError,
-				);
-			}
+			// Propagate to parent for list-level state
+			onFavoriteMetaUpdate?.(projectId, {
+				favorites_count:
+					getFavoriteCountValue(response?.favorites_count) ?? null,
+				is_favourite: nextLiked,
+			});
 		} catch (e: unknown) {
 			console.error("Failed to toggle favorite:", e);
 			Alert.alert("Error", "Failed to update favorite. Please try again.");
@@ -529,14 +533,16 @@ function ProjectReelCard({
 				onShare={handleShare}
 				onAgentPress={handleAgentProfilePress}
 				onView={handleViewPress}
+				onNotInterested={onNotInterested}
 				isLiked={isLiked}
 				favoriteCount={favoriteCount}
 				isChatLoading={isChatLoading}
 				onImageChange={handleImageChange}
 				baseUrl={BASE_URL}
-        onHorizontalScrollBegin={onHorizontalScrollBegin}
-        onHorizontalScrollEnd={onHorizontalScrollEnd}
-      />
+				containerHeight={containerHeight}
+				onHorizontalScrollBegin={onHorizontalScrollBegin}
+				onHorizontalScrollEnd={onHorizontalScrollEnd}
+			/>
 		</View>
 	);
 }
