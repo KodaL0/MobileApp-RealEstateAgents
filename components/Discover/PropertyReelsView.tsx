@@ -11,7 +11,7 @@ import {
 	UserCircle,
 } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
+import type { ImageStyle, LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import {
 	ActivityIndicator,
 	Alert,
@@ -812,6 +812,17 @@ export default function PropertyReelsView({
 	const isAppendingRef = useRef(false);
 	const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 
+	// Use measured container height for scroll stability. Static SCREEN_HEIGHT can mismatch
+	// the actual visible area (tab bar, safe area), causing wrong items to display.
+	const [containerHeight, setContainerHeight] = useState(SCREEN_HEIGHT);
+
+	const handleLayout = useCallback((e: LayoutChangeEvent) => {
+		const { height } = e.nativeEvent.layout;
+		if (height > 0) {
+			setContainerHeight(height);
+		}
+	}, []);
+
 	const handleFavoriteMetaUpdate = useCallback(
 		(
 			itemId: number | string,
@@ -992,7 +1003,7 @@ export default function PropertyReelsView({
 		});
 		if (index >= 0) {
 			flatListRef.current.scrollToOffset({
-				offset: index * SCREEN_HEIGHT,
+				offset: index * containerHeight,
 				animated: false,
 			});
 			if (__DEV__ && Platform.OS === "web") {
@@ -1003,7 +1014,7 @@ export default function PropertyReelsView({
 				});
 			}
 		}
-	}, [initialSlug, properties]);
+	}, [initialSlug, properties, containerHeight]);
 
 	const loadMore = useCallback(() => {
 		// Prevent multiple simultaneous loads
@@ -1108,7 +1119,7 @@ export default function PropertyReelsView({
 
 	const renderItem = useCallback(
 		({ item }: { item: FeedItem; index: number }) => (
-			<View style={styles.reelItem}>
+			<View style={[styles.reelItem, { height: containerHeight }]}>
 				{isProperty(item) ? (
 					<PropertyReelCard
 						property={item}
@@ -1129,6 +1140,7 @@ export default function PropertyReelsView({
 			</View>
 		),
 		[
+			containerHeight,
 			handleFavoriteMetaUpdate,
 			handleHorizontalScrollBegin,
 			handleHorizontalScrollEnd,
@@ -1137,9 +1149,9 @@ export default function PropertyReelsView({
 
 	const keyExtractor = useCallback((item: FeedItem, index: number) => {
 		const type = isProperty(item) ? "property" : "project";
-		// Stable key: id + index. Never Math.random() - causes wrong reels on scroll.
+		// Stable key: type + id. Index only for fallback when id is missing (avoids wrong reels on scroll).
 		const id = item.id?.toString();
-		return `${type}-${id ?? `idx-${index}`}-${index}`;
+		return id ? `${type}-${id}` : `${type}-idx-${index}`;
 	}, []);
 
 	// Store the prefetch function in a ref for stable callback
@@ -1207,11 +1219,11 @@ export default function PropertyReelsView({
 
 	const getItemLayout = useCallback(
 		(_: unknown, index: number) => ({
-			length: SCREEN_HEIGHT,
-			offset: SCREEN_HEIGHT * index,
+			length: containerHeight,
+			offset: containerHeight * index,
 			index,
 		}),
-		[],
+		[containerHeight],
 	);
 
 	// Only show loading before init completes (splash handles loading state)
@@ -1251,7 +1263,10 @@ export default function PropertyReelsView({
 	}
 
 	return (
-		<View style={styles.feedContainer}>
+		<View
+			style={styles.feedContainer}
+			onLayout={handleLayout}
+		>
 			<FlatList
 				ref={flatListRef}
 				data={properties}
@@ -1259,7 +1274,7 @@ export default function PropertyReelsView({
 				keyExtractor={keyExtractor}
 				getItemLayout={getItemLayout}
 				pagingEnabled
-				snapToInterval={SCREEN_HEIGHT}
+				snapToInterval={containerHeight}
 				snapToAlignment="start"
 				decelerationRate="fast"
 				showsVerticalScrollIndicator={false}
@@ -1300,14 +1315,14 @@ const ICON_CIRCLE_SIZE = 40;
 
 const styles = StyleSheet.create({
 	feedContainer: {
-		height: SCREEN_HEIGHT,
+		flex: 1,
 		width: SCREEN_WIDTH,
 		backgroundColor: "#000",
 		overflow: "hidden",
 	},
 	reelItem: {
 		width: SCREEN_WIDTH,
-		height: SCREEN_HEIGHT,
+		height: SCREEN_HEIGHT, // Overridden inline with containerHeight for scroll stability
 		overflow: "hidden",
 	},
 	loadingContainer: {
@@ -1362,24 +1377,24 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	safeContainer: {
-		height: SCREEN_HEIGHT,
+		flex: 1,
 		width: SCREEN_WIDTH,
 		backgroundColor: "#000",
 	},
 	container: {
+		flex: 1,
 		width: SCREEN_WIDTH,
-		height: SCREEN_HEIGHT,
 		position: "relative",
 		backgroundColor: "#000",
 		overflow: "hidden",
 	},
 	imageScroll: {
 		width: SCREEN_WIDTH,
-		height: SCREEN_HEIGHT,
+		flex: 1,
 	},
 	imageWrapper: {
 		width: SCREEN_WIDTH,
-		height: SCREEN_HEIGHT,
+		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
 		position: "relative",
