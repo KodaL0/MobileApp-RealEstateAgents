@@ -29,21 +29,25 @@ import GlobalOAuthHandler, {
 	useGoogleLogin,
 } from "./_userbase/GlobalOAuthHandler";
 import { NativeLogin } from "./_userbase/NativeLogin";
-import { UserProvider, useUser } from "./_userbase/UserContext";
+import { AppInitProvider, useAppInit } from "./context/AppInitContext";
 import { ChatProvider } from "./features/chat/context/ChatContext";
+import { UserProvider, useUser } from "./_userbase/UserContext";
 
 ExpoSplash.preventAutoHideAsync();
 
 export default function RootLayout() {
 	return (
 		<UserProvider>
-			<InnerApp />
+			<AppInitProvider>
+				<InnerApp />
+			</AppInitProvider>
 		</UserProvider>
 	);
 }
 
 function InnerApp() {
 	const { user, isLoading, isAuthenticated } = useUser();
+	const { setInitComplete } = useAppInit();
 
 	const [fontsLoaded, fontError] = useFonts({
 		"Poppins-Regular": Poppins_400Regular,
@@ -106,6 +110,7 @@ function InnerApp() {
 		return (
 			<SplashScreen
 				onFinish={async () => {
+					setInitComplete(true);
 					setSplashFinished(true);
 					setShowCustomSplash(false);
 				}}

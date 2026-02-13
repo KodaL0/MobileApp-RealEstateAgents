@@ -26,6 +26,7 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
+import { useAppInit } from "@/app/context/AppInitContext";
 import { useUser } from "@/app/_userbase/UserContext";
 import { useChat } from "@/app/features/chat/context/ChatContext";
 import type { FeedItem, FeedProperty } from "@/app/features/types";
@@ -787,6 +788,7 @@ export default function PropertyReelsView({
 }: {
 	initialSlug?: string;
 } = {}) {
+	const { isInitComplete } = useAppInit();
 	const [properties, setProperties] = useState<FeedItem[]>([]);
 	const [loading, setLoading] = useState(true); // Start true to avoid "No properties found" flash while cache loads
 	const [error, setError] = useState<string | null>(null);
@@ -1176,16 +1178,17 @@ export default function PropertyReelsView({
 		[],
 	);
 
+	// Don't show feed content until init has completed (cache is populated during splash)
+	if (!isInitComplete || (properties.length === 0 && loading)) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="large" color="#10b981" />
+			</View>
+		);
+	}
+
 	// Only show error/empty states if we have no content to display
 	if (properties.length === 0) {
-		if (loading) {
-			// Show minimal loading indicator only if actively loading with no cache
-			return (
-				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#10b981" />
-				</View>
-			);
-		}
 
 		if (error) {
 			return (
