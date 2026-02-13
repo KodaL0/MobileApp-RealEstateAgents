@@ -903,6 +903,22 @@ export default function PropertyReelsView({
 			style={styles.feedContainer}
 			onLayout={handleLayout}
 		>
+			{/* Web: floating refresh button (pull-to-refresh doesn't work on mobile browsers) */}
+			{Platform.OS === "web" && (
+				<TouchableOpacity
+					style={styles.floatingRefreshButton}
+					onPress={handleRefresh}
+					activeOpacity={0.8}
+					accessibilityRole="button"
+					accessibilityLabel="Refresh feed"
+				>
+					{isRefreshing ? (
+						<ActivityIndicator size="small" color="#fff" />
+					) : (
+						<Text style={styles.floatingRefreshText}>↻ Refresh</Text>
+					)}
+				</TouchableOpacity>
+			)}
 			<FlatList
 				ref={flatListRef}
 				data={properties}
@@ -1003,6 +1019,26 @@ const styles = StyleSheet.create({
 	},
 	refreshHeaderSpinner: {
 		marginLeft: 8,
+	},
+	floatingRefreshButton: {
+		position: "absolute",
+		top: 12,
+		right: 12,
+		zIndex: 100,
+		backgroundColor: "rgba(16, 185, 129, 0.9)",
+		paddingHorizontal: 14,
+		paddingVertical: 10,
+		borderRadius: 20,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.3,
+		shadowRadius: 4,
+		elevation: 4,
+	},
+	floatingRefreshText: {
+		color: "#fff",
+		fontSize: 14,
+		fontWeight: "600",
 	},
 	reelItem: {
 		width: SCREEN_WIDTH,
