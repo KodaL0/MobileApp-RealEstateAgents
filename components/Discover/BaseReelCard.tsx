@@ -329,15 +329,14 @@ export function BaseReelCard({
 	const validImages = images.map(getValidUrl).filter(Boolean);
 	const displayImages = validImages.length > 0 ? validImages : [getValidUrl()];
 
-	// Lazy slice: only mount the first INITIAL_IMAGE_LIMIT images until the
-	// user proves they're browsing deeply. Remaining images are appended
-	// seamlessly after the current scroll position so there's no visual jump.
-	const visibleImages = useMemo(() => {
-		if (imagesExpanded || displayImages.length <= INITIAL_IMAGE_LIMIT) {
-			return displayImages;
-		}
-		return displayImages.slice(0, INITIAL_IMAGE_LIMIT);
-	}, [displayImages, imagesExpanded]);
+	// How many images should have real <Image> sources loaded.
+	// All pages are always rendered (so ScrollView content width is correct on web),
+	// but pages beyond this count show a lightweight dark placeholder instead of
+	// decoding a real bitmap. When expansion triggers the placeholders swap to images.
+	const loadedCount =
+		imagesExpanded || displayImages.length <= INITIAL_IMAGE_LIMIT
+			? displayImages.length
+			: INITIAL_IMAGE_LIMIT;
 
 	return (
 		<View style={dyn.outer}>
@@ -348,7 +347,9 @@ export function BaseReelCard({
 				onStartShouldSetResponder={() => false}
 				onMoveShouldSetResponder={() => false}
 			>
-				{/* IMAGE CAROUSEL – renders visibleImages (lazy subset until expanded) */}
+				{/* IMAGE CAROUSEL – all pages always rendered so ScrollView content
+				    width is stable on web. Pages beyond loadedCount show a dark
+				    placeholder instead of decoding a real bitmap. */}
 				<ScrollView
 					ref={scrollViewRef}
 					horizontal
@@ -373,38 +374,49 @@ export function BaseReelCard({
 					alwaysBounceVertical={false}
 					nestedScrollEnabled={true}
 				>
-					{visibleImages.map((uri: string, index: number) => (
-						<View key={uri || `image-${index}`} style={dyn.page}>
-							{/* Blurred background – skipped on web to save memory.
-							    Each blur creates a full-screen bitmap + GPU compositing layer
-							    via CSS filter:blur(). On mobile browsers this alone can double
-							    memory usage and trigger an OOM crash. */}
-							{!IS_WEB && (
-								<OptimizedImage
-									uri={uri}
-									style={StyleSheet.absoluteFillObject}
-									containerStyle={StyleSheet.absoluteFillObject}
-									blurRadius={25}
-								/>
-							)}
+					{displayImages.map((uri: string, index: number) => {
+						const isLoaded = index < loadedCount;
+						return (
+							<View key={uri || `image-${index}`} style={dyn.page}>
+								{isLoaded ? (
+									<>
+										{/* Blurred background – skipped on web to save memory.
+										    Each blur creates a full-screen bitmap + GPU compositing
+										    layer via CSS filter:blur(). On mobile browsers this
+										    alone can double memory usage and trigger an OOM crash. */}
+										{!IS_WEB && (
+											<OptimizedImage
+												uri={uri}
+												style={StyleSheet.absoluteFillObject}
+												containerStyle={StyleSheet.absoluteFillObject}
+												blurRadius={25}
+											/>
+										)}
 
-							{/* Dark overlay */}
-							<View style={styles.imageOverlay} />
+										{/* Dark overlay */}
+										<View style={styles.imageOverlay} />
 
-							{/* Foreground image (contain) */}
-							<View style={dyn.imageFrame}>
-								<Image
-									source={{
-										uri,
-										cache: "force-cache",
-									}}
-									style={styles.image}
-									resizeMode="contain"
-									fadeDuration={0}
-								/>
+										{/* Foreground image (contain) */}
+										<View style={dyn.imageFrame}>
+											<Image
+												source={{
+													uri,
+													cache: "force-cache",
+												}}
+												style={styles.image}
+												resizeMode="contain"
+												fadeDuration={0}
+											/>
+										</View>
+									</>
+								) : (
+									/* Placeholder – lightweight dark page, no image decode.
+									   Swapped for real image once the user swipes past EXPAND_THRESHOLD. */
+									<View style={styles.imageOverlay} />
+								)}
 							</View>
-						</View>
-					))}
+						);
+					})}
 				</ScrollView>
 
 				{/* Bottom gradient */}

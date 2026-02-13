@@ -68,6 +68,13 @@ export default function PropertyReelsView({
 	const isMountedRef = useRef(true);
 	const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 
+	// Pagination retry tracking – prevents infinite retry storms when the API
+	// is down or a new feed hasn't been generated yet.
+	const MAX_PAGINATION_RETRIES = 3;
+	const consecutiveFailsRef = useRef(0);
+	// True when the user has consumed every item and server has no more
+	const [feedExhausted, setFeedExhausted] = useState(false);
+
 	// Unmount guard – prevents state updates after the component is torn down
 	useEffect(() => () => { isMountedRef.current = false; }, []);
 
@@ -253,6 +260,9 @@ export default function PropertyReelsView({
 				// Guard: component may have unmounted during the await
 				if (!isMountedRef.current) return;
 
+				// Success – reset retry counter
+				consecutiveFailsRef.current = 0;
+
 				if (append) {
 					setProperties((prev) => {
 						// Avoid duplicates when appending
@@ -276,10 +286,8 @@ export default function PropertyReelsView({
 						return updated;
 					});
 
-					// Brief lock to let render complete, then clear
-					setTimeout(() => {
-						if (isMountedRef.current) isAppendingRef.current = false;
-					}, 100);
+					// Advance page only after a successful append
+					setPage(pageNum);
 				} else {
 					const items = response.results;
 					setProperties(items);
@@ -293,11 +301,31 @@ export default function PropertyReelsView({
 					}).catch(() => {});
 				}
 
-				setHasNextPage(response.next !== null);
+				const moreAvailable = response.next !== null;
+				setHasNextPage(moreAvailable);
+
+				// If no more pages, mark feed as exhausted
+				if (!moreAvailable && append) {
+					setFeedExhausted(true);
+				}
 			} catch (err: unknown) {
 				console.error("Failed to fetch feed:", err);
 				if (!isMountedRef.current) return;
-				if (!silent) {
+
+				if (append) {
+					// Pagination failure – count consecutive failures.
+					// After MAX_PAGINATION_RETRIES, stop trying so we don't loop.
+					consecutiveFailsRef.current += 1;
+					if (consecutiveFailsRef.current >= MAX_PAGINATION_RETRIES) {
+						console.warn(
+							`⛔ Pagination failed ${MAX_PAGINATION_RETRIES} times, pausing.`,
+						);
+						setHasNextPage(false);
+						setFeedExhausted(true);
+					}
+					// Don't set error state for pagination failures – the existing
+					// feed items are still valid and should keep displaying.
+				} else if (!silent) {
 					setError(
 						(err as { response?: { data?: { detail?: string } } })?.response
 							?.data?.detail || "Failed to load feed. Please try again.",
@@ -308,6 +336,10 @@ export default function PropertyReelsView({
 					setLoading(false);
 					setLoadingMore(false);
 					setIsRefreshing(false);
+					// ALWAYS reset append lock – the old code only reset on success,
+					// which permanently deadlocked pagination after any error.
+					isAppendingRef.current = false;
+					isLoadingNextPageRef.current = false;
 				}
 			}
 		},
@@ -389,17 +421,15 @@ export default function PropertyReelsView({
 		) {
 			isLoadingNextPageRef.current = true;
 			isAppendingRef.current = true;
+			// Page is only advanced inside fetchFeed on success – if the fetch
+			// fails, `page` stays at the current value so the next retry hits the
+			// same page instead of skipping one.
 			const nextPage = page + 1;
 
 			console.log(`📄 Loading page ${nextPage}...`);
 
-			setPage(nextPage);
-			fetchFeed(nextPage, true).finally(() => {
-				// Shorter cooldown to prevent UI freeze
-				setTimeout(() => {
-					if (isMountedRef.current) isLoadingNextPageRef.current = false;
-				}, 200);
-			});
+			fetchFeed(nextPage, true);
+			// Locks are reset in fetchFeed's `finally` block.
 		}
 	}, [page, loadingMore, hasNextPage, fetchFeed]);
 
@@ -787,12 +817,24 @@ export default function PropertyReelsView({
 						<View style={styles.footerLoader}>
 							<ActivityIndicator size="small" color="#10b981" />
 						</View>
+					) : feedExhausted ? (
+						<View style={styles.feedEndContainer}>
+							<Text style={styles.feedEndText}>
+								You're all caught up!
+							</Text>
+							<Text style={styles.feedEndSubtext}>
+								Pull down to refresh for new listings
+							</Text>
+						</View>
 					) : null
 				}
 				refreshing={isRefreshing}
 				onRefresh={() => {
 					setIsRefreshing(true);
 					setPage(1);
+					setHasNextPage(true);
+					setFeedExhausted(false);
+					consecutiveFailsRef.current = 0;
 					fetchFeed(1, false, false);
 				}}
 				removeClippedSubviews={Platform.OS === "android"}
@@ -875,5 +917,19 @@ const styles = StyleSheet.create({
 	footerLoader: {
 		paddingVertical: 20,
 		alignItems: "center",
+	},
+	feedEndContainer: {
+		paddingVertical: 32,
+		alignItems: "center",
+	},
+	feedEndText: {
+		color: "#fff",
+		fontSize: 16,
+		fontWeight: "600",
+		marginBottom: 4,
+	},
+	feedEndSubtext: {
+		color: "#9ca3af",
+		fontSize: 13,
 	},
 });
