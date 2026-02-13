@@ -79,6 +79,13 @@ export default function PropertyReelsView({
 	}, []);
 
 	// ── Impression / dwell tracking ──────────────────────────────────────
+	// Use a ref for properties so trackVisibility never recreates on data changes.
+	// This breaks the cascade: properties → trackVisibility → checkAndPrefetchNextPage → ref effect.
+	const propertiesRef = useRef(properties);
+	useEffect(() => {
+		propertiesRef.current = properties;
+	}, [properties]);
+
 	const currentVisibleRef = useRef<{
 		id: number | string;
 		type: "property" | "project";
@@ -88,11 +95,13 @@ export default function PropertyReelsView({
 		matchScore?: number | null;
 	} | null>(null);
 
-	const trackVisibility = useCallback(
-		(index: number) => {
-			if (index < 0 || index >= properties.length) return;
+	// Stable callback – reads properties from ref, never triggers re-render cascade.
+	const trackVisibility = useCallback((index: number) => {
+		try {
+			const currentProperties = propertiesRef.current;
+			if (index < 0 || index >= currentProperties.length) return;
 
-			const item = properties[index];
+			const item = currentProperties[index];
 			if (!item) return;
 
 			const itemType = isProperty(item) ? "property" : "project";
@@ -135,23 +144,29 @@ export default function PropertyReelsView({
 				slotType: feedItem.slot_type,
 				matchScore: feedItem.match_score,
 			};
-		},
-		[properties],
-	);
+		} catch (e) {
+			// Analytics must never crash the feed
+			if (__DEV__) console.warn("trackVisibility error:", e);
+		}
+	}, []); // Stable – reads from propertiesRef
 
 	// Flush dwell on unmount
 	useEffect(
 		() => () => {
-			if (currentVisibleRef.current) {
-				const dwellTimeMs = Date.now() - currentVisibleRef.current.startTime;
-				if (dwellTimeMs > 500) {
-					analytics.trackFeedDwell({
-						itemId: currentVisibleRef.current.id,
-						itemType: currentVisibleRef.current.type,
-						dwellTimeMs,
-						position: currentVisibleRef.current.index,
-					});
+			try {
+				if (currentVisibleRef.current) {
+					const dwellTimeMs = Date.now() - currentVisibleRef.current.startTime;
+					if (dwellTimeMs > 500) {
+						analytics.trackFeedDwell({
+							itemId: currentVisibleRef.current.id,
+							itemType: currentVisibleRef.current.type,
+							dwellTimeMs,
+							position: currentVisibleRef.current.index,
+						});
+					}
 				}
+			} catch {
+				// Swallow – component is unmounting
 			}
 		},
 		[],
@@ -163,13 +178,15 @@ export default function PropertyReelsView({
 			// Optimistically remove from feed
 			setProperties((prev) => prev.filter((item) => item.id !== itemId));
 
-			// Fire API (non-blocking)
-			api.feed.notInterested(itemId, itemType).catch((err) => {
-				if (__DEV__) console.warn("Failed to send not-interested signal:", err);
-			});
-
-			// Track analytics
-			analytics.trackFeedNotInterested({ itemId, itemType });
+			// Fire API + analytics (non-blocking, must never throw)
+			try {
+				api.feed.notInterested(itemId, itemType).catch((err) => {
+					if (__DEV__) console.warn("Failed to send not-interested signal:", err);
+				});
+				analytics.trackFeedNotInterested({ itemId, itemType });
+			} catch {
+				// Swallow – network/analytics failures must not crash the feed
+			}
 		},
 		[],
 	);
