@@ -67,13 +67,13 @@ function InnerApp() {
     }
   }, [isLoading, user, isAuthenticated]);
 
-  // Wait for fonts to load
+  // Hide native splash only when we're ready to show the main app (avoids double-splash flash)
+  // We keep native splash visible until custom splash finishes, then hide once
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && (!showCustomSplash || splashFinished)) {
       ExpoSplash.hideAsync();
-      // Don't hide custom splash immediately, let it run for 1.5 seconds
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, showCustomSplash, splashFinished]);
 
   // 1) fonts
   if (!fontsLoaded && !fontError) return null;
@@ -103,7 +103,7 @@ function InnerApp() {
           setShowCustomSplash(false);
         }}
         initializationTask={initializationTask}
-        minimumDuration={3000}
+        minimumDuration={1000}
       />
     );
   }

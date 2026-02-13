@@ -772,7 +772,7 @@ function getItemSlug(item: FeedItem): string {
 // ---------- Feed Container Component ----------
 export default function PropertyReelsView({ initialSlug }: { initialSlug?: string } = {}) {
 	const [properties, setProperties] = useState<FeedItem[]>([]);
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading] = useState(true); // Start true to avoid "No properties found" flash while cache loads
 	const [error, setError] = useState<string | null>(null);
 	const [page, setPage] = useState(1);
 	const [hasNextPage, setHasNextPage] = useState(true);
@@ -910,26 +910,29 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 		if (hasMountedRef.current) return;
 		hasMountedRef.current = true;
 
-		if (isAuthenticated) {
-			// Try to load from cache first (instant display)
-			getCachedFeedData().then((cachedData) => {
-				if (cachedData?.items && cachedData.items.length > 0) {
-					console.log(
-						`📦 Loading feed from cache: ${cachedData.items.length} items`,
-					);
-					setProperties(cachedData.items);
-					setHasNextPage(!!cachedData.next);
-					setLoading(false);
-
-					// Refresh in background (silent update)
-					fetchFeed(1, false, true);
-				} else {
-					// No cache, fetch normally
-					console.log("📡 No cache found, fetching feed...");
-					fetchFeed(1, false, false);
-				}
-			});
+		if (!isAuthenticated) {
+			setLoading(false);
+			return;
 		}
+
+		// Keep loading=true until we have data (avoids "No properties found" flash)
+		getCachedFeedData().then((cachedData) => {
+			if (cachedData?.items && cachedData.items.length > 0) {
+				console.log(
+					`📦 Loading feed from cache: ${cachedData.items.length} items`,
+				);
+				setProperties(cachedData.items);
+				setHasNextPage(!!cachedData.next);
+				setLoading(false);
+
+				// Refresh in background (silent update)
+				fetchFeed(1, false, true);
+			} else {
+				// No cache, fetch normally
+				console.log("📡 No cache found, fetching feed...");
+				fetchFeed(1, false, false);
+			}
+		});
 	}, [isAuthenticated, fetchFeed]);
 
 	// Scroll to item when landing on /feed/slug (e.g. refresh or shared link)

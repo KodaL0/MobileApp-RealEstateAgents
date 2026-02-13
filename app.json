@@ -9,7 +9,9 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "backgroundColor": "#ffffff"
+      "image": "./assets/images/propertprologo.png",
+      "backgroundColor": "#0F3460",
+      "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
