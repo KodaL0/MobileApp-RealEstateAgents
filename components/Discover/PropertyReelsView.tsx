@@ -12,6 +12,7 @@ import {
 	Dimensions,
 	FlatList,
 	Image,
+	PanResponder,
 	Platform,
 	RefreshControl,
 	StyleSheet,
@@ -90,9 +91,14 @@ export default function PropertyReelsView({
 	const lastScrollOffsetRef = useRef(0);
 	const pendingScrollAdjustmentRef = useRef<number | null>(null);
 	const [trimTrigger, setTrimTrigger] = useState(0);
+	const isRefreshingRef = useRef(false);
 
 	// Unmount guard – prevents state updates after the component is torn down
 	useEffect(() => () => { isMountedRef.current = false; }, []);
+
+	useEffect(() => {
+		isRefreshingRef.current = isRefreshing;
+	}, [isRefreshing]);
 
 	// Use measured container height for scroll stability. Static SCREEN_HEIGHT can mismatch
 	// the actual visible area (tab bar, safe area), causing wrong items to display.
@@ -488,6 +494,31 @@ export default function PropertyReelsView({
 		fetchFeed(1, false, false);
 	}, [fetchFeed]);
 
+	// Web: pull-to-refresh when on first property (RefreshControl doesn't work on mobile web)
+	const PULL_THRESHOLD = 80;
+	const webPullResponder = useMemo(() => {
+		if (Platform.OS !== "web") return { panHandlers: {} };
+		return PanResponder.create({
+			onMoveShouldSetPanResponder: (
+				_evt: { nativeEvent: unknown },
+				gestureState: { dy: number },
+			) => {
+				// Only capture when at top (first property) and user pulls down
+				const atTop = lastScrollOffsetRef.current <= 20;
+				const pullingDown = gestureState.dy > 0;
+				return atTop && pullingDown && !isRefreshingRef.current;
+			},
+			onPanResponderRelease: (
+				_evt: { nativeEvent: unknown },
+				gestureState: { dy: number },
+			) => {
+				if (gestureState.dy >= PULL_THRESHOLD && !isRefreshingRef.current) {
+					handleRefresh();
+				}
+			},
+		});
+	}, [handleRefresh]);
+
 	const loadMore = useCallback(() => {
 		// Prevent multiple simultaneous loads
 		if (
@@ -871,23 +902,8 @@ export default function PropertyReelsView({
 		<View
 			style={styles.feedContainer}
 			onLayout={handleLayout}
+			{...webPullResponder.panHandlers}
 		>
-			{/* Web: floating refresh button (pull-to-refresh doesn't work on mobile browsers) */}
-			{Platform.OS === "web" && (
-				<TouchableOpacity
-					style={styles.floatingRefreshButton}
-					onPress={handleRefresh}
-					activeOpacity={0.8}
-					accessibilityRole="button"
-					accessibilityLabel="Refresh feed"
-				>
-					{isRefreshing ? (
-						<ActivityIndicator size="small" color="#fff" />
-					) : (
-						<Text style={styles.floatingRefreshText}>↻ Refresh</Text>
-					)}
-				</TouchableOpacity>
-			)}
 			<FlatList
 				ref={flatListRef}
 				data={properties}
@@ -958,6 +974,8 @@ export default function PropertyReelsView({
 					style: {
 						// CSS scroll-snap replaces pagingEnabled on web (which adds a broken wrapper div)
 						scrollSnapType: "y mandatory",
+						// Prevent browser's default pull-to-refresh so our custom one works
+						overscrollBehaviorY: "contain",
 					} as ViewStyle,
 				} : {})}
 			/>
@@ -971,26 +989,6 @@ const styles = StyleSheet.create({
 		width: SCREEN_WIDTH,
 		backgroundColor: "#000",
 		overflow: "hidden",
-	},
-	floatingRefreshButton: {
-		position: "absolute",
-		top: 12,
-		right: 12,
-		zIndex: 100,
-		backgroundColor: "rgba(16, 185, 129, 0.9)",
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-		borderRadius: 20,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.3,
-		shadowRadius: 4,
-		elevation: 4,
-	},
-	floatingRefreshText: {
-		color: "#fff",
-		fontSize: 14,
-		fontWeight: "600",
 	},
 	reelItem: {
 		width: SCREEN_WIDTH,
