@@ -51,10 +51,23 @@ export const apiClient = axios.create({
 });
 
 // Request interceptor: attach Bearer token from AsyncStorage if present
+// On web: also add X-CSRFToken for session auth (required for POST/PUT/PATCH/DELETE)
 apiClient.interceptors.request.use(
   async config => {
     if (isWeb) {
-      return config; // Web uses cookies
+      // Web uses cookies; add CSRF token for state-changing requests (session auth requires it)
+      const method = (config.method ?? 'get').toLowerCase();
+      if (['post', 'put', 'patch', 'delete'].includes(method) && typeof document !== 'undefined') {
+        const csrfMatch = document.cookie
+          .split(';')
+          .map(c => c.trim())
+          .find(c => c.startsWith('csrftoken='));
+        const csrfToken = csrfMatch ? csrfMatch.split('=').slice(1).join('=').trim() : undefined;
+        if (csrfToken && config.headers) {
+          (config.headers as Record<string, string>)['X-CSRFToken'] = csrfToken;
+        }
+      }
+      return config;
     }
 
     try {
