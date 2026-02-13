@@ -1,14 +1,13 @@
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { StyleSheet, View } from "react-native";
 import PropertyReelsView from "../../../components/Discover/PropertyReelsView";
 
 export default function FeedIndexScreen() {
 	return (
-		<GestureHandlerRootView style={styles.container}>
+		<View style={styles.container}>
 			<StatusBar style="light" backgroundColor="#000" translucent />
 			<PropertyReelsView />
-		</GestureHandlerRootView>
+		</View>
 	);
 }
 

@@ -17,14 +17,15 @@ import {
 	Alert,
 	Animated,
 	Dimensions,
+	FlatList,
 	Image,
 	Platform,
+	ScrollView,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
-import { FlatList, ScrollView } from "react-native-gesture-handler";
 import { useUser } from "@/app/_userbase/UserContext";
 import { useAppInit } from "@/app/context/AppInitContext";
 import { useChat } from "@/app/features/chat/context/ChatContext";
@@ -120,7 +121,6 @@ const PropertyReelCard = memo(function PropertyReelCard({
 	onFavoriteMetaUpdate,
 	onHorizontalScrollBegin,
 	onHorizontalScrollEnd,
-	horizontalScrollRef,
 }: {
 	property: FeedProperty;
 	onViewProperty?: () => void;
@@ -131,7 +131,6 @@ const PropertyReelCard = memo(function PropertyReelCard({
 	) => void;
 	onHorizontalScrollBegin?: () => void;
 	onHorizontalScrollEnd?: () => void;
-	horizontalScrollRef?: React.RefObject<unknown>;
 }) {
 	const router = useRouter();
 	const getFavoriteCountValue = useCallback((value: unknown): number | null => {
@@ -152,9 +151,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [isChatLoading, setIsChatLoading] = useState(false);
 	const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-	const scrollViewRef = useRef<{
-		scrollTo: (opts: { x: number; animated: boolean }) => void;
-	} | null>(null);
+	const scrollViewRef = useRef<ScrollView>(null);
 	const heartScale = useRef(new Animated.Value(0)).current;
 	const heartOpacity = useRef(new Animated.Value(0)).current;
 	const lastTap = useRef<number>(0);
@@ -563,10 +560,7 @@ const PropertyReelCard = memo(function PropertyReelCard({
 			>
 				{/* IMAGE CAROUSEL – fixed 9:16-ish frame, blur + contain */}
 				<ScrollView
-					ref={(node) => {
-						scrollViewRef.current = node;
-						if (horizontalScrollRef) horizontalScrollRef.current = node;
-					}}
+					ref={scrollViewRef}
 					horizontal
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
@@ -823,9 +817,7 @@ export default function PropertyReelsView({
 	const isLoadingNextPageRef = useRef(false);
 	const lastViewableCheckRef = useRef(0);
 	const isAppendingRef = useRef(false);
-	const horizontalScrollRef = useRef<unknown>(null);
 	const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
-	const [viewableIndex, setViewableIndex] = useState(0);
 
 	const handleFavoriteMetaUpdate = useCallback(
 		(
@@ -1108,40 +1100,31 @@ export default function PropertyReelsView({
 	}, []);
 
 	const renderItem = useCallback(
-		({ item, index }: { item: FeedItem; index: number }) => {
-			const isViewable = index === viewableIndex;
-			const directionLockProps = isViewable
-				? {
-						onHorizontalScrollBegin: handleHorizontalScrollBegin,
-						onHorizontalScrollEnd: handleHorizontalScrollEnd,
-						horizontalScrollRef,
-					}
-				: {};
-			return (
-				<View style={styles.reelItem}>
-					{isProperty(item) ? (
-						<PropertyReelCard
-							property={item}
-							source="feed"
-							onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
-							{...directionLockProps}
-						/>
-					) : (
-						<ProjectReelCard
-							project={item}
-							source="feed"
-							onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
-							{...directionLockProps}
-						/>
-					)}
-				</View>
-			);
-		},
+		({ item }: { item: FeedItem; index: number }) => (
+			<View style={styles.reelItem}>
+				{isProperty(item) ? (
+					<PropertyReelCard
+						property={item}
+						source="feed"
+						onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
+						onHorizontalScrollBegin={handleHorizontalScrollBegin}
+						onHorizontalScrollEnd={handleHorizontalScrollEnd}
+					/>
+				) : (
+					<ProjectReelCard
+						project={item}
+						source="feed"
+						onFavoriteMetaUpdate={handleFavoriteMetaUpdate}
+						onHorizontalScrollBegin={handleHorizontalScrollBegin}
+						onHorizontalScrollEnd={handleHorizontalScrollEnd}
+					/>
+				)}
+			</View>
+		),
 		[
 			handleFavoriteMetaUpdate,
 			handleHorizontalScrollBegin,
 			handleHorizontalScrollEnd,
-			viewableIndex,
 		],
 	);
 
@@ -1175,7 +1158,6 @@ export default function PropertyReelsView({
 			const currentViewable = viewableItems[0];
 			const index = currentViewable?.index;
 			if (index !== undefined && index !== null && typeof index === "number") {
-				setViewableIndex(index);
 				checkAndPrefetchNextPageRef.current(index);
 			}
 
@@ -1271,7 +1253,6 @@ export default function PropertyReelsView({
 				decelerationRate="fast"
 				showsVerticalScrollIndicator={false}
 				scrollEnabled={feedScrollEnabled}
-				waitFor={[horizontalScrollRef]}
 				onEndReached={loadMore}
 				onEndReachedThreshold={0.5}
 				onViewableItemsChanged={handleViewableItemsChanged}

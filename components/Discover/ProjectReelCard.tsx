@@ -17,9 +17,8 @@ function ProjectReelCard({
 	onViewProject,
 	source,
 	onFavoriteMetaUpdate,
-	onHorizontalScrollBegin,
-	onHorizontalScrollEnd,
-	horizontalScrollRef,
+  onHorizontalScrollBegin,
+  onHorizontalScrollEnd,
 }: {
 	project: FeedProject;
 	onViewProject?: () => void;
@@ -28,9 +27,8 @@ function ProjectReelCard({
 		projectId: number | string,
 		meta: { favorites_count?: number | null; is_favourite?: boolean | null },
 	) => void;
-	onHorizontalScrollBegin?: () => void;
-	onHorizontalScrollEnd?: () => void;
-	horizontalScrollRef?: React.RefObject<unknown>;
+  onHorizontalScrollBegin?: () => void;
+  onHorizontalScrollEnd?: () => void;
 }) {
 	const router = useRouter();
 	const getFavoriteCountValue = useCallback((value: unknown): number | null => {
@@ -536,10 +534,9 @@ function ProjectReelCard({
 				isChatLoading={isChatLoading}
 				onImageChange={handleImageChange}
 				baseUrl={BASE_URL}
-				onHorizontalScrollBegin={onHorizontalScrollBegin}
-				onHorizontalScrollEnd={onHorizontalScrollEnd}
-				horizontalScrollRef={horizontalScrollRef}
-			/>
+        onHorizontalScrollBegin={onHorizontalScrollBegin}
+        onHorizontalScrollEnd={onHorizontalScrollEnd}
+      />
 		</View>
 	);
 }

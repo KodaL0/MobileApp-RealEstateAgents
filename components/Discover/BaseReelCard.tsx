@@ -9,6 +9,7 @@ import {
 	Image,
 	type ImageStyle,
 	Platform,
+	ScrollView,
 	type StyleProp,
 	StyleSheet,
 	Text,
@@ -16,7 +17,6 @@ import {
 	View,
 	type ViewStyle,
 } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -137,7 +137,6 @@ export interface BaseReelCardProps {
 	// Direction lock for nested scroll (feed)
 	onHorizontalScrollBegin?: () => void;
 	onHorizontalScrollEnd?: () => void;
-	horizontalScrollRef?: React.RefObject<unknown>;
 }
 
 export function BaseReelCard({
@@ -156,11 +155,10 @@ export function BaseReelCard({
 	baseUrl = "https://propertprodjango.onrender.com",
 	onHorizontalScrollBegin,
 	onHorizontalScrollEnd,
-	horizontalScrollRef,
 }: BaseReelCardProps) {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-	const scrollViewRef = useRef<{ scrollTo: (opts: { x: number; animated: boolean }) => void } | null>(null);
+	const scrollViewRef = useRef<ScrollView>(null);
 	const heartScale = useRef(new Animated.Value(0)).current;
 	const heartOpacity = useRef(new Animated.Value(0)).current;
 	const lastTap = useRef<number>(0);
@@ -278,12 +276,7 @@ export function BaseReelCard({
 			>
 				{/* IMAGE CAROUSEL */}
 				<ScrollView
-					ref={(node) => {
-						scrollViewRef.current = node;
-						if (horizontalScrollRef) {
-							(horizontalScrollRef as React.MutableRefObject<unknown>).current = node;
-						}
-					}}
+					ref={scrollViewRef}
 					horizontal
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
