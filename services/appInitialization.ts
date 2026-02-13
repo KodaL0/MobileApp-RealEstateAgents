@@ -2,6 +2,7 @@
  * App Initialization Service
  * Handles initialization of all tabs and critical data during splash screen
  */
+import type { Message } from "@/app/features/types";
 import { apiClient } from "@/config/api";
 import { setChatMessagesCache, setChatThreadsCache } from "@/data/chatCache";
 import { clearFeedCache, setFeedCache } from "@/data/feedCache";
@@ -54,16 +55,18 @@ async function initializeFeed(): Promise<InitializationResult> {
 			success: true,
 			duration,
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
 		const duration = Date.now() - startTime;
-		console.warn("⚠️ Feed initialization failed:", error?.message);
+		const err = error as {
+			message?: string;
+			response?: { data?: { detail?: string } };
+		};
+		console.warn("⚠️ Feed initialization failed:", err?.message);
 
 		return {
 			success: false,
 			error:
-				error?.response?.data?.detail ||
-				error?.message ||
-				"Failed to load feed",
+				err?.response?.data?.detail || err?.message || "Failed to load feed",
 			duration,
 		};
 	}
@@ -85,7 +88,7 @@ async function initializeChat(): Promise<InitializationResult> {
 
 		// Pre-fetch messages for the top 10 most recent threads
 		// This ensures the messages tab is fully cached and ready
-		const messagesCache: Record<string, any[]> = {};
+		const messagesCache: Record<string, Message[]> = {};
 		const threadsToPrefetch = threads.slice(0, 10); // Top 10 most recent threads
 
 		if (threadsToPrefetch.length > 0) {
@@ -94,28 +97,37 @@ async function initializeChat(): Promise<InitializationResult> {
 			);
 
 			// Fetch messages for each thread in parallel (but limit concurrency)
-			const messagePromises = threadsToPrefetch.map(async (thread: any) => {
-				try {
-					const messagesResponse = await apiClient.get(
-						`chat/${thread.id}/messages/`,
-						{
-							params: { limit: 30 },
-						},
-					);
+			const messagePromises = threadsToPrefetch.map(
+				async (thread: { id: string }) => {
+					try {
+						const messagesResponse = await apiClient.get(
+							`chat/${thread.id}/messages/`,
+							{
+								params: { limit: 30 },
+							},
+						);
 
-					// Messages come in reverse chronological order, reverse them for proper display
-					const messages = (messagesResponse.data.results || []).reverse();
-					messagesCache[thread.id] = messages;
+						// Messages come in reverse chronological order, reverse them for proper display
+						const messages = (
+							(messagesResponse.data.results || []) as Message[]
+						).reverse();
+						messagesCache[thread.id] = messages;
 
-					return { threadId: thread.id, success: true, count: messages.length };
-				} catch (error: any) {
-					console.warn(
-						`⚠️ Failed to pre-fetch messages for thread ${thread.id}:`,
-						error?.message,
-					);
-					return { threadId: thread.id, success: false };
-				}
-			});
+						return {
+							threadId: thread.id,
+							success: true,
+							count: messages.length,
+						};
+					} catch (error: unknown) {
+						const err = error as { message?: string };
+						console.warn(
+							`⚠️ Failed to pre-fetch messages for thread ${thread.id}:`,
+							err?.message,
+						);
+						return { threadId: thread.id, success: false };
+					}
+				},
+			);
 
 			const results = await Promise.allSettled(messagePromises);
 			const successful = results.filter(
@@ -143,17 +155,19 @@ async function initializeChat(): Promise<InitializationResult> {
 			success: true,
 			duration,
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
 		const duration = Date.now() - startTime;
-		console.warn("⚠️ Chat initialization failed:", error?.message);
+		const err = error as {
+			message?: string;
+			response?: { data?: { detail?: string } };
+		};
+		console.warn("⚠️ Chat initialization failed:", err?.message);
 
 		// Chat initialization failure is not critical
 		return {
 			success: false,
 			error:
-				error?.response?.data?.detail ||
-				error?.message ||
-				"Failed to load chat",
+				err?.response?.data?.detail || err?.message || "Failed to load chat",
 			duration,
 		};
 	}
@@ -175,12 +189,13 @@ async function initializeSearch(): Promise<InitializationResult> {
 			success: true,
 			duration,
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
 		const duration = Date.now() - startTime;
+		const err = error as { message?: string };
 
 		return {
 			success: false,
-			error: error?.message || "Failed to initialize search",
+			error: err?.message || "Failed to initialize search",
 			duration,
 		};
 	}
@@ -202,12 +217,13 @@ async function initializeProfile(): Promise<InitializationResult> {
 			success: true,
 			duration,
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
 		const duration = Date.now() - startTime;
+		const err = error as { message?: string };
 
 		return {
 			success: false,
-			error: error?.message || "Failed to initialize profile",
+			error: err?.message || "Failed to initialize profile",
 			duration,
 		};
 	}
@@ -286,7 +302,9 @@ export async function initializeAllTabs(): Promise<AppInitializationStatus> {
 		);
 
 		if (!feed.success) {
-			console.warn("⚠️ Feed initialization failed - will load on first tab visit");
+			console.warn(
+				"⚠️ Feed initialization failed - will load on first tab visit",
+			);
 		}
 		if (!chat.success) {
 			console.warn(

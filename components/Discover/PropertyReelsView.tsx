@@ -11,6 +11,7 @@ import {
 	UserCircle,
 } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
 import {
 	ActivityIndicator,
 	Alert,
@@ -25,7 +26,6 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
 import { useUser } from "@/app/_userbase/UserContext";
 import { useChat } from "@/app/features/chat/context/ChatContext";
 import type { FeedItem, FeedProperty } from "@/app/features/types";
@@ -52,7 +52,7 @@ const OptimizedImage = memo(
 		blurRadius = 0,
 		onError,
 		containerStyle,
-  }: {
+	}: {
 		uri: string;
 		style: StyleProp<ImageStyle>;
 		blurRadius?: number;
@@ -272,10 +272,15 @@ const PropertyReelCard = memo(function PropertyReelCard({
 		return [getValidUrl()];
 	}, [property, getValidUrl]);
 
-	const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
-		const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-		setCurrentIndex(index);
-	}, []);
+	const handleScroll = useCallback(
+		(event: { nativeEvent: { contentOffset: { x: number } } }) => {
+			const index = Math.round(
+				event.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+			);
+			setCurrentIndex(index);
+		},
+		[],
+	);
 
 	const formatPrice = useCallback(
 		(price: number) =>
@@ -414,16 +419,23 @@ const PropertyReelCard = memo(function PropertyReelCard({
 	}, [property?.id, isLiked, onFavoriteMetaUpdate, getFavoriteCountValue]);
 
 	// Tap / double-tap handler
-	const handleTouchStart = useCallback((event: { nativeEvent: { touches: Array<{ pageY: number; pageX: number }> } }) => {
-		const touch = event.nativeEvent.touches[0];
-		if (touch) {
-			touchStartY.current = touch.pageY;
-			touchStartX.current = touch.pageX;
-		}
-	}, []);
+	const handleTouchStart = useCallback(
+		(event: {
+			nativeEvent: { touches: Array<{ pageY: number; pageX: number }> };
+		}) => {
+			const touch = event.nativeEvent.touches[0];
+			if (touch) {
+				touchStartY.current = touch.pageY;
+				touchStartX.current = touch.pageX;
+			}
+		},
+		[],
+	);
 
 	const handleTouchEnd = useCallback(
-		(event: { nativeEvent: { changedTouches?: Array<{ pageY: number; pageX: number }> } }) => {
+		(event: {
+			nativeEvent: { changedTouches?: Array<{ pageY: number; pageX: number }> };
+		}) => {
 			const touch = event.nativeEvent.changedTouches?.[0];
 			if (!touch) return;
 
@@ -770,7 +782,11 @@ function getItemSlug(item: FeedItem): string {
 }
 
 // ---------- Feed Container Component ----------
-export default function PropertyReelsView({ initialSlug }: { initialSlug?: string } = {}) {
+export default function PropertyReelsView({
+	initialSlug,
+}: {
+	initialSlug?: string;
+} = {}) {
 	const [properties, setProperties] = useState<FeedItem[]>([]);
 	const [loading, setLoading] = useState(true); // Start true to avoid "No properties found" flash while cache loads
 	const [error, setError] = useState<string | null>(null);
@@ -885,8 +901,8 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 				console.error("Failed to fetch feed:", err);
 				if (!silent) {
 					setError(
-						(err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-							"Failed to load feed. Please try again.",
+						(err as { response?: { data?: { detail?: string } } })?.response
+							?.data?.detail || "Failed to load feed. Please try again.",
 					);
 				}
 			} finally {
@@ -901,7 +917,10 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 	// [DEBUG] Log feed URL state on web mount
 	useEffect(() => {
 		if (__DEV__ && Platform.OS === "web") {
-			console.log("[feed:url] mount", initialSlug ? { initialSlug } : { initialSlug: "(none)" });
+			console.log(
+				"[feed:url] mount",
+				initialSlug ? { initialSlug } : { initialSlug: "(none)" },
+			);
 		}
 	}, [initialSlug]);
 
@@ -949,9 +968,16 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 		});
 		if (index >= 0) {
 			lastUrlSlugRef.current = initialSlug;
-			flatListRef.current.scrollToOffset({ offset: index * SCREEN_HEIGHT, animated: false });
+			flatListRef.current.scrollToOffset({
+				offset: index * SCREEN_HEIGHT,
+				animated: false,
+			});
 			if (__DEV__ && Platform.OS === "web") {
-				console.log("[feed:url] deep link →", { initialSlug, index, totalItems: properties.length });
+				console.log("[feed:url] deep link →", {
+					initialSlug,
+					index,
+					totalItems: properties.length,
+				});
 			}
 		}
 	}, [initialSlug, properties]);
@@ -1086,7 +1112,11 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 
 	// Define stable viewability callback (doesn't change between renders)
 	const handleViewableItemsChanged = useCallback(
-		({ viewableItems }: { viewableItems: Array<{ item: FeedItem; index: number }> }) => {
+		({
+			viewableItems,
+		}: {
+			viewableItems: Array<{ item: FeedItem; index: number }>;
+		}) => {
 			// Only process if not currently appending items
 			if (
 				isAppendingRef.current ||
@@ -1106,7 +1136,11 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 
 			// Update URL with feed/slug on web when scrolling to a new item
 			// Use history.replaceState to avoid remounting (router.replace would navigate)
-			if (Platform.OS === "web" && typeof window !== "undefined" && currentViewable?.item) {
+			if (
+				Platform.OS === "web" &&
+				typeof window !== "undefined" &&
+				currentViewable?.item
+			) {
 				const slug = getItemSlug(currentViewable.item);
 				if (slug && slug !== lastUrlSlugRef.current) {
 					lastUrlSlugRef.current = slug;
@@ -1115,7 +1149,11 @@ export default function PropertyReelsView({ initialSlug }: { initialSlug?: strin
 					const newPath = `${base}/feed/${slug}`;
 					window.history.replaceState(null, "", newPath);
 					if (__DEV__) {
-						console.log("[feed:url] scroll →", { slug, index: currentViewable.index, path: newPath });
+						console.log("[feed:url] scroll →", {
+							slug,
+							index: currentViewable.index,
+							path: newPath,
+						});
 					}
 				}
 			}
