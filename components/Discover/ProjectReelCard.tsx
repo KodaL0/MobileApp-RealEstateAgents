@@ -187,17 +187,22 @@ function ProjectReelCard({
   const formatPriceRange = useCallback(
     (min?: number, max?: number, isRent: boolean = false) => {
       if (min === undefined && max === undefined) return null;
-      if (min === max) {
-        return `${formatPrice(min!)}${isRent ? '/mo' : ''}`;
+      
+      // Round values first to avoid showing identical prices as a range
+      const roundedMin = min !== undefined ? Math.round(min) : undefined;
+      const roundedMax = max !== undefined ? Math.round(max) : undefined;
+      
+      if (roundedMin === roundedMax && roundedMin !== undefined) {
+        return `${formatPrice(roundedMin)}${isRent ? '/mo' : ''}`;
       }
-      if (min && max) {
-        return `${formatPrice(min)} - ${formatPrice(max)}${isRent ? '/mo' : ''}`;
+      if (roundedMin && roundedMax) {
+        return `${formatPrice(roundedMin)} - ${formatPrice(roundedMax)}${isRent ? '/mo' : ''}`;
       }
-      if (min) {
-        return `From ${formatPrice(min)}${isRent ? '/mo' : ''}`;
+      if (roundedMin) {
+        return `From ${formatPrice(roundedMin)}${isRent ? '/mo' : ''}`;
       }
-      if (max) {
-        return `Up to ${formatPrice(max)}${isRent ? '/mo' : ''}`;
+      if (roundedMax) {
+        return `Up to ${formatPrice(roundedMax)}${isRent ? '/mo' : ''}`;
       }
       return null;
     },

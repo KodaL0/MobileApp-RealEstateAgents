@@ -1,7 +1,7 @@
 // File: app/(tabs)/_layout.tsx
-import { Tabs, usePathname, useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
-import { StyleSheet, Platform, Dimensions } from 'react-native';
+import { Tabs, type Href, usePathname, useRouter } from 'expo-router';
+import { useMemo } from 'react';
+import { Dimensions, Platform, StyleSheet } from 'react-native';
 import { Home, Search, MessageSquare, User } from 'lucide-react-native';
 import { getLastChatRoute } from '../features/chat/navigationState';
 
@@ -43,10 +43,16 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="feed"
         options={{ 
           title: IS_SMALL_SCREEN ? '' : 'Home', 
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> 
+        }}
+      />
+      <Tabs.Screen
+        name="index"
+        options={{ 
+          href: null, // Hide from tab bar but keep route accessible
         }}
       />
       <Tabs.Screen
@@ -68,7 +74,7 @@ export default function TabLayout() {
               e.preventDefault();
               const target = getLastChatRoute() || '/(tabs)/chat';
               if (target !== pathname) {
-                router.push(target);
+                router.push(target as Href);
               }
             } else if (pathname !== '/(tabs)/chat') {
               e.preventDefault();

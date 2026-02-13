@@ -31,17 +31,22 @@ export function ProjectCard({
 
   const formatPriceRange = (min?: number, max?: number) => {
     if (min === undefined && max === undefined) return null;
-    if (min === max) {
-      return formatPrice(min!);
+    
+    // Round values first to avoid showing identical prices as a range
+    const roundedMin = min !== undefined ? Math.round(min) : undefined;
+    const roundedMax = max !== undefined ? Math.round(max) : undefined;
+    
+    if (roundedMin === roundedMax && roundedMin !== undefined) {
+      return formatPrice(roundedMin);
     }
-    if (min && max) {
-      return `${formatPrice(min)} - ${formatPrice(max)}`;
+    if (roundedMin && roundedMax) {
+      return `${formatPrice(roundedMin)} - ${formatPrice(roundedMax)}`;
     }
-    if (min) {
-      return `From ${formatPrice(min)}`;
+    if (roundedMin) {
+      return `From ${formatPrice(roundedMin)}`;
     }
-    if (max) {
-      return `Up to ${formatPrice(max)}`;
+    if (roundedMax) {
+      return `Up to ${formatPrice(roundedMax)}`;
     }
     return null;
   };

@@ -1,11 +1,11 @@
 // config/api.ts
 
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios, { type AxiosRequestConfig } from 'axios';
 import { Platform } from 'react-native';
-import type { FeedProperty, PublicProfileData, PublicProfileResponse } from '@/app/features/types';
-import { normalizePropertyData, normalizeProjectData } from '@/app/features/types';
-import type { UnifiedListingsResponse, ListingQueryParams } from '@/types/listings';
+import type { PublicProfileData, PublicProfileResponse } from '@/app/features/types';
+import { normalizeProjectData, normalizePropertyData } from '@/app/features/types';
+import type { ListingQueryParams, UnifiedListingsResponse } from '@/types/listings';
 
 /**
  * Mobile API client for PropertPro backend.
@@ -62,7 +62,7 @@ apiClient.interceptors.request.use(
       if (token && config.headers) {
         (config.headers as any).Authorization = `Bearer ${token}`;
       }
-    } catch (e) {
+    } catch (_e) {
       // Silently fail - token may not be available
     }
     
@@ -87,13 +87,13 @@ apiClient.interceptors.response.use(
  * Adjust or remove trailing slash logic if your backend does not require trailing slashes.
  */
 const formatEndpoint = (ep: string): string => {
-  let clean = ep.replace(/^\/+/, ''); // remove leading slashes
+  const clean = ep.replace(/^\/+/, ''); // remove leading slashes
   if (clean.includes('?')) {
     const [path, query] = clean.split('?');
-    const p = path.endsWith('/') ? path : path + '/';
+    const p = path.endsWith('/') ? path : `${path}/`;
     return `/${p}?${query}`;
   }
-  return '/' + (clean.endsWith('/') ? clean : clean + '/');
+  return `/${clean.endsWith('/') ? clean : `${clean}/`}`;
 };
 
 /**
