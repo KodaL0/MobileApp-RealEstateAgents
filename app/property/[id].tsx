@@ -32,6 +32,7 @@ import PropertyMapView from "@/components/property/PropertyMapView";
 import ChatButton from "@/components/property/ChatButton";
 import { useUser } from "@/app/_userbase/UserContext";
 import { api } from "../../config/api";
+import { analytics } from "@/services/analytics";
 
 const { width } = Dimensions.get("window");
 
@@ -165,6 +166,11 @@ export default function PropertyDetailScreen() {
 
         setProperty(normalized);
         setIsFavourite(Boolean(data.is_favourite));
+
+        analytics.trackPropertyView({
+          propertyId: Number(id),
+          source: (typeof source === "string" ? source : undefined) || "direct",
+        });
       } catch (err) {
         if (mounted) setError("Failed to load property details.");
       } finally {

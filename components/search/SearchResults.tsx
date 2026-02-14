@@ -17,6 +17,7 @@ import { ProjectCard } from "@/components/cards/ProjectCard";
 import PropertyCard from "@/components/property/PropertyCard";
 import type { UnifiedListing, UnifiedListingsResponse } from "@/types/listings";
 import { api } from "../../config/api";
+import { analytics } from "@/services/analytics";
 import {
 	buildSearchQueryParams,
 	type SearchEventParams,
@@ -95,6 +96,20 @@ export default function SearchResults({
 
 				const cnt = respData.count ?? (append ? totalCount : items.length);
 				setTotalCount(cnt);
+
+				if (!append) {
+					analytics.trackSearch({
+						query: searchParams.search,
+						filters: searchParams as unknown as Record<string, unknown>,
+						resultsCount: cnt,
+						propertyStatus:
+							searchParams.filter === "Rent"
+								? "rent"
+								: searchParams.filter === "Buy"
+									? "sale"
+									: "sale",
+					});
+				}
 
 				// Determine if there are more pages
 				const hasNext = respData.next !== null && respData.next !== undefined;

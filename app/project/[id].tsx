@@ -19,6 +19,7 @@ import { ArrowLeft, MapPin, Heart, Share, Building2 } from "lucide-react-native"
 
 import { useUser } from "@/app/_userbase/UserContext";
 import { api } from "../../config/api";
+import { analytics } from "@/services/analytics";
 
 const { width } = Dimensions.get("window");
 const BASE_URL = "https://api.propertpro.com";
@@ -48,6 +49,11 @@ export default function ProjectDetailScreen() {
 
         setProject(data);
         setIsFavourite(Boolean(data?.is_favourite));
+
+        analytics.trackProjectView({
+          projectId: Number(id),
+          source: (typeof source === "string" ? source : undefined) || "direct",
+        });
       } catch {
         if (mounted) setError("Failed to load project details.");
       } finally {

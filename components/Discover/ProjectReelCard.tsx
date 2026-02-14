@@ -360,6 +360,11 @@ function ProjectReelCard({
 					getFavoriteCountValue(response?.favorites_count) ?? null,
 				is_favourite: nextLiked,
 			});
+
+			analytics.trackPropertyFavorite({
+				projectId,
+				action: nextLiked ? "add" : "remove",
+			});
 		} catch (e: unknown) {
 			console.error("Failed to toggle favorite:", e);
 			Alert.alert("Error", "Failed to update favorite. Please try again.");

@@ -30,7 +30,8 @@ export interface ProfileViewParams {
 }
 
 export interface PropertyFavoriteParams {
-  propertyId: number | string;
+  propertyId?: number | string;
+  projectId?: number | string;
   action: 'add' | 'remove';
 }
 
@@ -69,12 +70,14 @@ export interface SortChangeParams {
 /**
  * Internal helper to send events to the backend.
  * All tracking methods use this under the hood.
+ * Uses snake_case (property_id, project_id, agent_id) for backend API contract.
  */
 async function trackEvent(
   eventType: string,
   payload: {
-    propertyId?: number | string;
-    agentId?: number | string;
+    property_id?: number | string;
+    project_id?: number | string;
+    agent_id?: number | string;
     metadata?: EventMetadata;
   }
 ): Promise<void> {
@@ -109,9 +112,29 @@ async function trackEvent(
  */
 export function trackPropertyView(params: PropertyViewParams): void {
   trackEvent('property_view', {
-    propertyId: params.propertyId,
+    property_id: params.propertyId,
     metadata: {
       source: params.source,
+      ...(params.position !== undefined && { position: params.position }),
+    },
+  });
+}
+
+export interface ProjectViewParams {
+  projectId: number | string;
+  source?: string;
+  position?: number;
+}
+
+/**
+ * Track when a user views a project detail page.
+ * Uses event_type='property_view' with project_id (dashboard funnel treats both the same).
+ */
+export function trackProjectView(params: ProjectViewParams): void {
+  trackEvent('property_view', {
+    project_id: params.projectId,
+    metadata: {
+      source: params.source || 'direct',
       ...(params.position !== undefined && { position: params.position }),
     },
   });
@@ -130,12 +153,17 @@ export function trackPropertyView(params: PropertyViewParams): void {
  */
 export function trackPropertyFavorite(params: PropertyFavoriteParams): void {
   const eventType = params.action === 'add' ? 'property_favorite' : 'property_unfavorite';
-  trackEvent(eventType, {
-    propertyId: params.propertyId,
-    metadata: {
-      action: params.action,
-    },
-  });
+  const payload: Parameters<typeof trackEvent>[1] = {
+    metadata: { action: params.action },
+  };
+  if (params.projectId !== undefined) {
+    payload.project_id = params.projectId;
+  } else if (params.propertyId !== undefined) {
+    payload.property_id = params.propertyId;
+  } else {
+    return; // Require at least one
+  }
+  trackEvent(eventType, payload);
 }
 
 /**
@@ -159,7 +187,7 @@ export function trackPropertyContact(params: PropertyContactParams): void {
       : `property_${params.contactMethod}_click`;
 
   trackEvent(eventType, {
-    propertyId: params.propertyId,
+    property_id: params.propertyId,
     metadata: {
       contact_method: params.contactMethod,
       is_conversion: true,
@@ -180,7 +208,7 @@ export function trackPropertyContact(params: PropertyContactParams): void {
  */
 export function trackPropertyShare(params: PropertyShareParams): void {
   trackEvent('property_share', {
-    propertyId: params.propertyId,
+    property_id: params.propertyId,
     metadata: {
       share_method: params.method,
     },
@@ -205,7 +233,7 @@ export function trackDocumentView(
   documentName: string
 ): void {
   trackEvent('property_document_view', {
-    propertyId,
+    property_id: propertyId,
     metadata: {
       document_type: documentType,
       document_name: documentName,
@@ -303,8 +331,8 @@ export function trackSortChange(params: SortChangeParams): void {
  */
 export function trackProfileView(params: ProfileViewParams): void {
   trackEvent('profile_view', {
-    agentId: params.agentId,
-    propertyId: params.propertyId,
+    agent_id: params.agentId,
+    property_id: params.propertyId,
     metadata: {
       source: params.source,
       ...(params.tab && { tab: params.tab }),
@@ -375,7 +403,7 @@ export function trackConnectionAction(params: {
   action: 'send' | 'accept' | 'reject' | 'remove';
 }): void {
   trackEvent('connection_action', {
-    agentId: params.targetUserId,
+    agent_id: params.targetUserId,
     metadata: {
       action: params.action,
     },
@@ -400,8 +428,8 @@ export function trackChatAction(params: {
   propertyId?: number | string;
 }): void {
   trackEvent('chat_action', {
-    agentId: params.recipientUserId,
-    propertyId: params.propertyId,
+    agent_id: params.recipientUserId,
+    property_id: params.propertyId,
     metadata: {
       action: params.action,
     },
@@ -426,7 +454,7 @@ export function trackReviewAction(params: {
   rating?: number;
 }): void {
   trackEvent('review_action', {
-    agentId: params.targetUserId,
+    agent_id: params.targetUserId,
     metadata: {
       action: params.action,
       ...(params.rating !== undefined && { rating: params.rating }),
@@ -482,7 +510,7 @@ export function trackInstagramPost(params: {
   errorMessage?: string;
 }): void {
   trackEvent('instagram_post', {
-    propertyId: params.propertyId,
+    property_id: params.propertyId,
     metadata: {
       success: params.success,
       ...(params.errorMessage && { error_message: params.errorMessage }),
@@ -515,72 +543,27 @@ export interface FeedNotInterestedParams {
 }
 
 /**
- * Track when a feed item becomes visible in the viewport.
- *
- * @example
- * ```ts
- * analytics.trackFeedImpression({
- *   itemId: 123,
- *   itemType: 'property',
- *   position: 0,
- *   slotType: 'personalized',
- *   matchScore: 0.87,
- * });
- * ```
+ * Feed impression is now created server-side when the feed API serves items.
+ * Client-side tracking removed; keep as no-op to avoid breaking imports.
  */
-export function trackFeedImpression(params: FeedImpressionParams): void {
-  trackEvent('feed_impression', {
-    propertyId: params.itemId,
-    metadata: {
-      item_type: params.itemType,
-      position: params.position,
-      slot_type: params.slotType ?? null,
-      match_score: params.matchScore ?? null,
-    },
-  });
+export function trackFeedImpression(_params: FeedImpressionParams): void {
+  // No-op: FeedImpression created server-side
 }
 
 /**
- * Track how long a user viewed a single feed item.
- * Only fired when dwell > 500 ms (meaningful view).
- *
- * @example
- * ```ts
- * analytics.trackFeedDwell({
- *   itemId: 123,
- *   itemType: 'property',
- *   dwellTimeMs: 4200,
- *   position: 2,
- * });
- * ```
+ * Feed dwell is no longer tracked client-side.
+ * Click-through is recorded via source=feed on detail navigation.
  */
-export function trackFeedDwell(params: FeedDwellParams): void {
-  trackEvent('feed_dwell', {
-    propertyId: params.itemId,
-    metadata: {
-      item_type: params.itemType,
-      dwell_time_ms: params.dwellTimeMs,
-      position: params.position,
-    },
-  });
+export function trackFeedDwell(_params: FeedDwellParams): void {
+  // No-op: server-owned distribution
 }
 
 /**
  * Track when a user explicitly signals "not interested" on a feed item.
- * This is a strong negative signal for the ranking algorithm.
- *
- * @example
- * ```ts
- * analytics.trackFeedNotInterested({ itemId: 123, itemType: 'property' });
- * ```
+ * Kept as no-op for now; may be re-enabled if backend supports it.
  */
-export function trackFeedNotInterested(params: FeedNotInterestedParams): void {
-  trackEvent('feed_not_interested', {
-    propertyId: params.itemId,
-    metadata: {
-      item_type: params.itemType,
-    },
-  });
+export function trackFeedNotInterested(_params: FeedNotInterestedParams): void {
+  // No-op
 }
 
 // ============================================================================
@@ -600,6 +583,7 @@ export function trackFeedNotInterested(params: FeedNotInterestedParams): void {
 export const analytics = {
   // Property events
   trackPropertyView,
+  trackProjectView,
   trackPropertyFavorite,
   trackPropertyContact,
   trackPropertyShare,

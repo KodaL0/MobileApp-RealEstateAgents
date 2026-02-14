@@ -29,7 +29,6 @@ import {
 	getCacheAge,
 	setFeedCache,
 } from "@/data/feedCache";
-import { analytics } from "@/services/analytics";
 import ProjectReelCard from "./ProjectReelCard";
 import PropertyReelCard from "./PropertyReelCard";
 
@@ -116,101 +115,8 @@ export default function PropertyReelsView({
 		}
 	}, []);
 
-	// ── Impression / dwell tracking ──────────────────────────────────────
-	// Use a ref for properties so trackVisibility never recreates on data changes.
-	// This breaks the cascade: properties → trackVisibility → checkAndPrefetchNextPage → ref effect.
-	const propertiesRef = useRef(properties);
-	useEffect(() => {
-		propertiesRef.current = properties;
-	}, [properties]);
-
-	const currentVisibleRef = useRef<{
-		id: number | string;
-		type: "property" | "project";
-		startTime: number;
-		position: number; // positional snapshot (informational only – dedup is by id)
-		slotType?: string | null;
-		matchScore?: number | null;
-	} | null>(null);
-
-	// Stable callback – reads properties from ref, never triggers re-render cascade.
-	// All tracking is id-based: even if the positional index is stale after a removal,
-	// we verify the item id before firing and never re-fire for the same id.
-	const trackVisibility = useCallback((index: number) => {
-		try {
-			const currentProperties = propertiesRef.current;
-			if (index < 0 || index >= currentProperties.length) return;
-
-			const item = currentProperties[index];
-			if (!item || item.id == null) return; // guard missing id
-
-			const itemType = isProperty(item) ? "property" : "project";
-			const itemId = item.id;
-
-			// Same item – nothing to do (id-based, immune to index shifts)
-			if (currentVisibleRef.current?.id === itemId) return;
-
-			// Fire dwell for previous item (uses stored id, not positional index)
-			if (currentVisibleRef.current) {
-				const dwellTimeMs = Date.now() - currentVisibleRef.current.startTime;
-				if (dwellTimeMs > 500) {
-					analytics.trackFeedDwell({
-						itemId: currentVisibleRef.current.id,
-						itemType: currentVisibleRef.current.type,
-						dwellTimeMs,
-						position: currentVisibleRef.current.position,
-					});
-				}
-			}
-
-			// Fire impression for new item
-			const feedItem = item as FeedItem & {
-				slot_type?: string | null;
-				match_score?: number | null;
-			};
-			analytics.trackFeedImpression({
-				itemId,
-				itemType,
-				position: index,
-				slotType: feedItem.slot_type,
-				matchScore: feedItem.match_score,
-			});
-
-			currentVisibleRef.current = {
-				id: itemId,
-				type: itemType,
-				startTime: Date.now(),
-				position: index,
-				slotType: feedItem.slot_type,
-				matchScore: feedItem.match_score,
-			};
-		} catch (e) {
-			// Analytics must never crash the feed
-			if (__DEV__) console.warn("trackVisibility error:", e);
-		}
-	}, []); // Stable – reads from propertiesRef
-
-	// Flush dwell on unmount (id-based – immune to stale indices)
-	useEffect(
-		() => () => {
-			try {
-				if (currentVisibleRef.current) {
-					const dwellTimeMs = Date.now() - currentVisibleRef.current.startTime;
-					if (dwellTimeMs > 500) {
-						analytics.trackFeedDwell({
-							itemId: currentVisibleRef.current.id,
-							itemType: currentVisibleRef.current.type,
-							dwellTimeMs,
-							position: currentVisibleRef.current.position,
-						});
-					}
-				}
-			} catch {
-				// Swallow – component is unmounting
-			}
-		},
-		[],
-	);
+	// FeedImpression is created server-side when the feed API serves items.
+	// Click-through is recorded via source=feed on detail navigation. No client-side feed events.
 
 	// ── Favourite meta propagation ──────────────────────────────────────
 	const handleFavoriteMetaUpdate = useCallback(
@@ -567,9 +473,6 @@ export default function PropertyReelsView({
 				setCurrentIndex(index);
 			}
 
-			// Track impression/dwell
-			trackVisibility(index);
-
 			const itemsRemaining = properties.length - index;
 			// Prefetch when 8 items left (was 5) - new feed ready before user reaches end
 			const shouldPrefetch = itemsRemaining <= 8;
@@ -587,7 +490,7 @@ export default function PropertyReelsView({
 				loadMore();
 			}
 		},
-		[properties.length, hasNextPage, loadingMore, loadMore, trackVisibility],
+		[properties.length, hasNextPage, loadingMore, loadMore],
 	);
 
 	// Aggressive image preloading for smoother transitions
