@@ -312,6 +312,27 @@ export function trackSortChange(params: SortChangeParams): void {
   });
 }
 
+/**
+ * Track when user taps a property or project from search results.
+ * Sends to analytics/search/click/ for conversion funnel.
+ * Fire-and-forget; does not block navigation.
+ */
+export function trackSearchClick(params: {
+  searchEventId: number | null | undefined;
+  propertyId?: number | string;
+  projectId?: number | string;
+  position: number;
+}): void {
+  if (!params.searchEventId || (!params.propertyId && !params.projectId)) return;
+  const payload = {
+    search_event_id: params.searchEventId,
+    property_id: params.propertyId ?? undefined,
+    project_id: params.projectId ?? undefined,
+    position: params.position,
+  };
+  apiPost('analytics/search/click', payload).catch(() => {});
+}
+
 // ============================================================================
 // PROFILE EVENTS
 // ============================================================================
@@ -593,6 +614,7 @@ export const analytics = {
   trackSearch,
   trackFilterChange,
   trackSortChange,
+  trackSearchClick,
 
   // Profile events
   trackProfileView,

@@ -2,6 +2,7 @@
 // Search results component - displays results and tracks search events
 
 import { ArrowLeft } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
 	ActivityIndicator,
@@ -35,6 +36,7 @@ export default function SearchResults({
 	onBack,
 }: SearchResultsProps) {
 	const insets = useSafeAreaInsets();
+	const router = useRouter();
 
 	// Data state:
 	const [listings, setListings] = useState<UnifiedListing[]>([]);
@@ -48,6 +50,9 @@ export default function SearchResults({
 
 	// Total count for display
 	const [totalCount, setTotalCount] = useState(0);
+
+	// Search event ID from API (for click tracking)
+	const [searchEventId, setSearchEventId] = useState<number | null>(null);
 
 	// Build query params using exported function
 	const buildQueryParams = useCallback(
@@ -96,6 +101,10 @@ export default function SearchResults({
 
 				const cnt = respData.count ?? (append ? totalCount : items.length);
 				setTotalCount(cnt);
+
+				if (!append && respData.search_event_id) {
+					setSearchEventId(respData.search_event_id);
+				}
 
 				if (!append) {
 					analytics.trackSearch({
@@ -149,8 +158,26 @@ export default function SearchResults({
 		}
 	}, [loadingMore, hasMore, nextPage, fetchListings]);
 
+	// Handle card press: track search click, then navigate
+	const handleCardPress = useCallback(
+		(item: UnifiedListing, index: number) => {
+			analytics.trackSearchClick({
+				searchEventId,
+				propertyId: item._type === "property" ? item.id : undefined,
+				projectId: item._type === "project" ? item.id : undefined,
+				position: index + 1,
+			});
+			(router.push as (href: string) => void)(
+				item._type === "project" ? `/project/${item.id}` : `/property/${item.id}`,
+			);
+		},
+		[searchEventId],
+	);
+
 	// Render item for FlatList - conditionally renders PropertyCard or ProjectCard
-	const renderItem = ({ item }: { item: UnifiedListing }) => {
+	const renderItem = ({ item, index }: { item: UnifiedListing; index: number }) => {
+		const onPress = () => handleCardPress(item, index);
+
 		// Check if it's a project and render ProjectCard
 		if (item._type === "project") {
 			const listingType = searchParams.filter === "Rent" ? "rent" : "sale";
@@ -162,7 +189,7 @@ export default function SearchResults({
 				rent_price_min: item.rent_price_min ?? undefined,
 				rent_price_max: item.rent_price_max ?? undefined,
 			};
-			return <ProjectCard project={feedProject} listingType={listingType} />;
+			return <ProjectCard project={feedProject} listingType={listingType} onPress={onPress} />;
 		}
 
 		// Otherwise it's a property - render PropertyCard
@@ -196,7 +223,7 @@ export default function SearchResults({
 			propertyType: item.property_type || "",
 		};
 
-		return <PropertyCard property={propForCard} />;
+		return <PropertyCard property={propForCard} onPress={onPress} />;
 	};
 
 	// Footer for infinite scroll loading indicator

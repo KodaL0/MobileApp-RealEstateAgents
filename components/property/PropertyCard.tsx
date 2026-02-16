@@ -45,7 +45,15 @@ type Property = {
   propertyType: string;
 };
 
-export default function PropertyCard({ property, saved = false }: { property: Property; saved?: boolean }) {
+export default function PropertyCard({
+	property,
+	saved = false,
+	onPress,
+}: {
+	property: Property;
+	saved?: boolean;
+	onPress?: () => void;
+}) {
   const router = useRouter();
   const { user } = useUser();
   const [isFavorite, setIsFavorite] = useState(saved);
@@ -136,10 +144,18 @@ export default function PropertyCard({ property, saved = false }: { property: Pr
     }
   }
 
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      router.push(`/property/${property.id}`);
+    }
+  };
+
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={() => router.push(`/property/${property.id}`)}
+      onPress={handlePress}
       activeOpacity={0.9}
     >
       {/* Image slideshow section */}
